@@ -679,7 +679,7 @@ export default function FormEditor({
                   snapOn && !preview
                     ? {
                         backgroundImage:
-                          'linear-gradient(to right, rgb(27 108 196 / 0.06) 1px, transparent 1px), linear-gradient(to bottom, rgb(27 108 196 / 0.06) 1px, transparent 1px)',
+                          'linear-gradient(to right, color-mix(in srgb, var(--fl-primary) 7%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--fl-primary) 7%, transparent) 1px, transparent 1px)',
                         backgroundSize: '2% 2%',
                       }
                     : undefined

@@ -1,20 +1,23 @@
-# Publishes to npm when a GitHub release is published (tag e.g. v0.1.0 matching package.json).
-# Needs the repo secret NPM_TOKEN (npmjs.com → Access Tokens → Granular, publish rights for formlift).
+# Publishes to npm when a GitHub release is published (tag vX.Y.Z matching package.json "version").
+# No token: npm Trusted Publishing (OIDC). Set it up once on npmjs.com → formlift → Settings → Trusted Publisher:
+# GitHub Actions · owner harendra-singh-negi · repo formlift · workflow release.yml.
 name: Release
 on:
   release:
     types: [published]
 permissions:
   contents: read
-  id-token: write # npm provenance: the package page links back to this build
+  id-token: write # OIDC: npm verifies this run instead of a token, and adds provenance
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with: { node-version: 22, cache: npm, registry-url: 'https://registry.npmjs.org' }
+        with: { node-version: 24, cache: npm, registry-url: 'https://registry.npmjs.org' }
+      - run: npm install -g npm@latest # Trusted Publishing needs npm 11.5+
       - run: npm ci
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Skips a version that is already on npm (e.g. 0.1.0, published by hand before Trusted Publishing existed).
+      - run: |
+          V=$(node -p "require('./package.json').version")
+          if npm view "formlift@$V" version >/dev/null 2>&1; then echo "formlift@$V already on npm, skipping"; else npm publish --access public; fi

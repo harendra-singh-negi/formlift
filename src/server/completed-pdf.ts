@@ -243,7 +243,7 @@ export async function completedPdf(
       y: multiline ? top - size - 1 : top - h / 2 - size * 0.35,
       size,
       font,
-      color: rgb(0.05, 0.15, 0.45),
+      color: rgb(0.075, 0.306, 0.29),
       ...(multiline ? { maxWidth: w - 4, lineHeight: size * 1.2 } : {}),
     });
   }

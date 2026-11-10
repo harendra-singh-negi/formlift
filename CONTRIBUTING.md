@@ -66,7 +66,8 @@ Short and in the imperative mood, for example: `Detect checkboxes drawn as curve
 ## Releasing (maintainer)
 
 1. Update `version` in `package.json` and move the "Unreleased" notes in `CHANGELOG.md` to the new version.
-2. Commit, then create a GitHub release with the tag `vX.Y.Z`. The Release workflow publishes it to npm.
+2. Commit, then create a GitHub release with the tag `vX.Y.Z`. The Release workflow publishes it to npm through
+   Trusted Publishing (no token).
 
 ## License
 

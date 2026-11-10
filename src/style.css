@@ -37,17 +37,17 @@
 @layer base {
   .fl-root {
     --fl-font: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
-    --fl-primary: #1b6cc4;
-    --fl-primary-hover: #155aa6;
-    --fl-primary-soft: #eef5fd;
-    --fl-primary-tint: #eaf2fb;
-    --fl-brand: #0f4c81;
-    --fl-brand-hover: #0c3d68;
+    --fl-primary: #0f766e;
+    --fl-primary-hover: #115e59;
+    --fl-primary-soft: #f0fdfa;
+    --fl-primary-tint: #ccfbf1;
+    --fl-brand: #134e4a;
+    --fl-brand-hover: #042f2e;
     --fl-success: #22a06b;
     --fl-success-hover: #1c8b5b;
     --fl-danger: #dc3545;
-    --fl-heading: #5aa9e6;
-    --fl-heading-hover: #4a99d6;
+    --fl-heading: #115e59;
+    --fl-heading-hover: #134e4a;
     --fl-ink: #1f2937;
     --fl-ink-2: #334155;
     --fl-ink-3: #475569;
@@ -58,7 +58,7 @@
     --fl-line-soft: #eef2f7;
     --fl-hover: #f1f5f9;
     --fl-surface: #f8fafc;
-    --fl-accent: #f0b429; /* suggested (auto-detected) fields, Edit text */
+    --fl-accent: #f59e0b; /* suggested (auto-detected) fields, Edit text */
     font-family: var(--fl-font);
     box-sizing: border-box;
   }

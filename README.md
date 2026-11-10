@@ -6,10 +6,10 @@
 
 Auto-detect fields · Drag-and-drop builder · Conditional logic · Validation · Fill-in UI · Completed PDF
 
-[![npm version](https://img.shields.io/npm/v/formlift?color=1b6cc4&label=npm)](https://www.npmjs.com/package/formlift)
-[![npm downloads](https://img.shields.io/npm/dm/formlift?color=1b6cc4)](https://www.npmjs.com/package/formlift)
-[![types](https://img.shields.io/npm/types/formlift?color=1b6cc4)](https://www.npmjs.com/package/formlift)
-[![license](https://img.shields.io/npm/l/formlift?color=1b6cc4)](./LICENSE)
+[![npm version](https://img.shields.io/npm/v/formlift?color=0f766e&label=npm)](https://www.npmjs.com/package/formlift)
+[![npm downloads](https://img.shields.io/npm/dm/formlift?color=0f766e)](https://www.npmjs.com/package/formlift)
+[![types](https://img.shields.io/npm/types/formlift?color=0f766e)](https://www.npmjs.com/package/formlift)
+[![license](https://img.shields.io/npm/l/formlift?color=0f766e)](./LICENSE)
 [![CI](https://github.com/harendra-singh-negi/formlift/actions/workflows/ci.yml/badge.svg)](https://github.com/harendra-singh-negi/formlift/actions/workflows/ci.yml)
 
 **[▶ Live demo](https://harendra-singh-negi.github.io/formlift/)** · [Quick start](#quick-start) · [API](#api-reference) · [Server](#server-side) · [Theming](#theming) · [FAQ](#faq)

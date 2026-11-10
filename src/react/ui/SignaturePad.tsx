@@ -31,7 +31,7 @@ export default function SignaturePad({
     const p = point(e)
     ctx.lineWidth = 3
     ctx.lineCap = 'round'
-    ctx.strokeStyle = '#0f2540'
+    ctx.strokeStyle = '#111827'
     ctx.beginPath()
     ctx.moveTo(last.current.x, last.current.y)
     ctx.lineTo(p.x, p.y)
