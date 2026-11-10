@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "types": [
+      "node",
+      "vite/client"
+    ],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "paths": {
+      "formlift": [
+        "./src/index.ts"
+      ],
+      "formlift/react": [
+        "./src/react/index.ts"
+      ],
+      "formlift/server": [
+        "./src/server/index.ts"
+      ],
+      "formlift/style.css": [
+        "./dist/style.css"
+      ]
+    }
+  },
+  "include": [
+    "src",
+    "example",
+    "*.config.ts"
+  ]
+}

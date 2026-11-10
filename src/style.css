@@ -1,0 +1,82 @@
+/*
+ * formlift styles. Built to dist/style.css: utilities only (no global reset), scoped to .fl-root, so they never
+ * touch the host page. Theme: override any --fl-* variable on .fl-root (or a parent) in your own CSS.
+ */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@source './';
+
+@theme inline {
+  --font-sans: var(--fl-font);
+  --color-primary: var(--fl-primary);
+  --color-primary-hover: var(--fl-primary-hover);
+  --color-primary-soft: var(--fl-primary-soft);
+  --color-primary-tint: var(--fl-primary-tint);
+  --color-brand: var(--fl-brand);
+  --color-brand-hover: var(--fl-brand-hover);
+  --color-success: var(--fl-success);
+  --color-success-hover: var(--fl-success-hover);
+  --color-danger: var(--fl-danger);
+  --color-heading: var(--fl-heading);
+  --color-heading-hover: var(--fl-heading-hover);
+  --color-ink: var(--fl-ink);
+  --color-ink-2: var(--fl-ink-2);
+  --color-ink-3: var(--fl-ink-3);
+  --color-muted: var(--fl-muted);
+  --color-faint: var(--fl-faint);
+  --color-line: var(--fl-line);
+  --color-line-strong: var(--fl-line-strong);
+  --color-line-soft: var(--fl-line-soft);
+  --color-hover: var(--fl-hover);
+  --color-surface: var(--fl-surface);
+  --color-folder: var(--fl-accent);
+  --color-navy: var(--fl-ink);
+}
+
+@layer base {
+  .fl-root {
+    --fl-font: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+    --fl-primary: #1b6cc4;
+    --fl-primary-hover: #155aa6;
+    --fl-primary-soft: #eef5fd;
+    --fl-primary-tint: #eaf2fb;
+    --fl-brand: #0f4c81;
+    --fl-brand-hover: #0c3d68;
+    --fl-success: #22a06b;
+    --fl-success-hover: #1c8b5b;
+    --fl-danger: #dc3545;
+    --fl-heading: #5aa9e6;
+    --fl-heading-hover: #4a99d6;
+    --fl-ink: #1f2937;
+    --fl-ink-2: #334155;
+    --fl-ink-3: #475569;
+    --fl-muted: #6b7280;
+    --fl-faint: #94a3b8;
+    --fl-line: #e2e8f0;
+    --fl-line-strong: #cbd5e1;
+    --fl-line-soft: #eef2f7;
+    --fl-hover: #f1f5f9;
+    --fl-surface: #f8fafc;
+    --fl-accent: #f0b429; /* suggested (auto-detected) fields, Edit text */
+    font-family: var(--fl-font);
+    box-sizing: border-box;
+  }
+  .fl-root *,
+  .fl-root *::before,
+  .fl-root *::after {
+    box-sizing: border-box;
+    border: 0 solid;
+  }
+  .fl-root button,
+  .fl-root input,
+  .fl-root select,
+  .fl-root textarea {
+    font: inherit;
+    color: inherit;
+  }
+  .fl-root button {
+    background: none;
+    padding: 0;
+  }
+}

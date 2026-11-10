@@ -1,0 +1,20 @@
+# Publishes to npm when a GitHub release is published (tag e.g. v0.1.0 matching package.json).
+# Needs the repo secret NPM_TOKEN (npmjs.com → Access Tokens → Granular, publish rights for formlift).
+name: Release
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+  id-token: write # npm provenance: the package page links back to this build
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, registry-url: 'https://registry.npmjs.org' }
+      - run: npm ci
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

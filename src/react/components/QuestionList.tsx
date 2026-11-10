@@ -1,0 +1,422 @@
+import { Search, SlidersHorizontal } from 'lucide-react'
+import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import Button from '../ui/Button'
+import { Chip, ChipGroup, RemovableChip } from '../ui/Chip'
+import { EmptyText } from '../ui/Panel'
+import Popover from '../ui/Popover'
+import SegmentedTabs from '../ui/SegmentedTabs'
+import { Tag } from '../ui/Tag'
+import { TYPE_LABEL } from '../constants'
+import type { Answers, FieldDef, FieldType } from '../../core/form-logic'
+import {
+  choicesOf,
+  matches,
+  NO_FILTER,
+  pickedOf,
+  type Filled,
+  type Question,
+  type QuestionFilter,
+} from '../../core/questions'
+
+const PAGE = 100
+
+// Box for a control in the list (controls size their text to the box, as on the page).
+const SIZE: Partial<Record<FieldType, string>> = {
+  checkbox: 'h-7 w-7 lg:h-8 lg:w-8',
+  textarea: 'h-20 w-full',
+  signature: 'h-16 w-56',
+  file: 'h-9 w-full sm:w-72',
+  radio: 'h-9 w-full',
+}
+// Parts of an option grid: its rows (the rest of the parts come after it).
+const gridSize = (q: Question) => q.rows?.reduce((a, b) => a + b, 0) ?? 0
+const wide = (t: FieldType) => t === 'textarea' || t === 'radio' || t === 'file'
+
+/**
+ * The form as questions with search and filters: only the questions that match are shown. Answers are the
+ * same as on the document; `control(field)` draws a field's answer control.
+ */
+export default function QuestionList({
+  questions,
+  answers,
+  control,
+}: {
+  questions: Question[]
+  answers: Answers
+  control: (f: FieldDef) => ReactNode
+}) {
+  const [filter, setFilter] = useState<QuestionFilter>(NO_FILTER)
+  const [shown, setShown] = useState(PAGE)
+  // The answers the filter last looked at: typing into a remark while "Remark empty" is on must not make the
+  // question vanish mid-word. The list follows new answers when a filter changes.
+  const [seen, setSeen] = useState(answers)
+  const set = (patch: Partial<QuestionFilter>) => {
+    setFilter((f) => ({ ...f, ...patch }))
+    setSeen(answers)
+    setShown(PAGE)
+  }
+  const list = useMemo(() => questions.filter((q) => matches(q, seen, filter)), [questions, seen, filter])
+  const count = (f: (q: Question) => boolean) => questions.filter(f).length
+  const types = useMemo(() => [...new Set(questions.flatMap((q) => q.parts.map((p) => p.field.type)))], [questions])
+  const categories = useMemo(
+    () => [...new Set(questions.map((q) => q.category).filter((c): c is string => !!c))],
+    [questions],
+  )
+  // Tag filters ("Classification", "Risk", "Assigned to"): every key read from the form, with its values.
+  const tagValues = useMemo(() => {
+    const m = new Map<string, Set<string>>()
+    for (const q of questions)
+      for (const [k, v] of Object.entries(q.tags ?? {})) m.set(k, (m.get(k) ?? new Set()).add(v))
+    return [...m].map(
+      ([k, vs]) => [k, [...vs].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))] as const,
+    )
+  }, [questions])
+  // Remarks / Comments filters only for forms that have such boxes.
+  const has = (re: RegExp) => questions.some((q) => q.parts.some((p) => re.test(p.name) || re.test(p.field.label)))
+  const progress = (
+    [
+      ['answered', 'Answered', 'Answered', 'Not answered'],
+      ['remarks', 'Remarks', 'Written', 'Empty'],
+      ['comments', 'Comments', 'Written', 'Empty'],
+    ] as const
+  ).filter(([key]) => key === 'answered' || has(key === 'remarks' ? /remark/i : /comment/i))
+  const setTag = (key: string, value: string | null) => {
+    const tags = { ...filter.tags }
+    if (value == null) delete tags[key]
+    else tags[key] = value
+    set({ tags })
+  }
+
+  // Answer choices, each on its own ("Yes", "No", "NA", "As Expected"…), in the form's order: those offered by
+  // two questions or more, with how many offer them.
+  const choiceCount = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const q of questions) for (const c of new Set(choicesOf(q))) m.set(c, (m.get(c) ?? 0) + 1)
+    return [...m].filter(([, n]) => n >= 2).slice(0, 40)
+  }, [questions])
+  const [choiceMode, setChoiceMode] = useState<'offered' | 'picked'>('offered')
+  const choiceValue = choiceMode === 'picked' ? filter.picked : filter.choices
+  // Ticked counts follow the answers as they are given.
+  const pickedCount = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const q of questions) for (const c of new Set(pickedOf(q, answers))) m.set(c, (m.get(c) ?? 0) + 1)
+    return m
+  }, [questions, answers])
+
+  // The filters in use, as chips to take them off one by one.
+  const inUse: { label: string; clear: () => void }[] = [
+    ...progress
+      .filter(([key]) => filter[key] !== 'all')
+      .map(([key, title, yes, no]) => ({
+        label: `${title}: ${filter[key] === 'filled' ? yes : no}`,
+        clear: () => set({ [key]: 'all' }),
+      })),
+    ...(filter.type !== 'all'
+      ? [{ label: `Type: ${TYPE_LABEL[filter.type]}`, clear: () => set({ type: 'all' }) }]
+      : []),
+    ...Object.entries(filter.tags).map(([k, v]) => ({ label: `${k}: ${v}`, clear: () => setTag(k, null) })),
+    ...(filter.choices !== 'all'
+      ? [{ label: `Has option: ${filter.choices}`, clear: () => set({ choices: 'all' }) }]
+      : []),
+    ...(filter.picked !== 'all' ? [{ label: `Answered: ${filter.picked}`, clear: () => set({ picked: 'all' }) }] : []),
+  ]
+  const active = JSON.stringify(filter) !== JSON.stringify(NO_FILTER)
+
+  return (
+    <div className="w-full p-3 sm:p-4 lg:px-6">
+      <div className="sticky top-0 z-10 -mx-3 mb-3 flex flex-col gap-2 border-b border-line bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="relative min-w-0 flex-1 basis-full sm:basis-72">
+            <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
+            <input
+              type="search"
+              aria-label="Search questions"
+              placeholder="Search questions, sections, answers…"
+              value={filter.search}
+              onChange={(e) => set({ search: e.target.value })}
+              className="w-full rounded-full border border-line-strong bg-surface py-1.5 pr-3 pl-9 text-[13px] outline-none focus:border-primary focus:bg-white max-sm:text-base"
+            />
+          </label>
+          <Popover label="Filters" icon={SlidersHorizontal} badge={inUse.length} align="right">
+            <div className="flex flex-col gap-4">
+              <FilterSection title="Progress">
+                {progress.map(([key, title, yes, no]) => (
+                  <ChipGroup
+                    key={key}
+                    title={title}
+                    value={filter[key] === 'all' ? null : filter[key]}
+                    onChange={(v) => set({ [key]: (v ?? 'all') as Filled })}
+                    options={[
+                      { value: 'filled', label: yes },
+                      { value: 'empty', label: no },
+                    ]}
+                  />
+                ))}
+              </FilterSection>
+              {choiceCount.length > 0 && (
+                <FilterSection
+                  title="Answers"
+                  action={
+                    <SegmentedTabs
+                      size="sm"
+                      value={choiceMode}
+                      onChange={(m) => {
+                        setChoiceMode(m)
+                        // The picked choice carries over to the other way of filtering on it.
+                        const c = filter.choices !== 'all' ? filter.choices : filter.picked
+                        if (c !== 'all')
+                          set(m === 'picked' ? { picked: c, choices: 'all' } : { choices: c, picked: 'all' })
+                      }}
+                      options={[
+                        { value: 'offered', label: 'Has option' },
+                        { value: 'picked', label: 'Answered' },
+                      ]}
+                    />
+                  }
+                >
+                  {/* One row of choices: questions that offer it, or that were answered with it. */}
+                  <ChipGroup
+                    value={choiceValue === 'all' ? null : choiceValue}
+                    onChange={(v) => set(choiceMode === 'picked' ? { picked: v ?? 'all' } : { choices: v ?? 'all' })}
+                    options={choiceCount.map(([c, n]) => ({
+                      value: c,
+                      label: c,
+                      count: choiceMode === 'picked' ? (pickedCount.get(c) ?? 0) : n,
+                    }))}
+                  />
+                </FilterSection>
+              )}
+              {tagValues.length > 0 && (
+                <FilterSection title="Question details">
+                  {tagValues.map(([key, values]) => (
+                    <ChipGroup
+                      key={key}
+                      title={key}
+                      value={filter.tags[key] ?? null}
+                      onChange={(v) => setTag(key, v)}
+                      options={values.map((v) => ({ value: v, label: v, count: count((q) => q.tags?.[key] === v) }))}
+                    />
+                  ))}
+                </FilterSection>
+              )}
+              {types.length > 1 && (
+                <FilterSection title="Answer type">
+                  <ChipGroup
+                    value={filter.type === 'all' ? null : filter.type}
+                    onChange={(v) => set({ type: (v ?? 'all') as QuestionFilter['type'] })}
+                    options={types.map((t) => ({
+                      value: t,
+                      label: TYPE_LABEL[t],
+                      count: count((q) => q.parts.some((p) => p.field.type === t)),
+                    }))}
+                  />
+                </FilterSection>
+              )}
+            </div>
+          </Popover>
+          <span className="text-[12.5px] text-muted sm:ml-auto" aria-live="polite">
+            <b className="font-semibold text-ink-2">{list.length}</b> of {questions.length} questions
+          </span>
+          {active && (
+            <Button variant="secondary" size="sm" onClick={() => set(NO_FILTER)}>
+              Clear all
+            </Button>
+          )}
+        </div>
+        {categories.length > 0 && (
+          <div role="group" aria-label="Category" className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-[11.5px] font-semibold tracking-wide text-muted uppercase">Category</span>
+            <Chip
+              label="All"
+              count={questions.length}
+              active={filter.category === 'all'}
+              onClick={() => set({ category: 'all' })}
+            />
+            {categories.map((c) => (
+              <Chip
+                key={c}
+                label={c}
+                count={count((q) => q.category === c)}
+                active={filter.category === c}
+                onClick={() => set({ category: filter.category === c ? 'all' : c })}
+              />
+            ))}
+          </div>
+        )}
+        {inUse.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {inUse.map((f) => (
+              <RemovableChip key={f.label} label={f.label} onRemove={f.clear} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {list.length === 0 && <EmptyText>No question matches these filters.</EmptyText>}
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {list.slice(0, shown).map((q, i, all) => (
+          <Fragment key={q.id}>
+            {/* The numbered question these answers belong to, once over its run of answers. */}
+            {q.section && q.section !== all[i - 1]?.section && (
+              <li className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line pb-1">
+                <span className="text-[13.5px] font-semibold text-primary lg:text-[15px]">{q.section}</span>
+                {Object.entries(q.tags ?? {}).map(([k, v]) => (
+                  <Tag key={k} tone="muted">
+                    {k}: {v}
+                  </Tag>
+                ))}
+              </li>
+            )}
+            {/* What a run of rows on one scale asks, once over them. */}
+            {q.intro && (q.intro !== all[i - 1]?.intro || q.section !== all[i - 1]?.section) && (
+              <li className="rounded-md border-l-4 border-primary bg-primary-soft px-3 py-2 text-[13px] font-medium text-ink-2 lg:text-[14px]">
+                {q.intro}
+              </li>
+            )}
+            <li className="rounded-lg border border-line bg-white p-3">
+              <div className="mb-2 flex items-start gap-2">
+                <p className="m-0 min-w-0 flex-1 text-[13.5px] font-semibold whitespace-pre-line text-ink-2 lg:text-[15px]">
+                  {q.title}
+                </p>
+                {q.category && <Tag tone="muted">{q.category}</Tag>}
+                <Tag tone="muted">p.{q.page}</Tag>
+              </div>
+              {q.columns ? (
+                <TableGrid q={q} control={control} />
+              ) : (
+                <>
+                  {q.rows && <OptionGrid rows={q.rows} parts={q.parts.slice(0, gridSize(q))} control={control} />}
+                  {/* Parts after an option grid (the "Finding" box under its options) are laid out on their own. */}
+                  {q.parts.length > gridSize(q) && (
+                    <div className={`flex flex-wrap items-end gap-x-4 gap-y-2 ${q.rows ? 'mt-3' : ''}`}>
+                      {q.parts.slice(gridSize(q)).map(({ field, name }) => (
+                        <div
+                          key={field.id}
+                          className={`flex min-w-0 flex-col gap-1 ${wide(field.type) ? 'basis-full' : ''} ${
+                            field.type === 'checkbox'
+                              ? 'flex-row-reverse items-center justify-end gap-2'
+                              : 'max-sm:basis-full'
+                          }`}
+                        >
+                          {name && <span className="text-[12px] text-muted lg:text-[13.5px]">{name}</span>}
+                          <div
+                            className={`relative [container-type:size] ${SIZE[field.type] ?? 'h-9 w-full sm:w-80 lg:h-10 lg:w-96'}`}
+                          >
+                            {control(field)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </li>
+          </Fragment>
+        ))}
+      </ul>
+      {list.length > shown && (
+        <div className="mt-3 text-center">
+          <Button variant="secondary" size="sm" onClick={() => setShown((n) => n + PAGE)}>
+            Show more ({list.length - shown} left)
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Checkboxes of one grid as on the document: each line of the form is a row, a box left of its label; columns
+ * as many as the widest line (2 on phones).
+ */
+function OptionGrid({
+  rows,
+  parts,
+  control,
+}: {
+  rows: number[]
+  parts: Question['parts']
+  control: (f: FieldDef) => ReactNode
+}) {
+  const starts = new Set(rows.map((_, i) => rows.slice(0, i).reduce((a, b) => a + b, 0)))
+  return (
+    <div
+      className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-[repeat(var(--cols),minmax(0,1fr))]"
+      style={{ '--cols': Math.max(...rows) } as CSSProperties}
+    >
+      {parts.map(({ field, name }, i) => (
+        <div
+          key={field.id}
+          className={`flex min-w-0 items-center gap-2 text-[13px] text-ink-2 lg:text-[14.5px] ${starts.has(i) ? 'sm:col-start-1' : ''}`}
+        >
+          <div className="relative h-6 w-6 shrink-0 [container-type:size] lg:h-7 lg:w-7">{control(field)}</div>
+          {/* The control is its own <label>: a click on the name ticks the box the same way. */}
+          <span
+            className="min-w-0 cursor-pointer break-words"
+            onClick={(e) => e.currentTarget.parentElement?.querySelector('input')?.click()}
+          >
+            {name}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** A table as on the document: its column names over the rows, each row's name on its left when it has one. */
+function TableGrid({ q, control }: { q: Question; control: (f: FieldDef) => ReactNode }) {
+  const rows = q.rows!.map((n, i) => q.parts.slice(q.rows!.slice(0, i).reduce((a, b) => a + b, 0)).slice(0, n))
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-separate border-spacing-x-2 border-spacing-y-1.5 text-left">
+        <thead className={q.columns!.some(Boolean) ? '' : 'sr-only'}>
+          <tr>
+            {q.rowNames && <th />}
+            {q.columns!.map((c, i) => (
+              <th key={i} scope="col" className="min-w-32 px-0 text-[12px] font-medium text-muted lg:text-[13.5px]">
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, r) => (
+            <tr key={row[0].field.id}>
+              {q.rowNames && (
+                <th
+                  scope="row"
+                  className="w-px pr-2 text-[12.5px] font-semibold whitespace-nowrap text-ink-2 lg:text-[14px]"
+                >
+                  {q.rowNames[r]}
+                </th>
+              )}
+              {/* Controls are size containers (no width of their own): each cell gets a minimum width. */}
+              {row.map(({ field }) => (
+                <td key={field.id} className="p-0 align-middle">
+                  <div
+                    className={`relative [container-type:size] ${field.type === 'checkbox' ? 'h-7 w-7' : `${field.type === 'textarea' ? 'h-16' : 'h-9 lg:h-10'} w-full min-w-32`}`}
+                  >
+                    {control(field)}
+                  </div>
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/** A titled block of filters in the Filters panel. */
+function FilterSection({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-2 border-b border-line-soft pb-3 last:border-0 last:pb-0">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="m-0 text-[13px] font-semibold text-ink">{title}</h4>
+        {action}
+      </div>
+      {children}
+    </section>
+  )
+}

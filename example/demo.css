@@ -1,0 +1,27 @@
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1f2937; background: #f7f9fc; }
+.app { height: 100%; display: flex; flex-direction: column; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 10px 16px; background: #0f2540; color: #fff; }
+.brand { font-weight: 700; font-size: 18px; letter-spacing: .01em; }
+.brand small { font-weight: 400; opacity: .7; margin-left: 8px; font-size: 13px; }
+.steps { display: flex; gap: 4px; background: rgba(255,255,255,.08); padding: 3px; border-radius: 999px; }
+.steps button { border: 0; background: none; color: #cbd5e1; padding: 6px 14px; border-radius: 999px; font: inherit; font-size: 13.5px; cursor: pointer; }
+.steps button[aria-selected='true'] { background: #fff; color: #0f2540; font-weight: 600; }
+.steps button:disabled { opacity: .4; cursor: not-allowed; }
+.pick { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-left: auto; }
+.pick select, .pick label { background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 5px 8px; font: inherit; cursor: pointer; }
+.pick select option { color: #1f2937; }
+.pick input { display: none; }
+.links a { color: #93c5fd; font-size: 13px; margin-left: 4px; text-decoration: none; }
+.hint { margin: 0; padding: 8px 16px; font-size: 13px; background: #eef5fd; color: #334155; border-bottom: 1px solid #dbe6f3; }
+.hint b { color: #0f4c81; }
+.main { flex: 1; min-height: 0; }
+.code { height: 100%; overflow: auto; padding: 20px; display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); align-content: start; }
+.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; min-width: 0; }
+.card h3 { margin: 0; padding: 10px 14px; font-size: 13px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; gap: 8px; }
+.card h3 span { font-weight: 400; color: #6b7280; }
+.card pre { margin: 0; padding: 14px; font-size: 12px; line-height: 1.5; overflow: auto; max-height: 460px; background: #0b1220; color: #e2e8f0; }
+.btn { border: 1px solid #1b6cc4; background: #1b6cc4; color: #fff; border-radius: 6px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.btn.ghost { background: #fff; color: #1b6cc4; }
+@media (max-width: 640px) { .pick { margin-left: 0; } .links { display: none; } .code { padding: 12px; grid-template-columns: 1fr; } .brand small { display: none; } }
