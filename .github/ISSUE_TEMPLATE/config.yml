@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Live demo
+    url: https://harendra-singh-negi.github.io/formlift/
+    about: Try formlift in your browser before reporting

@@ -56,8 +56,9 @@
     "dev": "npm run build && vite",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build",
-    "demo:build": "npm run build && vite build"
+    "prepublishOnly": "npm run typecheck && npm test",
+    "demo:build": "npm run build && vite build",
+    "prepare": "npm run build"
   },
   "peerDependencies": {
     "lucide-react": ">=0.400.0",

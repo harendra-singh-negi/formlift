@@ -1,0 +1,26 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Code snippet, or steps in the live demo. Attach the PDF if it is about auto-detect and you can share it.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: formlift, react, pdfjs-dist, browser / Node
+      placeholder: formlift 0.1.0 · react 19 · pdfjs-dist 5.7 · Chrome 130
+    validations:
+      required: true

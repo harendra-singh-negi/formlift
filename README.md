@@ -87,6 +87,13 @@ pnpm add formlift
 yarn add formlift
 ```
 
+Or install straight from GitHub (it builds on install), from a release tag or from a branch:
+
+```bash
+npm install github:harendra-singh-negi/formlift#v0.1.0
+npm install github:harendra-singh-negi/formlift          # latest main
+```
+
 Then add the peer dependencies for the parts you use:
 
 ```bash
@@ -460,21 +467,15 @@ No. Every rule and CSS variable is scoped to `.fl-root`.
 
 ## Contributing
 
-Issues and pull requests are welcome on [GitHub](https://github.com/harendra-singh-negi/formlift).
+Contributions are welcome: bug reports, fixes, new auto-detect cases and docs. Read
+[CONTRIBUTING.md](./CONTRIBUTING.md) for the setup and guidelines. In short:
 
 ```bash
-git clone https://github.com/harendra-singh-negi/formlift.git && cd formlift
-npm install
-npm run dev        # live demo at http://localhost:5173 (uses src/ directly)
-npm run demo:build # static demo in public/ (deployed to GitHub Pages)
-npm test           # unit, detector fixture, server and React tests
-npm run typecheck
-npm run build      # dist/: ESM + CJS + .d.ts + scoped style.css
+git clone https://github.com/<your-username>/formlift.git && cd formlift
+npm install        # installs and builds
+npm run dev        # live demo at http://localhost:5173
+npm test           # must pass before a pull request
 ```
-
-If auto-detect misses a layout, add a small synthetic PDF to `src/core/fixtures/` and a case to
-`detect.fixtures.test.ts`. Rules must stay generic, measured relative to text size and never tuned to a
-single document.
 
 ## License
 
