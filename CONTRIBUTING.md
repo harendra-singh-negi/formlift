@@ -66,8 +66,10 @@ Short and in the imperative mood, for example: `Detect checkboxes drawn as curve
 ## Releasing (maintainer)
 
 1. Update `version` in `package.json` and move the "Unreleased" notes in `CHANGELOG.md` to the new version.
-2. Commit, then create a GitHub release with the tag `vX.Y.Z`. The Release workflow publishes it to npm through
+2. Commit, then create a GitHub release with the tag `vX.Y.Z`. The Release workflow stages it on npm through
    Trusted Publishing (no token).
+3. Approve the staged version on npmjs.com (Staged Packages) or with `npm stage approve <id>`. Only then does it go
+   live.
 
 ## License
 

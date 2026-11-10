@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-10
+
+### Changed
+
+- Releases are now published from GitHub Actions through npm Trusted Publishing (no tokens) and staged for
+  maintainer approval before they go live. No code changes.
+
 ## [0.1.0] - 2026-11-10
 
 ### Added
