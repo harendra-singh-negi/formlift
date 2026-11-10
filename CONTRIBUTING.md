@@ -60,16 +60,31 @@ All three must pass, and CI runs them again on your PR.
 
 ## Commit messages
 
-Short and in the imperative mood, for example: `Detect checkboxes drawn as curves`,
-`Fix autosave after a failed save`.
+formlift uses [Conventional Commits](https://www.conventionalcommits.org/). The version number and the changelog
+are generated from them, so the prefix matters:
+
+| Prefix | Meaning | Release |
+| --- | --- | --- |
+| `feat: ...` | a new feature | minor (0.1.x → 0.2.0) |
+| `fix: ...` | a bug fix | patch (0.1.1 → 0.1.2) |
+| `perf: ...` | a performance improvement | patch |
+| `docs: ...` | documentation only | shown in the changelog, no release on its own |
+| `refactor:`, `test:`, `build:`, `ci:`, `chore:` | internal changes | not in the changelog |
+| `feat!: ...` or a `BREAKING CHANGE:` footer | breaking change | minor while below 1.0, then major |
+
+Examples: `feat: detect checkboxes drawn as curves`, `fix: autosave after a failed save`,
+`docs: add a Next.js recipe`. Pull requests are squash-merged, so the **PR title** is the commit message and
+must follow the same format.
 
 ## Releasing (maintainer)
 
-1. Update `version` in `package.json` and move the "Unreleased" notes in `CHANGELOG.md` to the new version.
-2. Commit, then create a GitHub release with the tag `vX.Y.Z`. The Release workflow stages it on npm through
-   Trusted Publishing (no token).
-3. Approve the staged version on npmjs.com (Staged Packages) or with `npm stage approve <id>`. Only then does it go
-   live.
+Releases are automatic ([release-please](https://github.com/googleapis/release-please)):
+
+1. Every merge to `main` updates an open **"chore(main): release X.Y.Z"** pull request. It bumps
+   `package.json` and writes `CHANGELOG.md` from the commit messages.
+2. When you want to release, merge that pull request. The tag, the GitHub release and the staged npm
+   version are created for you.
+3. Approve the staged version on npmjs.com (Staged Packages). Only then does it go live.
 
 ## License
 

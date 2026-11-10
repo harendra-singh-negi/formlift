@@ -1,24 +1,43 @@
-# Stages a new npm version when a GitHub release is published (tag vX.Y.Z matching package.json "version").
-# No token: npm Trusted Publishing (OIDC), set up on npmjs.com → formlift → Settings → Trusted Publisher
-# (GitHub Actions · harendra-singh-negi / formlift · release.yml). The version goes live only after a maintainer
-# approves it on npmjs.com (Staged Packages) or with `npm stage approve <id>`.
+# Automatic releases with release-please (https://github.com/googleapis/release-please).
+#
+# 1. Every push to main: release-please reads the Conventional Commit messages since the last release
+#    (feat: → minor, fix: → patch, feat!: → breaking) and opens / updates a "Release PR" that bumps package.json
+#    and writes CHANGELOG.md.
+# 2. Merging that Release PR: release-please tags vX.Y.Z and creates the GitHub release, then the publish job
+#    stages the version on npm through Trusted Publishing (no token).
+# 3. A maintainer approves the staged version on npmjs.com (Staged Packages). Only then does it go live.
+#
+# Keep this file name: npm's Trusted Publisher for formlift is bound to release.yml.
 name: Release
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
+  workflow_dispatch:
 permissions:
-  contents: read
-  id-token: write # OIDC: npm verifies this run instead of a token, and adds provenance
+  contents: write # tags, releases, the Release PR branch
+  pull-requests: write # the Release PR
 jobs:
-  publish:
+  release-please:
     runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v5
+
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC: npm verifies this run instead of a token, and adds provenance
     steps:
       - uses: actions/checkout@v7
+        with: { ref: '${{ needs.release-please.outputs.tag }}' }
       - uses: actions/setup-node@v7
         with: { node-version: 24, cache: npm, registry-url: 'https://registry.npmjs.org' }
       - run: npm install -g npm@latest # npm stage needs npm 11.15+
       - run: npm ci
-      # Skips a version that is already on npm (e.g. 0.1.0, published by hand before Trusted Publishing existed).
-      - run: |
-          V=$(node -p "require('./package.json').version")
-          if npm view "formlift@$V" version >/dev/null 2>&1; then echo "formlift@$V already on npm, skipping"; else npm stage publish --access public; fi
+      - run: npm stage publish --access public

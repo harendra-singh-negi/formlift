@@ -1,3 +1,5 @@
+<!-- The PR title becomes the commit message: use a Conventional Commit, e.g. "fix: autosave after a failed save" -->
+
 ## What does this change?
 
 <!-- A short description. Link the issue it fixes: "Fixes #123" -->
