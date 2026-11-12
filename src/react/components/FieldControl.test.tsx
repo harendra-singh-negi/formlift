@@ -40,3 +40,22 @@ it('compact (phone): the box on the page opens a full-size 16 px input, and the 
   expect(box.textContent).toBe('MT Spring Star')
   act(() => root.unmount())
 })
+
+it('read-only multi-select opens to show every choice, with its boxes locked', async () => {
+  const el = document.createElement('div')
+  document.body.appendChild(el)
+  const root = createRoot(el)
+  const multi: FieldDef = { ...field, key: 'cargo', type: 'multiselect', label: 'Cargo', options: ['Oil', 'Gas', 'Coal'] }
+  act(() => root.render(<FieldControl field={multi} value={'["Oil","Gas"]'} onChange={() => {}} readOnly />))
+  const button = el.querySelector<HTMLButtonElement>('button[aria-label="Cargo"]')!
+  expect(button.disabled).toBe(false)
+  act(() => button.click())
+  const boxes = [...document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type=checkbox]')]
+  expect(boxes.map((b) => [b.checked, b.disabled])).toEqual([
+    [true, true],
+    [true, true],
+    [false, true],
+  ])
+  act(() => root.unmount())
+  el.remove()
+})

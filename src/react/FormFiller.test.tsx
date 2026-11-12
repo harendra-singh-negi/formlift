@@ -240,3 +240,27 @@ it('onFieldChange: sees the answers after the change, sets other answers, opens 
   await flush()
   expect(save).toHaveBeenLastCalledWith({ status: 'Other', company: 'n/a', why: 'Retired' }, { submit: false, comments: {} })
 })
+
+it('a radio drawn on the page and in a dialog keeps its answer in both', async () => {
+  const radio: FieldDef[] = [
+    { id: 'r', key: 'shift', type: 'radio', label: 'Shift', source: 'manual', position: pos(0.1), options: ['Day', 'Night'] },
+    { id: 't', key: 'go', type: 'checkbox', label: 'Go', source: 'manual', position: pos(0.2) },
+  ]
+  await act(async () =>
+    root.render(
+      <FormFiller
+        pdf="x.pdf"
+        fields={radio}
+        onError={vi.fn()}
+        onFieldChange={(f, _v, api) => f.key === 'go' && api.openDialog(['shift'], 'Again')}
+      />,
+    ),
+  )
+  await flush()
+  const page = () => [...el.querySelectorAll<HTMLInputElement>('[data-page] input[type=radio]')]
+  act(() => page()[1].click()) // Night on the page
+  act(() => el.querySelector<HTMLInputElement>('[aria-label="Go"]')!.click())
+  const inDialog = [...document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type=radio]')]
+  expect(inDialog.map((r) => r.checked)).toEqual([false, true])
+  expect(page().map((r) => r.checked)).toEqual([false, true]) // not cleared by the dialog's copy
+})

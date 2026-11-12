@@ -1,6 +1,6 @@
 import type { FormliftComponents } from '../ui/slots'
 import { Paperclip, PenLine, Star } from 'lucide-react'
-import { useRef, useState, type KeyboardEvent } from 'react'
+import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import {
   answerText,
   multiAnswer,
@@ -243,6 +243,8 @@ export default function FieldControl({
   const [signing, setSigning] = useState(false)
   const [editing, setEditing] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
+  // radio names are per document: a field drawn twice (page + a dialog) must not share one
+  const radioName = useId()
   const border = error ? 'border-danger' : 'border-primary/40'
   const common = {
     'aria-label': field.label || field.key,
@@ -294,6 +296,8 @@ export default function FieldControl({
         <button
           type="button"
           {...common}
+          // read-only still opens, to read every choice (the boxes inside are disabled)
+          disabled={readOnly && !shown}
           onClick={() => setEditing(true)}
           className={`${box} ${border} flex cursor-pointer items-center overflow-hidden text-left leading-tight disabled:cursor-default`}
         >
@@ -306,7 +310,7 @@ export default function FieldControl({
             <ModalHeader title={name} onClose={() => setEditing(false)} />
             <ModalBody>
               <div className="max-h-[60dvh] overflow-y-auto">
-                <OptionChecks field={field} value={value} onChange={onChange} big />
+                <OptionChecks field={field} value={value} onChange={onChange} big disabled={readOnly} />
               </div>
               {field.helpText && <p className="mt-2 mb-0 text-[13px] text-muted">{field.helpText}</p>}
               {error && <p className="mt-2 mb-0 text-[13px] text-danger">{error}</p>}
@@ -387,6 +391,9 @@ export default function FieldControl({
             step={step}
             value={text === '' ? min : Number(text)}
             onChange={(e) => onChange(e.target.value)}
+            // empty, the thumb already sits on `min`: choosing min itself fires no change, so take it on release
+            onPointerUp={(e) => text === '' && onChange(e.currentTarget.value)}
+            onKeyUp={(e) => text === '' && onChange(e.currentTarget.value)}
           />
           <span className="min-w-[3ch] flex-none text-right tabular-nums">{text}</span>
         </div>
@@ -446,7 +453,7 @@ export default function FieldControl({
               <input
                 type="radio"
                 className="accent-primary"
-                name={field.id}
+                name={radioName}
                 checked={text === o}
                 disabled={readOnly}
                 onChange={() => onChange(o)}
