@@ -203,7 +203,7 @@ export default function FormEditor({
 
   return (
     <FormliftProvider components={components} labels={options.labels}>
-      <div className={`fl-root flex min-h-[640px] flex-col bg-white text-ink ${className}`}>
+      <div className={`fl-root flex min-h-[min(640px,100%)] flex-col bg-white text-ink ${className}`}>
         {/* Toolbar */}
         <div
           className={`flex flex-wrap items-center gap-2 border-b border-line bg-white px-4 py-2.5 max-sm:px-3 max-sm:py-2 ${stickyToolbar ? 'sticky top-0 z-20' : ''}`}
