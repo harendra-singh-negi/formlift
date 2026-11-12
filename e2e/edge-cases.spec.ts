@@ -79,6 +79,7 @@ test('editor: undo takes back a new group and a new follow-up question', async (
   await page.goto('/')
   await expect(page.locator('[data-page="1"] canvas')).toBeVisible()
   const fieldsTab = page.getByRole('tab', { name: /Fields \(/ })
+  await expect(fieldsTab).not.toHaveText('Fields (0)') // the sample's own fields load after the canvas
   const before = await fieldsTab.textContent()
   await page.locator('aside').getByRole('button', { name: 'Radio group', exact: true }).click()
   const box = (await page.locator('[data-page="1"]').boundingBox())!
