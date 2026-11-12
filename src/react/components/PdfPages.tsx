@@ -4,6 +4,7 @@ import type { LayoutPage } from '../../core/form-logic'
 import { toLines, type PdfTextItem, type TextLine } from '../../core/layout'
 import { loadPdfJs } from '../pdfjs'
 import { BASE_SCALE } from '../constants'
+import { useLabels } from '../labels'
 
 /** A PDF: URL, Blob / File, bytes, or a (possibly async) function returning one of those. */
 export type PdfBytes = string | URL | Blob | ArrayBuffer | Uint8Array
@@ -51,6 +52,7 @@ export default function PdfPages({
   onLoaded?: (sizes: PageSize[], pdf: PDFDocumentProxy) => void
   onError?: (err: unknown) => void
 }) {
+  const L = useLabels()
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [sizes, setSizes] = useState<PageSize[]>([])
   const loadRef = useRef(load)
@@ -84,7 +86,7 @@ export default function PdfPages({
     }
   }, [])
 
-  if (!doc) return <p className="p-6 text-center text-[13px] text-muted">Loading document…</p>
+  if (!doc) return <p className="p-6 text-center text-[13px] text-muted">{L.loadingDocument}</p>
   const shown: LayoutPage[] = pages ?? sizes.map((s, i) => ({ source: i + 1, ...s }))
   return (
     // min-w-full + w-max: centred when narrower than the panel, fully scrollable (left edge too) when wider.

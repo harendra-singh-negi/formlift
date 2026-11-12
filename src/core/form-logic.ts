@@ -72,6 +72,12 @@ export interface FieldDef {
   min?: number;
   max?: number;
   pattern?: string;
+  /** Shown instead of formlift's message when the answer breaks a rule of this field. */
+  errorMessage?: string;
+  /** Shown instead of "<label> is required" for this field. */
+  requiredMessage?: string;
+  /** Names of your own rules (AnswerOptions.rules) this field must pass, checked in order. */
+  rules?: string[];
   /** dropdown / radio choices. */
   options?: string[];
   visibleWhen?: Condition;
@@ -86,9 +92,100 @@ export interface FieldDef {
 export type AnswerValue = string | boolean | null;
 export type Answers = Record<string, AnswerValue>;
 
-export const MAX_FIELDS = 5000;
-export const MAX_SIGNATURE_CHARS = 300_000;
-const MAX_TEXT = 10_000;
+/**
+ * Size limits the validators enforce. Every one has a default; pass your own (all or some) to
+ * validateFields / validateLayout / validateAnswers / checkAnswer and to FormEditor / FormFiller's `limits`.
+ * Use the same values in the browser and on your server.
+ */
+export interface Limits {
+  /** Fields in one form. Default 5000. */
+  maxFields: number
+  /** Pages in a layout. Default 1000. */
+  maxPages: number
+  /** Text / box / line items in a layout. Default 5000. */
+  maxElements: number
+  /** Characters in one text answer. Default 10000. */
+  maxAnswerLength: number
+  /** Characters of a signature saved as a PNG data URL. Default 300000. */
+  maxSignatureChars: number
+  /** Characters in one layout text item. Default 5000. */
+  maxElementText: number
+}
+
+export const DEFAULT_LIMITS: Readonly<Limits> = Object.freeze({
+  maxFields: 5000,
+  maxPages: 1000,
+  maxElements: 5000,
+  maxAnswerLength: 10_000,
+  maxSignatureChars: 300_000,
+  maxElementText: 5000,
+});
+
+/** The defaults with your overrides applied. */
+export const resolveLimits = (limits?: Partial<Limits>): Limits => ({ ...DEFAULT_LIMITS, ...limits });
+
+/** Messages people see for wrong answers. Override any of them (other language, own wording). */
+export interface AnswerMessages {
+  required: (label: string) => string
+  checkbox: string
+  invalid: string
+  signature: string
+  tooShort: (min: number) => string
+  tooLong: (max: number) => string
+  number: string
+  min: (min: number) => string
+  max: (max: number) => string
+  date: string
+  email: string
+  phone: string
+  option: string
+  pattern: string
+}
+
+export const DEFAULT_ANSWER_MESSAGES: Readonly<AnswerMessages> = Object.freeze({
+  required: (label: string) => `${label} is required`,
+  checkbox: 'Must be checked or unchecked',
+  invalid: 'Invalid value',
+  signature: 'Invalid signature',
+  tooShort: (n: number) => `At least ${n} characters`,
+  tooLong: (n: number) => `At most ${n} characters`,
+  number: 'Must be a number',
+  min: (n: number) => `Must be at least ${n}`,
+  max: (n: number) => `Must be at most ${n}`,
+  date: 'Must be a date (YYYY-MM-DD)',
+  email: 'Must be an email address',
+  phone: 'Must be a phone number',
+  option: 'Pick one of the options',
+  pattern: 'Has the wrong format',
+});
+
+/** One of your own validation rules. Give the same rules to FormEditor (to pick them), FormFiller and your server. */
+export interface AnswerRule {
+  /** Name shown in the builder when picking rules for a field. Default: the rule's id. */
+  label?: string;
+  /** Field types the rule can be picked for. Default: all. */
+  types?: FieldType[];
+  /** The problem as a message, or null when the answer is fine. Not called for empty answers. */
+  check: (value: AnswerValue, field: FieldDef, answers: Answers) => string | null;
+}
+
+/** Options of checkAnswer / validateAnswers: limits, your wording, your own rules and full control. */
+export type AnswerOptions = Partial<Limits> & {
+  /** Your own wording for formlift's answer errors (any language). */
+  messages?: Partial<AnswerMessages>;
+  /** Named rules that fields list in `rules`, e.g. { imo: { label: 'IMO number', check: (v) => ... } }. */
+  rules?: Record<string, AnswerRule>;
+  /**
+   * Runs first, for every visible field. Return a message (error), null (valid: skip formlift's checks) or
+   * undefined (formlift checks as usual).
+   */
+  validate?: (field: FieldDef, value: AnswerValue | undefined, answers: Answers) => string | null | undefined;
+};
+
+/** @deprecated Use DEFAULT_LIMITS.maxFields; pass `limits` to change it. */
+export const MAX_FIELDS = DEFAULT_LIMITS.maxFields;
+/** @deprecated Use DEFAULT_LIMITS.maxSignatureChars; pass `limits` to change it. */
+export const MAX_SIGNATURE_CHARS = DEFAULT_LIMITS.maxSignatureChars;
 const KEY = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 const FILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -167,50 +264,80 @@ function safeRegex(pattern: string): RegExp | null {
 }
 
 /** One answer's problem, or null. Used per field while typing and for the whole form on submit. */
-export function checkAnswer(f: FieldDef, v: AnswerValue | undefined, required: boolean): string | null {
-  if (isEmpty(v)) return required ? `${f.label || f.key} is required` : null;
-  if (f.type === 'checkbox') return typeof v === 'boolean' ? null : 'Must be checked or unchecked';
-  if (typeof v !== 'string') return 'Invalid value';
+export function checkAnswer(
+  f: FieldDef,
+  v: AnswerValue | undefined,
+  required: boolean,
+  options?: AnswerOptions,
+  /** All answers, for rules that compare fields. */
+  answers: Answers = {},
+): string | null {
+  const own = options?.validate?.(f, v, answers);
+  if (own !== undefined) return own;
+  if (isEmpty(v)) {
+    if (!required) return null;
+    const m: AnswerMessages = { ...DEFAULT_ANSWER_MESSAGES, ...options?.messages };
+    return f.requiredMessage || m.required(f.label || f.key);
+  }
+  const err = builtinCheck(f, v as AnswerValue, options);
+  if (err) return f.errorMessage || err;
+  for (const name of f.rules ?? []) {
+    const ruleErr = options?.rules?.[name]?.check(v as AnswerValue, f, answers);
+    if (ruleErr) return f.errorMessage || ruleErr;
+  }
+  return null;
+}
+
+/** formlift's own checks of a non-empty answer. */
+function builtinCheck(f: FieldDef, v: AnswerValue, options?: AnswerOptions): string | null {
+  const { maxAnswerLength, maxSignatureChars } = resolveLimits(options);
+  const m: AnswerMessages = { ...DEFAULT_ANSWER_MESSAGES, ...options?.messages };
+  if (f.type === 'checkbox') return typeof v === 'boolean' ? null : m.checkbox;
+  if (typeof v !== 'string') return m.invalid;
   if (f.type === 'signature')
-    return FILE_ID.test(v) || (v.startsWith('data:image/png;base64,') && v.length <= MAX_SIGNATURE_CHARS)
+    return FILE_ID.test(v) || (v.startsWith('data:image/png;base64,') && v.length <= maxSignatureChars)
       ? null
-      : 'Invalid signature';
-  if (v.length > MAX_TEXT) return `At most ${MAX_TEXT} characters`;
-  if (f.minLength != null && v.length < f.minLength) return `At least ${f.minLength} characters`;
-  if (f.maxLength != null && v.length > f.maxLength) return `At most ${f.maxLength} characters`;
+      : m.signature;
+  if (v.length > maxAnswerLength) return m.tooLong(maxAnswerLength);
+  if (f.minLength != null && v.length < f.minLength) return m.tooShort(f.minLength);
+  if (f.maxLength != null && v.length > f.maxLength) return m.tooLong(f.maxLength);
   switch (f.type) {
     case 'number': {
       const n = Number(v);
-      if (v.trim() === '' || !Number.isFinite(n)) return 'Must be a number';
-      if (f.min != null && n < f.min) return `Must be at least ${f.min}`;
-      if (f.max != null && n > f.max) return `Must be at most ${f.max}`;
+      if (v.trim() === '' || !Number.isFinite(n)) return m.number;
+      if (f.min != null && n < f.min) return m.min(f.min);
+      if (f.max != null && n > f.max) return m.max(f.max);
       break;
     }
     case 'date':
-      if (!DATE.test(v) || Number.isNaN(Date.parse(v))) return 'Must be a date (YYYY-MM-DD)';
+      if (!DATE.test(v) || Number.isNaN(Date.parse(v))) return m.date;
       break;
     case 'email':
-      if (!EMAIL.test(v)) return 'Must be an email address';
+      if (!EMAIL.test(v)) return m.email;
       break;
     case 'phone':
-      if (!PHONE.test(v)) return 'Must be a phone number';
+      if (!PHONE.test(v)) return m.phone;
       break;
     case 'dropdown':
     case 'radio':
-      if (!(f.options ?? []).includes(v)) return 'Pick one of the options';
+      if (!(f.options ?? []).includes(v)) return m.option;
       break;
   }
-  if (f.pattern && !safeRegex(f.pattern)?.test(v)) return 'Has the wrong format';
+  if (f.pattern && !safeRegex(f.pattern)?.test(v)) return m.pattern;
   return null;
 }
 
 /** Every problem with these answers, by field key. Empty = valid. Hidden fields are skipped. */
-export function validateAnswers(fields: FieldDef[], answers: Answers): Record<string, string> {
+export function validateAnswers(
+  fields: FieldDef[],
+  answers: Answers,
+  options?: AnswerOptions,
+): Record<string, string> {
   const states = fieldStates(fields, answers);
   const errors: Record<string, string> = {};
   for (const f of fields) {
     if (!states[f.key].visible) continue;
-    const err = checkAnswer(f, answers[f.key], states[f.key].required);
+    const err = checkAnswer(f, answers[f.key], states[f.key].required, options, answers);
     if (err) errors[f.key] = err;
   }
   return errors;
@@ -243,9 +370,10 @@ const inUnit = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n 
  * Problems in a field mapping; empty = it can be saved / published. Checks shapes (the API gets it as JSON),
  * unique keys, positions inside the page, options, regexes, condition references and circular conditions.
  */
-export function validateFields(fields: unknown, pageCount: number): string[] {
+export function validateFields(fields: unknown, pageCount: number, limits?: Partial<Limits>): string[] {
+  const { maxFields } = resolveLimits(limits);
   if (!Array.isArray(fields)) return ['fields must be a list'];
-  if (fields.length > MAX_FIELDS) return [`At most ${MAX_FIELDS} fields`];
+  if (fields.length > maxFields) return [`At most ${maxFields} fields`];
   const errors: string[] = [];
   const keys = new Set<string>();
   const ids = new Set<string>();
@@ -280,6 +408,10 @@ export function validateFields(fields: unknown, pageCount: number): string[] {
     if ((f.type === 'dropdown' || f.type === 'radio') && !(Array.isArray(f.options) && f.options.length))
       errors.push(`${name}: needs at least one option`);
     if (f.pattern && !safeRegex(f.pattern)) errors.push(`${name}: regex is not valid`);
+    if (f.rules != null && !(Array.isArray(f.rules) && f.rules.every((x) => typeof x === 'string')))
+      errors.push(`${name}: rules must be a list of rule names`);
+    for (const k of ['errorMessage', 'requiredMessage'] as const)
+      if (f[k] != null && (typeof f[k] !== 'string' || f[k].length > 500)) errors.push(`${name}: ${k} must be text`);
     if (f.min != null && f.max != null && f.min > f.max) errors.push(`${name}: min is greater than max`);
     if (f.minLength != null && f.maxLength != null && f.minLength > f.maxLength)
       errors.push(`${name}: min length is greater than max length`);
@@ -361,8 +493,10 @@ export interface Layout {
   elements: LayoutElement[];
 }
 
-export const MAX_PAGES = 1000;
-export const MAX_ELEMENTS = 5000;
+/** @deprecated Use DEFAULT_LIMITS.maxPages; pass `limits` to change it. */
+export const MAX_PAGES = DEFAULT_LIMITS.maxPages;
+/** @deprecated Use DEFAULT_LIMITS.maxElements; pass `limits` to change it. */
+export const MAX_ELEMENTS = DEFAULT_LIMITS.maxElements;
 const COLOR = /^#[0-9a-f]{6}$/i;
 
 /** The layout of an untouched document: every original page once, in order, nothing drawn. */
@@ -372,13 +506,14 @@ export const defaultLayout = (sizes: { width: number; height: number }[]): Layou
 });
 
 /** Problems in a layout; empty = fine. `pageCount` = pages of the original PDF. */
-export function validateLayout(layout: unknown, pageCount: number): string[] {
+export function validateLayout(layout: unknown, pageCount: number, limits?: Partial<Limits>): string[] {
+  const { maxPages, maxElements, maxElementText } = resolveLimits(limits);
   const l = layout as Layout;
   if (!l || typeof l !== 'object' || !Array.isArray(l.pages) || !Array.isArray(l.elements))
     return ['layout must have pages and elements'];
   if (!l.pages.length) return ['The document needs at least one page'];
-  if (l.pages.length > MAX_PAGES) return [`At most ${MAX_PAGES} pages`];
-  if (l.elements.length > MAX_ELEMENTS) return [`At most ${MAX_ELEMENTS} text/box/line items`];
+  if (l.pages.length > maxPages) return [`At most ${maxPages} pages`];
+  if (l.elements.length > maxElements) return [`At most ${maxElements} text/box/line items`];
   const errors: string[] = [];
   l.pages.forEach((p, i) => {
     const okSource = p?.source === null || (Number.isInteger(p?.source) && p.source! >= 1 && p.source! <= pageCount);
@@ -398,8 +533,8 @@ export function validateLayout(layout: unknown, pageCount: number): string[] {
     const p = e.position;
     if (!p || ![p.x, p.y, p.width, p.height].every(inUnit) || p.x + p.width > 1.0001 || p.y + p.height > 1.0001)
       errors.push(`${name}: position must lie inside the page`);
-    if (e.text != null && (typeof e.text !== 'string' || e.text.length > 5000)) errors.push(`${name}: text too long`);
-    if (e.replaces != null && (typeof e.replaces !== 'string' || e.replaces.length > 5000))
+    if (e.text != null && (typeof e.text !== 'string' || e.text.length > maxElementText)) errors.push(`${name}: text too long`);
+    if (e.replaces != null && (typeof e.replaces !== 'string' || e.replaces.length > maxElementText))
       errors.push(`${name}: invalid original text`);
     if (e.fontSize != null && !(typeof e.fontSize === 'number' && e.fontSize >= 3 && e.fontSize <= 144))
       errors.push(`${name}: font size must be 3–144`);

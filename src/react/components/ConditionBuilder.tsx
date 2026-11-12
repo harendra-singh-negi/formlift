@@ -1,19 +1,8 @@
 import { Plus, X } from 'lucide-react'
 import { OPERATORS, type Condition, type FieldDef, type Operator, type Rule } from '../../core/form-logic'
 import { Button, IconButton, Select, TextInput } from '../ui/slots'
+import { operatorName, useLabels } from '../labels'
 
-const OP_LABEL: Record<Operator, string> = {
-  equals: 'equals',
-  notEquals: 'does not equal',
-  contains: 'contains',
-  startsWith: 'starts with',
-  endsWith: 'ends with',
-  greaterThan: 'is greater than',
-  lessThan: 'is less than',
-  between: 'is between',
-  isEmpty: 'is empty',
-  isNotEmpty: 'is not empty',
-}
 const isGroup = (r: Rule | Condition): r is Condition => 'rules' in r
 
 /**
@@ -31,6 +20,7 @@ export default function ConditionBuilder({
   fields: FieldDef[]
   depth?: number
 }) {
+  const L = useLabels()
   const setRule = (i: number, r: Rule | Condition) =>
     onChange({ ...value, rules: value.rules.map((x, j) => (j === i ? r : x)) })
   const remove = (i: number) => onChange({ ...value, rules: value.rules.filter((_, j) => j !== i) })
@@ -39,14 +29,14 @@ export default function ConditionBuilder({
   return (
     <div className={`space-y-2 ${depth ? 'rounded-md border border-line bg-surface p-2' : ''}`}>
       <div className="flex items-center gap-2 text-[12px]">
-        Match
+        {L.match}
         <Select
-          aria-label="Match all or any"
+          aria-label={L.matchAllOrAny}
           value={value.logic}
           onChange={(e) => onChange({ ...value, logic: e.target.value as Condition['logic'] })}
         >
-          <option value="and">ALL (AND)</option>
-          <option value="or">ANY (OR)</option>
+          <option value="and">{L.matchAll}</option>
+          <option value="or">{L.matchAny}</option>
         </Select>
       </div>
       {value.rules.map((r, i) =>
@@ -55,12 +45,12 @@ export default function ConditionBuilder({
             <div className="flex-1">
               <ConditionBuilder value={r} onChange={(c) => setRule(i, c)} fields={fields} depth={depth + 1} />
             </div>
-            <IconButton icon={X} title="Remove group" danger iconSize={14} onClick={() => remove(i)} />
+            <IconButton icon={X} title={L.removeGroup} danger iconSize={14} onClick={() => remove(i)} />
           </div>
         ) : (
           <div key={i} className="flex flex-wrap items-center gap-1">
             <Select
-              aria-label="Field"
+              aria-label={L.field}
               value={r.fieldKey}
               onChange={(e) => setRule(i, { ...r, fieldKey: e.target.value })}
             >
@@ -72,19 +62,19 @@ export default function ConditionBuilder({
               ))}
             </Select>
             <Select
-              aria-label="Operator"
+              aria-label={L.operator}
               value={r.op}
               onChange={(e) => setRule(i, { ...r, op: e.target.value as Operator })}
             >
               {OPERATORS.map((op) => (
                 <option key={op} value={op}>
-                  {OP_LABEL[op]}
+                  {operatorName(L, op)}
                 </option>
               ))}
             </Select>
             {r.op !== 'isEmpty' && r.op !== 'isNotEmpty' && (
               <TextInput
-                aria-label="Value"
+                aria-label={L.value}
                 className="!w-24 !py-1"
                 value={r.value ?? ''}
                 onChange={(e) => setRule(i, { ...r, value: e.target.value })}
@@ -92,13 +82,13 @@ export default function ConditionBuilder({
             )}
             {r.op === 'between' && (
               <TextInput
-                aria-label="Upper value"
+                aria-label={L.upperValue}
                 className="!w-24 !py-1"
                 value={r.value2 ?? ''}
                 onChange={(e) => setRule(i, { ...r, value2: e.target.value })}
               />
             )}
-            <IconButton icon={X} title="Remove rule" danger iconSize={14} onClick={() => remove(i)} />
+            <IconButton icon={X} title={L.removeRule} danger iconSize={14} onClick={() => remove(i)} />
           </div>
         ),
       )}
@@ -110,7 +100,7 @@ export default function ConditionBuilder({
           disabled={!fields.length}
           onClick={() => onChange({ ...value, rules: [...value.rules, newRule()] })}
         >
-          Rule
+          {L.rule}
         </Button>
         {depth < 2 && (
           <Button
@@ -120,7 +110,7 @@ export default function ConditionBuilder({
             disabled={!fields.length}
             onClick={() => onChange({ ...value, rules: [...value.rules, { logic: 'and', rules: [newRule()] }] })}
           >
-            Group
+            {L.group}
           </Button>
         )}
       </div>

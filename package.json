@@ -1,7 +1,7 @@
 {
   "name": "formlift",
   "version": "0.2.0",
-  "description": "Turn any PDF into a fillable web form: auto-detect fields, drag-and-drop builder, conditional logic, validation, fill-in UI and a completed-PDF generator. React UI + framework-agnostic core.",
+  "description": "Turn any PDF into a fillable web form: auto-detect fields, drag-and-drop builder, conditional logic, validation, fill-in UI and a completed-PDF generator. React UI, a framework-free element for Angular / Vue / plain JS, and a headless core.",
   "keywords": [
     "pdf",
     "pdf-form",
@@ -42,6 +42,9 @@
       ],
       "server": [
         "./dist/server/index.d.ts"
+      ],
+      "element": [
+        "./dist/element/index.d.ts"
       ]
     }
   },
@@ -58,11 +61,15 @@
       "import": "./dist/server/index.js",
       "require": "./dist/server/index.cjs"
     },
+    "./element": {
+      "import": "./dist/element/index.js",
+      "require": "./dist/element/index.cjs"
+    },
     "./style.css": "./dist/style.css",
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsup && node scripts/build-css.mjs",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsup && node scripts/build-css.mjs",
     "dev": "npm run build && vite",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
@@ -70,21 +77,16 @@
     "demo:build": "npm run build && vite build",
     "prepare": "npm run build"
   },
+  "dependencies": {
+    "pdfjs-dist": "^5.4.296"
+  },
   "peerDependencies": {
-    "lucide-react": ">=0.400.0",
     "pdf-lib": "^1.17.1",
-    "pdfjs-dist": ">=4.0.0",
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0"
   },
   "peerDependenciesMeta": {
-    "lucide-react": {
-      "optional": true
-    },
     "pdf-lib": {
-      "optional": true
-    },
-    "pdfjs-dist": {
       "optional": true
     },
     "react": {
@@ -103,7 +105,6 @@
     "jsdom": "^26.0.0",
     "lucide-react": "^0.500.0",
     "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "^5.4.296",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwindcss": "^4.1.0",

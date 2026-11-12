@@ -1,25 +1,26 @@
 import { useCallback, useState } from 'react'
 
-const LIMIT = 100
+/** Default number of undo steps kept. */
+export const UNDO_LIMIT = 100
 
 /**
  * Undo / redo over one value. `set(next, false)` changes it without a history step (during a drag; call
  * `checkpoint()` when the drag starts so the whole drag undoes in one step).
  */
-export function useUndo<T>(initial: T) {
+export function useUndo<T>(initial: T, limit = UNDO_LIMIT) {
   const [state, setState] = useState({ past: [] as T[], present: initial, future: [] as T[] })
   const set = useCallback((next: T | ((v: T) => T), record = true) => {
     setState((s) => {
       const value = typeof next === 'function' ? (next as (v: T) => T)(s.present) : next
       if (value === s.present) return s
       return record
-        ? { past: [...s.past, s.present].slice(-LIMIT), present: value, future: [] }
+        ? { past: [...s.past, s.present].slice(-limit), present: value, future: [] }
         : { ...s, present: value }
     })
-  }, [])
+  }, [limit])
   const checkpoint = useCallback(
-    () => setState((s) => ({ past: [...s.past, s.present].slice(-LIMIT), present: s.present, future: [] })),
-    [],
+    () => setState((s) => ({ past: [...s.past, s.present].slice(-limit), present: s.present, future: [] })),
+    [limit],
   )
   const undo = useCallback(
     () =>

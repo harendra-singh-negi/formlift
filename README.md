@@ -73,8 +73,9 @@ One install, four entry points. Import only what you use:
 | Entry | Contents | Needs |
 | --- | --- | --- |
 | `formlift` | Types, validation, conditions, auto-detect, helpers | – |
-| `formlift/react` | `<FormEditor>`, `<FormFiller>`, `<PdfPages>`, `setPdfWorker` | `react`, `react-dom`, `pdfjs-dist`, `lucide-react` |
+| `formlift/react` | `<FormEditor>`, `<FormFiller>`, `<PdfPages>`, `setPdfWorker` | `react`, `react-dom` |
 | `formlift/server` | `completedPdf()` | `pdf-lib` |
+| `formlift/element` | `mountEditor()`, `mountFiller()` for Angular, Vue, Svelte or plain JS | – (React is bundled in) |
 | `formlift/style.css` | Styles for the React components | – |
 
 ## Installation
@@ -94,14 +95,16 @@ npm install github:harendra-singh-negi/formlift#v0.1.0
 npm install github:harendra-singh-negi/formlift          # latest main
 ```
 
-Then add the peer dependencies for the parts you use:
+pdf.js comes with formlift. Add only what your app does not have yet:
 
 ```bash
-npm install react react-dom pdfjs-dist lucide-react   # React UI
-npm install pdf-lib                                   # completed PDF
+npm install react react-dom   # formlift/react, if your app is not already a React app
+npm install pdf-lib           # formlift/server (completed PDF)
 ```
 
-**Requirements:** React 18 or 19 · pdfjs-dist 4+ · Node 18+ · browsers with CSS `@scope` support (Chrome/Edge 118+,
+Angular, Vue, Svelte or plain JS: use `formlift/element`, which needs nothing else.
+
+**Requirements:** React 18 or 19 (only for `formlift/react`) · Node 18+ · browsers with CSS `@scope` support (Chrome/Edge 118+,
 Safari 17.4+, Firefox 128+).
 
 ## Quick start
@@ -178,6 +181,37 @@ export function FillForm({ pdfUrl, form }: { pdfUrl: string; form: FormDoc }) {
 
 That's it. Both components fill the height of their container.
 
+### Angular, Vue, Svelte or plain JS
+
+`formlift/element` has React inside, so your app installs only `formlift`:
+
+```ts
+import { mountEditor, mountFiller, setPdfWorker } from 'formlift/element'
+import 'formlift/style.css' // or add it to your global styles
+
+// Builder: the form is plain JSON, store it wherever you like
+const editor = mountEditor(element, {
+  pdf: '/files/form.pdf',
+  initialValue: saved,              // { fields, layout } from your store
+  onSave: (doc) => api.saveForm(doc),
+  limits: { maxFields: 20000 },
+})
+editor.update({ stickyToolbar: false }) // change options later
+editor.unmount()                        // e.g. in ngOnDestroy
+
+// Fill-in: answers come out as JSON on every change, no server needed
+const filler = mountFiller(element, {
+  pdf: '/files/form.pdf',
+  fields: saved.fields,
+  layout: saved.layout,
+  onChange: (answers) => console.log(answers), // { fieldKey: value }
+})
+```
+
+Options are the same as the `<FormEditor>` / `<FormFiller>` props below, except the ones that take React content
+(`toolbar`, `banner`, `tabs`, `components`); `title` is plain text. `mountEditor` also returns `save()`, `dirty` and
+`value`. Give the element a height: the components fill it.
+
 ## Server side
 
 **Never trust the browser.** Run the same checks on your server with the core package:
@@ -246,9 +280,15 @@ uploads are embedded as PDF attachments.
 | `fieldTypes` | `FieldType[]` | all | Field types that can be added |
 | `elementTools` | `ElementTool[]` | all | Layout tools that can be added (`[]` = none) |
 | `components` | `FormliftComponents` | – | Replacement UI components and answer controls ([Your own UI](#your-own-ui)) |
+| `labels` | `Partial<Labels>` | English | Your own text for every button, heading and message (any language) ([Labels](#labels-text-and-language)) |
 | `keyboard` | `boolean` | `true` | Keyboard shortcuts |
 | `warnUnsaved` | `boolean` | `true` | Browser warning when leaving with unsaved changes |
 | `onDetected` | `(found: FieldDef[]) => void` | – | Called with the fields auto-detect suggested |
+| `limits` | `Partial<Limits>` | `DEFAULT_LIMITS` | Size limits checked before saving, such as `{ maxFields: 20000 }` ([Limits](#limits)) |
+| `snapStep` | `number` | `0.005` | Snap-to-grid step as a fraction of the page |
+| `undoLimit` | `number` | `100` | Undo steps kept |
+| `zoomSteps` | `number[]` | `[0.5, 0.75, 1, 1.25, 1.5, 2]` | Steps of the zoom − / + buttons |
+| `stickyToolbar` | `boolean` | `true` | Keep the toolbar on top when the page around the editor scrolls |
 
 **Keyboard:** <kbd>Del</kbd> delete · <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> undo/redo ·
 <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate · arrow keys nudge (hold <kbd>Shift</kbd> for larger steps) ·
@@ -278,6 +318,13 @@ uploads are embedded as PDF attachments.
 | `renderFilters` | `(fs: QuestionFilterState) => ReactNode` | – | Your own search / filter bar instead of the built-in one |
 | `toQuestions` | `(fields, textOf) => Question[]` | `toQuestions` | How fields become list questions |
 | `components` | `FormliftComponents` | – | Replacement UI components and answer controls |
+| `labels` | `Partial<Labels>` | English | Your own text for every button, heading and message (any language) ([Labels](#labels-text-and-language)) |
+| `limits` | `Partial<Limits>` | `DEFAULT_LIMITS` | Size limits for answers ([Limits](#limits)) |
+| `zoomSteps` | `number[]` | `[0.5, 0.75, 1, 1.25, 1.5, 2]` | Steps of the zoom − / + buttons |
+| `listPageSize` | `number` | `100` | Questions shown per "Show more" step in the list view |
+| `stickyToolbar` | `boolean` | `true` | Keep the toolbar on top while the content scrolls; `false` lets it scroll away |
+| `onChange` | `(answers: Answers) => void` | – | Every change of the answers as JSON. With it, `onSave` is optional |
+| `messages` | `Partial<AnswerMessages>` | English | Your own wording for answer errors (any language) |
 | `title`, `onBack`, `toolbar`, `notify`, `onError`, `className` | | | Same as `FormEditor` |
 
 ### Hooks (`formlift/react`)
@@ -292,11 +339,11 @@ uploads are embedded as PDF attachments.
 
 | Function | Returns | Description |
 | --- | --- | --- |
-| `validateFields(fields, pageCount)` | `string[]` | Problems in a form definition: shapes, unique keys, positions, options, regexes, condition references and cycles |
-| `validateLayout(layout, pageCount)` | `string[]` | Problems in a layout |
-| `validateAnswers(fields, answers)` | `Record<key, message>` | Problems in the answers, with conditions applied |
+| `validateFields(fields, pageCount, limits?)` | `string[]` | Problems in a form definition: shapes, unique keys, positions, options, regexes, condition references and cycles |
+| `validateLayout(layout, pageCount, limits?)` | `string[]` | Problems in a layout |
+| `validateAnswers(fields, answers, options?)` | `Record<key, message>` | Problems in the answers, with conditions applied |
 | `cleanAnswers(fields, input)` | `Answers` | Keeps only known keys with the right value types |
-| `checkAnswer(field, value, required)` | `string \| null` | Checks a single answer |
+| `checkAnswer(field, value, required, options?)` | `string \| null` | Checks a single answer |
 | `fieldStates(fields, answers)` | `Record<key, { visible, required, readOnly }>` | Applies the conditions |
 | `evaluate(condition, answers)` | `boolean` | Evaluates one condition |
 | `defaultAnswers(fields)` | `Answers` | The answers a new submission starts with |
@@ -304,6 +351,79 @@ uploads are embedded as PDF attachments.
 | `detectDocument(pdf, OPS, pages, existing, onProgress?, signal?)` | `Promise<FieldDef[]>` | Suggests fields for a whole document |
 | `toQuestions(fields, textOf?, { categoryCode? })` | `Question[]` | Fields grouped as questions, used by the list view |
 | `filterQuestions(questions, answers, filters, values, search?)` | `Question[]` | The questions passing a search and picked filter values (see [Filters](#4-filters-you-choose-formlift-computes)) |
+
+### Limits
+
+Every size limit has a default and can be changed without a new formlift version. Pass only the values you
+want to change, and pass the **same** values in the browser and on your server:
+
+```ts
+import { DEFAULT_LIMITS, type Limits } from 'formlift'
+
+const limits: Partial<Limits> = { maxFields: 20000 } // a 300+ page checklist
+
+<FormEditor limits={limits} ... />
+<FormFiller limits={limits} ... />
+validateFields(fields, pageCount, limits) // server
+validateAnswers(fields, answers, limits)  // server
+```
+
+| Limit | Default | Checked by |
+| --- | --- | --- |
+| `maxFields` | 5000 | `validateFields`, FormEditor save |
+| `maxPages` | 1000 | `validateLayout`, FormEditor save |
+| `maxElements` | 5000 | `validateLayout` (text / box / line items) |
+| `maxElementText` | 5000 | `validateLayout` (characters in one layout text) |
+| `maxAnswerLength` | 10000 | `checkAnswer`, `validateAnswers`, FormFiller |
+| `maxSignatureChars` | 300000 | `checkAnswer` (signature saved as a PNG data URL) |
+
+### Validation
+
+formlift checks answers with its built-in rules (required, length, min/max, regex, email, phone, date, options).
+You can change every part of it, and the same code runs in the browser and on your server:
+
+| What | How |
+| --- | --- |
+| Your wording or language for every built-in message | `messages: { required: (label) => label + ' ज़रूरी है', email: '…' }` (`DEFAULT_ANSWER_MESSAGES` has them all) |
+| A message for one field | In the builder, or in JSON: `requiredMessage`, `errorMessage` on the field |
+| Your own rules, picked per field in the builder | `rules: { imo: { label: 'IMO number', check: (value, field, answers) => ... } }`; the field stores `rules: ['imo']` |
+| Rules for some field types only | `types: ['text', 'number']` on a rule |
+| Full control | `validate: (field, value, answers) => 'message' \| null \| undefined`: a message is the error, `null` accepts the answer, `undefined` lets formlift check as usual |
+
+```ts
+import { validateAnswers, type AnswerOptions } from 'formlift'
+
+const validation: AnswerOptions = {
+  rules: {
+    imo: { label: 'IMO number', types: ['text'], check: (v) => (/^\d{7}$/.test(String(v)) ? null : 'IMO must be 7 digits') },
+    afterStart: { label: 'After start date', types: ['date'], check: (v, f, a) => (v > a.startDate ? null : 'Must be after the start date') },
+  },
+}
+
+<FormEditor rules={validation.rules} ... />    // the admin picks rules per field
+<FormFiller {...validation} ... />             // rules, messages, validate
+validateAnswers(fields, answers, validation)   // your server: same rules
+```
+
+Rules get every answer, so they can compare fields. They are not called for empty answers (that is `required`).
+A rule name the app does not know is skipped, so give the server the same `rules` as the browser.
+
+### Labels (text and language)
+
+Every text formlift shows (buttons, headings, hints, messages) can be replaced. Pass only the ones you want;
+the rest stay English. `DEFAULT_LABELS` lists them all; texts with a number in them are functions:
+
+```tsx
+import { DEFAULT_LABELS, type Labels } from 'formlift/react'
+
+const hindi: Partial<Labels> = { save: 'सहेजें', submit: 'जमा करें', saveDraft: 'ड्राफ्ट सहेजें', fieldsTab: (n) => `फ़ील्ड (${n})` }
+
+<FormFiller labels={hindi} ... />
+<FormliftProvider labels={hindi}>...</FormliftProvider> // or for everything under it
+```
+
+Answer errors ("Name is required"…) come from the `messages` prop (`Partial<AnswerMessages>` from
+`'formlift'`, defaults in `DEFAULT_ANSWER_MESSAGES`), which FormFiller accepts too.
 
 ### Server (`formlift/server`)
 

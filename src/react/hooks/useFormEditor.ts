@@ -8,6 +8,8 @@ import {
   FIELD_TYPES,
   fieldStates,
   validateFields,
+  type AnswerRule,
+  type Limits,
   validateLayout,
   type Answers,
   type FieldDef,
@@ -31,9 +33,10 @@ import {
 } from '../../core/layout'
 import type { PageSize } from '../components/PdfPages'
 import { loadPdfJs } from '../pdfjs'
+import { useLabels, type Labels } from '../labels'
 import { useUndo } from './useUndo'
 
-const GRID = 0.005 // snap step: 0.5 % of the page
+const GRID = 0.005 // default snap step: 0.5 % of the page
 
 export type Selection = { kind: 'field' | 'element'; id: string } | null
 /** The editor's document: fields + layout (null = the original pages untouched, nothing drawn). */
@@ -59,8 +62,18 @@ export interface UseFormEditorOptions {
   elementTools?: readonly ElementTool[]
   /** Browser warning when leaving with unsaved changes. Default true. */
   warnUnsaved?: boolean
+  /** Size limits checked before saving (use the same on your server). Default: DEFAULT_LIMITS. */
+  limits?: Partial<Limits>
+  /** Snap-to-grid step as a fraction of the page. Default 0.005 (0.5 %). */
+  snapStep?: number
+  /** Undo steps kept. Default 100. */
+  undoLimit?: number
+  /** Your own validation rules, offered in a field's properties (same object as FormFiller's and your server's). */
+  rules?: Record<string, AnswerRule>
   notify?: (message: string) => void
   onError?: (error: unknown) => void
+  /** Your own text for every button, heading and message (any language). Default: DEFAULT_LABELS (English). */
+  labels?: Partial<Labels>
 }
 
 const isDefault = (l: Layout, sizes: PageSize[]) =>
@@ -81,11 +94,16 @@ export function useFormEditor({
   warnUnsaved = true,
   fieldTypes = FIELD_TYPES,
   elementTools = Object.keys(ELEMENT_TOOLS) as ElementTool[],
+  limits,
+  snapStep = GRID,
+  undoLimit,
   notify = () => {},
   onError: notifyError = (e) => console.error(e),
+  labels,
 }: UseFormEditorOptions) {
+  const L = useLabels(labels)
   const [sizes, setSizes] = useState<PageSize[] | null>(null)
-  const history = useUndo<FormDoc>(initialValue)
+  const history = useUndo<FormDoc>(initialValue, undoLimit)
   const { value: doc, set } = history
   const [saved, setSaved] = useState<FormDoc>(initialValue)
   const [selection, setSelection] = useState<Selection>(null)
@@ -112,7 +130,7 @@ export function useFormEditor({
   // The layout as shown: the saved one, or the original pages once the PDF told us their sizes.
   const layout: Layout | null = doc.layout ?? (sizes ? defaultLayout(sizes) : null)
   const pageCount = layout?.pages.length ?? 1
-  const grid = snapOn ? GRID : 0
+  const grid = snapOn ? snapStep : 0
   const selectedField = selection?.kind === 'field' ? (fields.find((f) => f.id === selection.id) ?? null) : null
   const selectedElement =
     selection?.kind === 'element' ? (layout?.elements.find((e) => e.id === selection.id) ?? null) : null
@@ -120,9 +138,10 @@ export function useFormEditor({
   const problems = useMemo(
     () =>
       sizes
-        ? [...(doc.layout ? validateLayout(doc.layout, sizes.length) : []), ...validateFields(fields, pageCount)]
+        ? [...(doc.layout ? validateLayout(doc.layout, sizes.length, limits) : []), ...validateFields(fields, pageCount, limits)]
         : [],
-    [sizes, doc.layout, fields, pageCount],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- limits by value: an inline object is new every render
+    [sizes, doc.layout, fields, pageCount, JSON.stringify(limits ?? {})],
   )
 
   const onChangeRef = useRef(onChange)
@@ -337,10 +356,10 @@ export function useFormEditor({
         }
         notify(
           found.length
-            ? `${found.length} fields suggested${stop.signal.aborted ? ' (stopped early)' : ''}. Check the dashed ones, then Save.`
+            ? L.fieldsSuggested(found.length, stop.signal.aborted)
             : auto
-              ? 'No fields found automatically. Drag them in from the left.'
-              : 'No new fields found',
+              ? L.noFieldsFoundAuto
+              : L.noNewFieldsFound,
         )
       } catch (err) {
         notifyError(err)
@@ -348,7 +367,7 @@ export function useFormEditor({
         setDetecting(null)
       }
     },
-    [pdf, layout, detecting, fields, setFields, notify, notifyError],
+    [pdf, layout, detecting, fields, setFields, notify, notifyError, L],
   )
 
   // A new form (nothing placed yet) gets suggestions right away.
@@ -380,7 +399,7 @@ export function useFormEditor({
       const sent = doc
       await onSave({ fields, layout: layoutToSave })
       setSaved(sent)
-      notify('Saved')
+      notify(L.saved)
       return true
     } catch (err) {
       notifyError(err)

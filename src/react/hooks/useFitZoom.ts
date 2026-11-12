@@ -9,7 +9,8 @@ const PADDING = 32
  * highest zoom), following the
  * panel's size (phone, tablet, a resized window) until the user picks a zoom. Pass `ref` to the scroll panel.
  */
-export function useFitZoom(pageWidthPt: number) {
+export function useFitZoom(pageWidthPt: number, steps: readonly number[] = ZOOMS) {
+  const max = Math.max(...steps)
   const [el, ref] = useState<HTMLElement | null>(null)
   const [fit, setFit] = useState(1)
   const [chosen, setZoom] = useState<number | null>(null)
@@ -17,14 +18,14 @@ export function useFitZoom(pageWidthPt: number) {
     if (!el) return
     const measure = () => {
       const room = el.clientWidth - PADDING
-      if (room > 0) setFit(Math.min(ZOOMS[ZOOMS.length - 1], Math.max(0.3, room / (pageWidthPt * BASE_SCALE))))
+      if (room > 0) setFit(Math.min(max, Math.max(0.3, room / (pageWidthPt * BASE_SCALE))))
     }
     measure()
     if (typeof ResizeObserver === 'undefined') return
     const watch = new ResizeObserver(measure)
     watch.observe(el)
     return () => watch.disconnect()
-  }, [el, pageWidthPt])
+  }, [el, pageWidthPt, max])
   return { zoom: chosen ?? fit, setZoom, ref }
 }
 

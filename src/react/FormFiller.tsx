@@ -1,5 +1,6 @@
 import { ArrowLeft, Download, Paperclip, Save, Send } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
+import { useLabels } from './labels'
 import { boxStyle } from '../core/coords'
 import type { FieldDef, Layout } from '../core/form-logic'
 import { AnswerControl } from './components/FieldControl'
@@ -52,6 +53,15 @@ export interface FormFillerProps extends UseFormFillerOptions {
   confirmSubmit?: boolean
   /** Extra classes on the root. It fills its container's height (`h-full`) by default: give the container a height. */
   className?: string
+  /** Zoom steps of the − / + buttons. Default [0.5, 0.75, 1, 1.25, 1.5, 2]. */
+  zoomSteps?: readonly number[]
+  /** Questions per "Show more" step in the list view. Default 100. */
+  listPageSize?: number
+  /**
+   * true (default): the toolbar stays on top while the page or answers scroll.
+   * false: it scrolls away with the content.
+   */
+  stickyToolbar?: boolean
 }
 
 const humanSize = (n?: number) => {
@@ -84,15 +94,19 @@ export default function FormFiller({
   renderFilters,
   confirmSubmit: askFirst = true,
   className = 'h-full',
+  zoomSteps,
+  listPageSize,
+  stickyToolbar = true,
   ...options
 }: FormFillerProps) {
   const shows = (p: FillerPart) => !hide.includes(p)
   const ff = useFormFiller(options)
+  const L = useLabels(options.labels)
   const { fields, readOnly = false, onSave } = options
   const layout: Layout | null = options.layout ?? null
   const { answers, states, errors } = ff
   const pdfWidth = ff.pdfSizes.length ? Math.max(...ff.pdfSizes.map((p) => p.width)) : 595
-  const { zoom, setZoom, ref: fitRef } = useFitZoom(Math.max(...(layout?.pages.map((p) => p.width) ?? [pdfWidth])))
+  const { zoom, setZoom, ref: fitRef } = useFitZoom(Math.max(...(layout?.pages.map((p) => p.width) ?? [pdfWidth])), zoomSteps)
   const compact = useCompact()
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -128,12 +142,16 @@ export default function FormFiller({
   )
 
   return (
-    <FormliftProvider components={components}>
-      <div className={`fl-root flex min-h-[min(600px,100dvh)] flex-col bg-white text-ink ${className}`}>
-        <div className="flex flex-wrap items-center gap-3 border-b border-line bg-white px-4 py-2.5">
+    <FormliftProvider components={components} labels={options.labels}>
+      <div
+        className={`fl-root flex min-h-[min(600px,100dvh)] flex-col bg-white text-ink ${stickyToolbar ? '' : 'overflow-auto'} ${className}`}
+      >
+        <div
+          className={`flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-white px-4 py-2.5 max-sm:px-3 max-sm:py-2 ${stickyToolbar ? 'sticky top-0 z-20' : ''}`}
+        >
           {onBack && shows('back') && (
             <Button variant="secondary" size="sm" icon={ArrowLeft} onClick={onBack}>
-              Back
+              {L.back}
             </Button>
           )}
           {title != null && shows('title') && (
@@ -143,35 +161,40 @@ export default function FormFiller({
           )}
           {views.length > 1 && shows('views') && (
             <SegmentedTabs
-              options={views.map((v) => ({ value: v, label: v === 'document' ? 'Document' : 'List' }))}
+              options={views.map((v) => ({ value: v, label: v === 'document' ? L.documentView : L.listView }))}
               value={view}
               onChange={setView}
             />
           )}
           <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:w-full max-sm:justify-end">
-            {view === 'document' && shows('zoom') && <ZoomControls zoom={zoom} onChange={setZoom} />}
+            {view === 'document' && shows('zoom') && (
+              // phones pinch-zoom and fit the page to the width already
+              <div className="max-sm:hidden">
+                <ZoomControls zoom={zoom} onChange={setZoom} steps={zoomSteps} />
+              </div>
+            )}
             {!readOnly && onSave && (
               <>
                 {shows('saveStatus') && (
                   <span className="text-right text-[12px] text-muted sm:w-24" aria-live="polite">
                     {
                       {
-                        saved: ff.hasSaved ? 'Draft saved' : '',
-                        dirty: 'Unsaved',
-                        saving: 'Saving…',
-                        error: 'Not saved',
+                        saved: ff.hasSaved ? L.draftSaved : '',
+                        dirty: L.unsaved,
+                        saving: L.saving,
+                        error: L.notSaved,
                       }[ff.saveState]
                     }
                   </span>
                 )}
                 {shows('saveDraft') && (
-                  <Button variant="secondary" size="sm" icon={Save} title="Save draft" onClick={() => void ff.save()}>
-                    <span className="max-sm:hidden">Save draft</span>
+                  <Button variant="secondary" size="sm" icon={Save} title={L.saveDraft} onClick={() => void ff.save()}>
+                    <span className="max-sm:hidden">{L.saveDraft}</span>
                   </Button>
                 )}
                 {shows('submit') && (
                   <Button size="sm" icon={Send} onClick={() => (askFirst ? setConfirmSubmit(true) : void ff.submit())}>
-                    Submit
+                    {L.submit}
                   </Button>
                 )}
               </>
@@ -182,13 +205,13 @@ export default function FormFiller({
         {ff.attachments.length > 0 && shows('attachments') && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-white px-4 py-1.5 text-[12.5px]">
             <span className="inline-flex items-center gap-1 font-semibold text-ink-2">
-              <Paperclip size={13} /> Attachments
+              <Paperclip size={13} /> {L.attachments}
             </span>
             {ff.attachments.map((x) => (
               <button
                 key={x.id}
                 type="button"
-                title={`Download ${x.fileName}`}
+                title={L.download(x.fileName)}
                 disabled={!ff.canLoadFiles}
                 className="inline-flex max-w-full cursor-pointer items-center gap-1 text-primary hover:underline disabled:cursor-default"
                 onClick={() => ff.downloadFile(x.id, x.fileName)}
@@ -204,13 +227,13 @@ export default function FormFiller({
           <ul className="m-0 border-b border-danger/30 bg-danger/5 px-6 py-2 text-[13px] text-danger">
             {ff.errorList.map((f) => (
               <li key={f.key}>
-                Page {f.position.page}: {errors[f.key]}
+                {L.errorOnPage(f.position.page, errors[f.key])}
               </li>
             ))}
           </ul>
         )}
         {view === 'list' && (
-          <div className="flex-1 overflow-auto bg-hover">
+          <div className={`bg-hover ${stickyToolbar ? 'flex-1 overflow-auto' : 'flex-none'}`}>
             <QuestionList
               questions={ff.questions}
               answers={answers}
@@ -219,17 +242,21 @@ export default function FormFiller({
               search={listSearch}
               hideUnavailable={hideUnavailableFilters}
               renderToolbar={renderFilters}
+              pageSize={listPageSize}
             />
           </div>
         )}
         {/* Kept while the list shows, so the pages need not be drawn again. */}
-        <div ref={fitRef} className={`flex-1 overflow-auto bg-hover ${view === 'list' ? 'hidden' : ''}`}>
+        <div
+          ref={fitRef}
+          className={`bg-hover ${stickyToolbar ? 'flex-1 overflow-auto' : 'flex-none'} ${view === 'list' ? 'hidden' : ''}`}
+        >
           <PdfPages
             load={pdfSource}
             zoom={zoom}
             pages={layout?.pages}
             onLoaded={ff.onPdfLoaded}
-            onError={() => setLoadError('The document could not be shown')}
+            onError={() => setLoadError(L.documentLoadError)}
             overlay={(page) => [
               // The admin's text / boxes / lines first, the answer controls on top.
               ...(layout?.elements ?? [])
@@ -249,14 +276,14 @@ export default function FormFiller({
         </div>
         {confirmSubmit && (
           <ConfirmModal
-            confirmLabel="Submit"
+            confirmLabel={L.submit}
             onConfirm={() => {
               setConfirmSubmit(false)
               void ff.submit()
             }}
             onCancel={() => setConfirmSubmit(false)}
           >
-            Submit this form? You cannot change the answers afterwards.
+            {L.confirmSubmit}
           </ConfirmModal>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import Button from './Button'
+import { useLabels } from '../labels'
 
 /**
  * Draw a signature with mouse, pen or finger. onSave gets a PNG data URL (transparent background).
@@ -14,6 +15,7 @@ export default function SignaturePad({
   onCancel: () => void
   maxWidth?: number
 }) {
+  const L = useLabels()
   const canvas = useRef<HTMLCanvasElement>(null)
   const last = useRef<{ x: number; y: number } | null>(null)
   const [empty, setEmpty] = useState(true)
@@ -61,7 +63,7 @@ export default function SignaturePad({
         ref={canvas}
         width={800}
         height={260}
-        aria-label="Signature drawing area"
+        aria-label={L.signatureArea}
         className="h-[200px] w-full touch-none rounded-md border border-dashed border-line-strong bg-surface"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId)
@@ -72,13 +74,13 @@ export default function SignaturePad({
       />
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={clear}>
-          Clear
+          {L.clear}
         </Button>
         <Button variant="secondary" onClick={onCancel}>
-          Cancel
+          {L.cancel}
         </Button>
         <Button disabled={empty} onClick={save}>
-          Use signature
+          {L.useSignature}
         </Button>
       </div>
     </div>

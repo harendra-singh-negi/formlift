@@ -2,6 +2,7 @@ import type { FormliftComponents } from '../ui/slots'
 import { Paperclip, PenLine } from 'lucide-react'
 import { useRef, useState } from 'react'
 import type { AnswerValue, FieldDef, FieldType } from '../../core/form-logic'
+import { useLabels } from '../labels'
 import { Button, inputClass, Modal, ModalBody, ModalFooter, ModalHeader, SignaturePad } from '../ui/slots'
 
 // Text scales with the field's box (container query height), so it zooms with the page.
@@ -114,6 +115,7 @@ export default function FieldControl({
   signatureSrc,
   compact,
 }: FieldControlProps) {
+  const L = useLabels()
   const [signing, setSigning] = useState(false)
   const [editing, setEditing] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -151,7 +153,7 @@ export default function FieldControl({
               {error && <p className="mt-2 mb-0 text-[13px] text-danger">{error}</p>}
             </ModalBody>
             <ModalFooter>
-              <Button onClick={() => setEditing(false)}>Done</Button>
+              <Button onClick={() => setEditing(false)}>{L.done}</Button>
             </ModalFooter>
           </Modal>
         )}
@@ -228,24 +230,24 @@ export default function FieldControl({
             {text ? (
               <img
                 src={text.startsWith('data:') ? text : signatureSrc}
-                alt="Signature"
+                alt={L.signature}
                 className="max-h-full max-w-full object-contain"
               />
             ) : (
               <span className="inline-flex items-center gap-1 text-[clamp(8px,45cqh,13px)] text-primary">
-                <PenLine size={12} /> Sign
+                <PenLine size={12} /> {L.sign}
               </span>
             )}
           </button>
           {signing && (
             <Modal onClose={() => setSigning(false)} width="w-[640px]">
-              <ModalHeader title={`Sign: ${field.label || field.key}`} onClose={() => setSigning(false)} />
+              <ModalHeader title={L.signTitle(field.label || field.key)} onClose={() => setSigning(false)} />
               <ModalBody>
                 <SignaturePad
                   onCancel={() => setSigning(false)}
                   onSave={(url) => {
                     // Stored as a PNG file (the answer gets its id); without an upload (editor preview) kept as is.
-                    if (onFile) onFile(pngFile(url, `Signature - ${field.label || field.key}.png`))
+                    if (onFile) onFile(pngFile(url, L.signatureFileName(field.label || field.key)))
                     else onChange(url)
                     setSigning(false)
                   }}
@@ -274,7 +276,7 @@ export default function FieldControl({
               onClick={onOpenFile}
               className="min-w-0 flex-1 cursor-pointer truncate text-left text-[clamp(8px,50cqh,13px)] text-primary underline"
             >
-              {fileName || 'Attached file'}
+              {fileName || L.attachedFile}
             </button>
           )}
           {!readOnly && (
@@ -284,7 +286,7 @@ export default function FieldControl({
               onClick={() => fileInput.current?.click()}
               className="inline-flex flex-none cursor-pointer items-center gap-1 text-[clamp(8px,50cqh,13px)] text-primary"
             >
-              <Paperclip size={12} /> {value ? 'Replace' : 'Attach'}
+              <Paperclip size={12} /> {value ? L.replace : L.attach}
             </button>
           )}
         </div>

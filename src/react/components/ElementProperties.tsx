@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { FONTS, type LayoutElement } from '../../core/form-logic'
 import { fitInPage } from '../../core/coords'
 import { Checkbox, FormField, Select, TextArea, TextInput } from '../ui/slots'
+import { useLabels } from '../labels'
 
 const num = (s: string) => (s.trim() === '' || !Number.isFinite(Number(s)) ? undefined : Number(s))
 const pct = (n: number) => Math.round(n * 1000) / 10
@@ -25,6 +26,7 @@ function ColorField({
   onChange: (v: string | undefined) => void
   allowNone?: boolean
 }) {
+  const L = useLabels()
   return (
     <FormField label={label}>
       <span className="flex items-center gap-2">
@@ -38,11 +40,11 @@ function ColorField({
         {allowNone && (
           <label className="inline-flex items-center gap-1.5 text-[12.5px]">
             <Checkbox
-              label={`No ${label.toLowerCase()}`}
+              label={L.noColour(label)}
               checked={!value}
               onChange={(e) => onChange(e.target.checked ? undefined : '#ffffff')}
             />
-            None
+            {L.none}
           </label>
         )}
       </span>
@@ -60,6 +62,7 @@ export default function ElementProperties({
   pageCount: number
   onChange: (e: LayoutElement) => void
 }) {
+  const L = useLabels()
   const set = (patch: Partial<LayoutElement>) => onChange({ ...e, ...patch })
   const setPos = (k: 'x' | 'y' | 'width' | 'height', v: string) => {
     const n = num(v)
@@ -78,22 +81,22 @@ export default function ElementProperties({
   return (
     <div className="text-[13px]">
       {e.type === 'text' && (
-        <Section title="Text">
+        <Section title={L.textSection}>
           {e.replaces != null && (
             <p className="m-0 rounded bg-primary-soft px-2 py-1 text-[12px] text-ink-2">
-              Replaces the original: “{e.replaces}”
+              {L.replacesOriginal(e.replaces)}
             </p>
           )}
           <TextArea
             rows={4}
-            aria-label="Text"
+            aria-label={L.text}
             autoFocus
             value={e.text ?? ''}
             maxLength={5000}
             onChange={(ev) => set({ text: ev.target.value })}
           />
           <div className="grid grid-cols-2 gap-2">
-            <FormField label="Font">
+            <FormField label={L.font}>
               <Select
                 className="w-full"
                 value={e.font ?? 'sans'}
@@ -101,12 +104,12 @@ export default function ElementProperties({
               >
                 {FONTS.map((f) => (
                   <option key={f} value={f}>
-                    {{ sans: 'Sans (Helvetica)', serif: 'Serif (Times)', mono: 'Mono (Courier)' }[f]}
+                    {{ sans: L.fontSans, serif: L.fontSerif, mono: L.fontMono }[f]}
                   </option>
                 ))}
               </Select>
             </FormField>
-            <FormField label="Size (pt)">
+            <FormField label={L.fontSize}>
               <TextInput
                 type="number"
                 min={3}
@@ -123,37 +126,37 @@ export default function ElementProperties({
           <div className="flex flex-wrap items-center gap-4">
             {(['bold', 'italic'] as const).map((k) => (
               <label key={k} className="inline-flex items-center gap-1.5">
-                <Checkbox label={k} checked={!!e[k]} onChange={(ev) => set({ [k]: ev.target.checked || undefined })} />
-                {k === 'bold' ? 'Bold' : 'Italic'}
+                <Checkbox label={L[k]} checked={!!e[k]} onChange={(ev) => set({ [k]: ev.target.checked || undefined })} />
+                {L[k]}
               </label>
             ))}
             <Select
-              aria-label="Alignment"
+              aria-label={L.alignment}
               value={e.align ?? 'left'}
               onChange={(ev) => set({ align: ev.target.value as LayoutElement['align'] })}
             >
-              <option value="left">Left</option>
-              <option value="center">Centre</option>
-              <option value="right">Right</option>
+              <option value="left">{L.alignLeft}</option>
+              <option value="center">{L.alignCenter}</option>
+              <option value="right">{L.alignRight}</option>
             </Select>
           </div>
-          <ColorField label="Text colour" value={e.color ?? '#000000'} onChange={(v) => set({ color: v })} />
+          <ColorField label={L.textColour} value={e.color ?? '#000000'} onChange={(v) => set({ color: v })} />
         </Section>
       )}
 
-      <Section title="Colours">
+      <Section title={L.coloursSection}>
         {e.type !== 'line' && (
-          <ColorField label="Background" allowNone value={e.fill} onChange={(v) => set({ fill: v })} />
+          <ColorField label={L.background} allowNone value={e.fill} onChange={(v) => set({ fill: v })} />
         )}
         {e.type !== 'text' && (
           <>
             <ColorField
-              label={e.type === 'line' ? 'Line colour' : 'Border'}
+              label={e.type === 'line' ? L.lineColour : L.border}
               allowNone={e.type === 'box'}
               value={e.stroke}
               onChange={(v) => set({ stroke: v })}
             />
-            <FormField label="Line width (pt)">
+            <FormField label={L.lineWidth}>
               <TextInput
                 type="number"
                 min={0}
@@ -169,13 +172,13 @@ export default function ElementProperties({
           </>
         )}
         {e.fill === '#ffffff' && (
-          <p className="m-0 text-[12px] text-muted">A white background hides the original under it.</p>
+          <p className="m-0 text-[12px] text-muted">{L.whiteHides}</p>
         )}
       </Section>
 
-      <Section title="Position (% of page)">
+      <Section title={L.positionSection}>
         <div className="grid grid-cols-2 gap-2">
-          <FormField label="Page">
+          <FormField label={L.page}>
             <TextInput
               type="number"
               min={1}
@@ -189,7 +192,7 @@ export default function ElementProperties({
           </FormField>
           <span />
           {(['x', 'y', 'width', 'height'] as const).map((k) => (
-            <FormField key={k} label={{ x: 'Left', y: 'Top', width: 'Width', height: 'Height' }[k]}>
+            <FormField key={k} label={{ x: L.left, y: L.top, width: L.width, height: L.height }[k]}>
               <TextInput
                 type="number"
                 step={0.1}

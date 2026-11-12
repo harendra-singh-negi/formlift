@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, FilePlus2, Trash2 } from 'lucide-react'
 import type { LayoutPage } from '../../core/form-logic'
 import { IconButton } from '../ui/slots'
+import { useLabels } from '../labels'
 
 /**
  * The document's pages in order: original pages (with their number in the uploaded PDF) and blank ones.
@@ -22,6 +23,7 @@ export default function PagesPanel({
   onInsertBlank: (after: number) => void
   onGoTo: (page: number) => void
 }) {
+  const L = useLabels()
   return (
     <div className="text-[12.5px]">
       <button
@@ -29,7 +31,7 @@ export default function PagesPanel({
         className="flex w-full cursor-pointer items-center gap-1.5 border-b border-line-soft px-3 py-2 text-primary hover:bg-primary-soft"
         onClick={() => onInsertBlank(0)}
       >
-        <FilePlus2 size={14} /> Blank page at the start
+        <FilePlus2 size={14} /> {L.blankPageAtStart}
       </button>
       <ol className="m-0 list-none p-0">
         {pages.map((p, i) => {
@@ -41,32 +43,32 @@ export default function PagesPanel({
                 className="min-w-0 flex-1 cursor-pointer truncate text-left"
                 onClick={() => onGoTo(n)}
               >
-                <b>Page {n}</b> <span className="text-muted">{p.source ? `· original p.${p.source}` : '· blank'}</span>
-                {counts[n] ? <span className="text-faint"> · {counts[n]} items</span> : null}
+                <b>{L.pageItem(n)}</b> <span className="text-muted">{p.source ? L.originalPage(p.source) : L.blankPage}</span>
+                {counts[n] ? <span className="text-faint">{L.pageItemCount(counts[n])}</span> : null}
               </button>
               <IconButton
                 icon={ArrowUp}
-                title="Move page up"
+                title={L.movePageUp}
                 iconSize={13}
                 disabled={n === 1}
                 onClick={() => onMove(n, -1)}
               />
               <IconButton
                 icon={ArrowDown}
-                title="Move page down"
+                title={L.movePageDown}
                 iconSize={13}
                 disabled={n === pages.length}
                 onClick={() => onMove(n, 1)}
               />
               <IconButton
                 icon={FilePlus2}
-                title="Add blank page after"
+                title={L.addBlankPageAfter}
                 iconSize={13}
                 onClick={() => onInsertBlank(n)}
               />
               <IconButton
                 icon={Trash2}
-                title="Delete page"
+                title={L.deletePage}
                 danger
                 iconSize={13}
                 disabled={pages.length <= 1}

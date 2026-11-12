@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import Button from './Button'
+import { useLabels } from '../labels'
 
 interface ModalProps {
   children: ReactNode
@@ -25,28 +26,23 @@ export default function Modal({ children, onClose, width }: ModalProps) {
 }
 
 /** Title and × (disabled while e.g. an upload runs). */
-export const ModalHeader = ({
-  title,
-  onClose,
-  disabled,
-}: {
-  title: string
-  onClose: () => void
-  disabled?: boolean
-}) => (
-  <div className="flex items-center justify-between border-b border-line px-5 py-4">
-    <h3 className="m-0 text-[17px] font-semibold">{title}</h3>
-    <button
-      type="button"
-      aria-label="Close"
-      disabled={disabled}
-      onClick={onClose}
-      className="cursor-pointer text-2xl leading-none text-muted enabled:hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      ×
-    </button>
-  </div>
-)
+export function ModalHeader({ title, onClose, disabled }: { title: string; onClose: () => void; disabled?: boolean }) {
+  const L = useLabels()
+  return (
+    <div className="flex items-center justify-between border-b border-line px-5 py-4">
+      <h3 className="m-0 text-[17px] font-semibold">{title}</h3>
+      <button
+        type="button"
+        aria-label={L.close}
+        disabled={disabled}
+        onClick={onClose}
+        className="cursor-pointer text-2xl leading-none text-muted enabled:hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        ×
+      </button>
+    </div>
+  )
+}
 
 export const ModalBody = ({ children }: { children: ReactNode }) => (
   <div className="space-y-4 px-5 py-4 text-[13.5px]">{children}</div>
@@ -57,11 +53,11 @@ export const ModalFooter = ({ children }: { children: ReactNode }) => (
   <div className="flex justify-end gap-2 border-t border-line px-5 py-3">{children}</div>
 )
 
-/** "Are you sure…?" with Yes / No. */
+/** "Are you sure…?" with Yes / No (labels `yes` / `no` by default). */
 export function ConfirmModal({
   children,
-  confirmLabel = 'Yes',
-  cancelLabel = 'No',
+  confirmLabel,
+  cancelLabel,
   danger,
   onConfirm,
   onCancel,
@@ -74,15 +70,16 @@ export function ConfirmModal({
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const L = useLabels()
   return (
     <Modal onClose={onCancel} width="w-[420px]">
       <div className="px-6 pt-7 pb-6 text-sm">{children}</div>
       <ModalFooter>
         <Button variant="secondary" onClick={onCancel}>
-          {cancelLabel}
+          {cancelLabel ?? L.no}
         </Button>
         <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm}>
-          {confirmLabel}
+          {confirmLabel ?? L.yes}
         </Button>
       </ModalFooter>
     </Modal>

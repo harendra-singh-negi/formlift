@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
-import { FIELD_TYPES, type Condition, type FieldDef, type FieldType } from '../../core/form-logic'
+import { FIELD_TYPES, type AnswerRule, type Condition, type FieldDef, type FieldType } from '../../core/form-logic'
 import { fitInPage } from '../../core/coords'
-import { TYPE_LABEL } from '../constants'
+import { typeName, useLabels } from '../labels'
 import ConditionBuilder from './ConditionBuilder'
 import { Checkbox, FormField, Select, TextArea, TextInput } from '../ui/slots'
 
@@ -15,11 +15,7 @@ const Section = ({ title, children }: { title: string; children: ReactNode }) =>
   </section>
 )
 
-const CONDITIONS = [
-  ['visibleWhen', 'Show only when'],
-  ['requiredWhen', 'Required when'],
-  ['readOnlyWhen', 'Read-only when'],
-] as const
+const CONDITIONS = ['visibleWhen', 'requiredWhen', 'readOnlyWhen'] as const
 
 /** Everything about the selected field: identity, rules, options, conditions, position (in % of the page). */
 export default function FieldProperties({
@@ -27,13 +23,18 @@ export default function FieldProperties({
   fields,
   pageCount,
   onChange,
+  rules = {},
 }: {
   field: FieldDef
   fields: FieldDef[]
   pageCount: number
   onChange: (f: FieldDef) => void
+  /** The app's own rules the admin can pick for this field. */
+  rules?: Record<string, AnswerRule>
 }) {
+  const L = useLabels()
   const set = (patch: Partial<FieldDef>) => onChange({ ...field, ...patch })
+  const pickable = Object.entries(rules).filter(([, r]) => !r.types || r.types.includes(field.type))
   const others = fields.filter((f) => f.id !== field.id)
   const [optionsText, setOptionsText] = useState((field.options ?? []).join('\n'))
   const hasOptions = field.type === 'dropdown' || field.type === 'radio'
@@ -45,32 +46,31 @@ export default function FieldProperties({
 
   return (
     <div className="text-[13px]">
-      <Section title="Field">
+      <Section title={L.fieldSection}>
         {field.source === 'ai' && (
           <p className="m-0 rounded bg-folder/15 px-2 py-1 text-[12px]">
-            Suggested automatically
-            {field.confidence != null && ` (${Math.round(field.confidence * 100)}% sure)`}. Check it.
+            {L.suggestedAutomatically(field.confidence != null ? Math.round(field.confidence * 100) : null)}
           </p>
         )}
-        <p className="m-0 font-mono text-[11px] text-faint">ID {field.id}</p>
-        <FormField label="Label">
+        <p className="m-0 font-mono text-[11px] text-faint">{L.fieldId(field.id)}</p>
+        <FormField label={L.label}>
           <TextInput value={field.label} onChange={(e) => set({ label: e.target.value })} />
         </FormField>
         {/* Made from the label (unique, kept in step by conditions), never typed: no clashes. */}
-        <FormField label="Key (automatic, from the label)">
+        <FormField label={L.keyAutomatic}>
           <TextInput value={field.key} readOnly className="text-faint" />
         </FormField>
-        <FormField label="Type">
+        <FormField label={L.type}>
           <Select className="w-full" value={field.type} onChange={(e) => set({ type: e.target.value as FieldType })}>
             {FIELD_TYPES.map((t) => (
               <option key={t} value={t}>
-                {TYPE_LABEL[t]}
+                {typeName(L, t)}
               </option>
             ))}
           </Select>
         </FormField>
         {textual && (
-          <FormField label="Placeholder">
+          <FormField label={L.placeholder}>
             <TextInput
               value={field.placeholder ?? ''}
               onChange={(e) => set({ placeholder: e.target.value || undefined })}
@@ -78,10 +78,10 @@ export default function FieldProperties({
           </FormField>
         )}
         {field.type !== 'file' && field.type !== 'signature' && (
-          <FormField label={field.type === 'checkbox' ? 'Checked by default' : 'Default value'}>
+          <FormField label={field.type === 'checkbox' ? L.checkedByDefault : L.defaultValue}>
             {field.type === 'checkbox' ? (
               <Checkbox
-                label="Checked by default"
+                label={L.checkedByDefault}
                 checked={field.defaultValue === 'true'}
                 onChange={(e) => set({ defaultValue: e.target.checked ? 'true' : undefined })}
               />
@@ -93,21 +93,21 @@ export default function FieldProperties({
             )}
           </FormField>
         )}
-        <FormField label="Help text (shown as tooltip)">
+        <FormField label={L.helpText}>
           <TextInput value={field.helpText ?? ''} onChange={(e) => set({ helpText: e.target.value || undefined })} />
         </FormField>
         <div className="flex flex-wrap gap-4">
           {(['required', 'readOnly', 'hidden'] as const).map((k) => (
             <label key={k} className="inline-flex items-center gap-1.5">
-              <Checkbox label={k} checked={!!field[k]} onChange={(e) => set({ [k]: e.target.checked || undefined })} />
-              {{ required: 'Required', readOnly: 'Read-only', hidden: 'Hidden' }[k]}
+              <Checkbox label={L[k]} checked={!!field[k]} onChange={(e) => set({ [k]: e.target.checked || undefined })} />
+              {L[k]}
             </label>
           ))}
         </div>
       </Section>
 
       {hasOptions && (
-        <Section title="Options (one per line)">
+        <Section title={L.optionsSection}>
           <TextArea
             rows={4}
             value={optionsText}
@@ -129,9 +129,9 @@ export default function FieldProperties({
       )}
 
       {textual && (
-        <Section title="Validation">
+        <Section title={L.validationSection}>
           <div className="grid grid-cols-2 gap-2">
-            <FormField label="Min length">
+            <FormField label={L.minLength}>
               <TextInput
                 type="number"
                 min={0}
@@ -139,7 +139,7 @@ export default function FieldProperties({
                 onChange={(e) => set({ minLength: num(e.target.value) })}
               />
             </FormField>
-            <FormField label="Max length">
+            <FormField label={L.maxLength}>
               <TextInput
                 type="number"
                 min={0}
@@ -149,14 +149,14 @@ export default function FieldProperties({
             </FormField>
             {field.type === 'number' && (
               <>
-                <FormField label="Min value">
+                <FormField label={L.minValue}>
                   <TextInput
                     type="number"
                     value={field.min ?? ''}
                     onChange={(e) => set({ min: num(e.target.value) })}
                   />
                 </FormField>
-                <FormField label="Max value">
+                <FormField label={L.maxValue}>
                   <TextInput
                     type="number"
                     value={field.max ?? ''}
@@ -166,7 +166,7 @@ export default function FieldProperties({
               </>
             )}
           </div>
-          <FormField label="Regex (whole value must match)">
+          <FormField label={L.regex}>
             <TextInput
               className="font-mono"
               value={field.pattern ?? ''}
@@ -176,10 +176,47 @@ export default function FieldProperties({
         </Section>
       )}
 
-      {CONDITIONS.map(([key, title]) => {
+      <Section title={L.messagesSection}>
+        <FormField label={L.requiredMessage}>
+          <TextInput
+            value={field.requiredMessage ?? ''}
+            placeholder={L.messageHint}
+            onChange={(e) => set({ requiredMessage: e.target.value || undefined })}
+          />
+        </FormField>
+        <FormField label={L.errorMessage}>
+          <TextInput
+            value={field.errorMessage ?? ''}
+            placeholder={L.messageHint}
+            onChange={(e) => set({ errorMessage: e.target.value || undefined })}
+          />
+        </FormField>
+        {pickable.length > 0 && (
+          <FormField label={L.rulesLabel}>
+            <div className="flex flex-col gap-1.5">
+              {pickable.map(([id, rule]) => (
+                <label key={id} className="flex cursor-pointer items-center gap-2 text-[13px]">
+                  <Checkbox
+                    label={rule.label ?? id}
+                    checked={!!field.rules?.includes(id)}
+                    onChange={(e) => {
+                      const next = (field.rules ?? []).filter((r) => r !== id)
+                      if (e.target.checked) next.push(id)
+                      set({ rules: next.length ? next : undefined })
+                    }}
+                  />
+                  {rule.label ?? id}
+                </label>
+              ))}
+            </div>
+          </FormField>
+        )}
+      </Section>
+
+      {CONDITIONS.map((key) => {
         const cond = field[key]
         return (
-          <Section key={key} title={title}>
+          <Section key={key} title={L[key]}>
             {cond ? (
               <ConditionBuilder
                 value={cond}
@@ -195,16 +232,16 @@ export default function FieldProperties({
                   set({ [key]: { logic: 'and', rules: [{ fieldKey: others[0].key, op: 'equals', value: '' }] } })
                 }
               >
-                + Add condition
+                {L.addCondition}
               </button>
             )}
           </Section>
         )
       })}
 
-      <Section title="Position (% of page)">
+      <Section title={L.positionSection}>
         <div className="grid grid-cols-2 gap-2">
-          <FormField label="Page">
+          <FormField label={L.page}>
             <TextInput
               type="number"
               min={1}
@@ -219,7 +256,7 @@ export default function FieldProperties({
           </FormField>
           <span />
           {(['x', 'y', 'width', 'height'] as const).map((k) => (
-            <FormField key={k} label={{ x: 'Left', y: 'Top', width: 'Width', height: 'Height' }[k]}>
+            <FormField key={k} label={{ x: L.left, y: L.top, width: L.width, height: L.height }[k]}>
               <TextInput
                 type="number"
                 step={0.1}

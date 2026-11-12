@@ -4,6 +4,7 @@ import { useQuestionFilter, type QuestionFilterState, type UseQuestionFilterOpti
 import { Button, Chip, ChipGroup, RemovableChip, EmptyText, Popover, Tag } from '../ui/slots'
 import type { Answers, FieldDef, FieldType } from '../../core/form-logic'
 import type { Question } from '../../core/questions'
+import { useLabels } from '../labels'
 
 const PAGE = 100
 
@@ -36,6 +37,7 @@ export default function QuestionList({
   hideUnavailable = true,
   toolbar = true,
   renderToolbar,
+  pageSize = PAGE,
 }: {
   questions: Question[]
   answers: Answers
@@ -46,12 +48,15 @@ export default function QuestionList({
   hideUnavailable?: boolean
   toolbar?: boolean
   renderToolbar?: (fs: QuestionFilterState) => ReactNode
+  /** Questions shown at first and added by "Show more". Default 100. */
+  pageSize?: number
 }) {
+  const L = useLabels()
   const own = useQuestionFilter(questions, answers, { filters, search })
   const fs = external ?? own
   const { list } = fs
-  const [shown, setShown] = useState(PAGE)
-  useEffect(() => setShown(PAGE), [fs.version])
+  const [shown, setShown] = useState(pageSize)
+  useEffect(() => setShown(pageSize), [fs.version, pageSize])
   const groups = fs.groups.filter((g) => g.available || !hideUnavailable)
   const bar = groups.filter((g) => g.section === 'bar')
   const menu = groups.filter((g) => g.section !== 'bar')
@@ -69,8 +74,8 @@ export default function QuestionList({
                     <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
                     <input
                       type="search"
-                      aria-label="Search questions"
-                      placeholder="Search questions, sections, answers…"
+                      aria-label={L.searchQuestions}
+                      placeholder={L.searchPlaceholder}
                       value={fs.search}
                       onChange={(e) => fs.setSearch(e.target.value)}
                       className="w-full rounded-full border border-line-strong bg-surface py-1.5 pr-3 pl-9 text-[13px] outline-none focus:border-primary focus:bg-white max-sm:text-base"
@@ -78,7 +83,7 @@ export default function QuestionList({
                   </label>
                 )}
                 {menu.length > 0 && (
-                  <Popover label="Filters" icon={SlidersHorizontal} badge={fs.inUse.length} align="right">
+                  <Popover label={L.filters} icon={SlidersHorizontal} badge={fs.inUse.length} align="right">
                     <div className="flex flex-col gap-4">
                       {sections.map((sec) => (
                         <FilterSection key={sec} title={sec}>
@@ -99,18 +104,25 @@ export default function QuestionList({
                   </Popover>
                 )}
                 <span className="text-[12.5px] text-muted sm:ml-auto" aria-live="polite">
-                  <b className="font-semibold text-ink-2">{list.length}</b> of {fs.total} questions
+                  {L.questionsCount(list.length, fs.total)
+                    .split(String(list.length))
+                    .map((part, i) => (
+                      <Fragment key={i}>
+                        {i > 0 && <b className="font-semibold text-ink-2">{list.length}</b>}
+                        {part}
+                      </Fragment>
+                    ))}
                 </span>
                 {fs.active && (
                   <Button variant="secondary" size="sm" onClick={fs.clear}>
-                    Clear all
+                    {L.clearAll}
                   </Button>
                 )}
               </div>
               {bar.map((g) => (
                 <div key={g.id} role="group" aria-label={g.title} className="flex flex-wrap items-center gap-1.5">
                   <span className="mr-1 text-[11.5px] font-semibold tracking-wide text-muted uppercase">{g.title}</span>
-                  <Chip label="All" count={fs.total} active={g.value == null} onClick={() => g.set(null)} />
+                  <Chip label={L.all} count={fs.total} active={g.value == null} onClick={() => g.set(null)} />
                   {g.options.map((o) => (
                     <Chip
                       key={o.value}
@@ -132,7 +144,7 @@ export default function QuestionList({
             </div>
           )}
 
-      {list.length === 0 && <EmptyText>No question matches these filters.</EmptyText>}
+      {list.length === 0 && <EmptyText>{L.noQuestionMatches}</EmptyText>}
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {list.slice(0, shown).map((q, i, all) => (
           <Fragment key={q.id}>
@@ -159,7 +171,7 @@ export default function QuestionList({
                   {q.title}
                 </p>
                 {q.category && <Tag tone="muted">{q.category}</Tag>}
-                <Tag tone="muted">p.{q.page}</Tag>
+                <Tag tone="muted">{L.pageTag(q.page)}</Tag>
               </div>
               {q.columns ? (
                 <TableGrid q={q} control={control} />
@@ -196,8 +208,8 @@ export default function QuestionList({
       </ul>
       {list.length > shown && (
         <div className="mt-3 text-center">
-          <Button variant="secondary" size="sm" onClick={() => setShown((n) => n + PAGE)}>
-            Show more ({list.length - shown} left)
+          <Button variant="secondary" size="sm" onClick={() => setShown((n) => n + pageSize)}>
+            {L.showMore(list.length - shown)}
           </Button>
         </div>
       )}

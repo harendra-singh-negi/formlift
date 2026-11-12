@@ -8,6 +8,8 @@ export { default as PdfPages, readPdf } from './components/PdfPages'
 export type { PdfSource, PdfBytes, PageSize } from './components/PdfPages'
 export { setPdfWorker } from './pdfjs'
 export { TYPE_LABEL } from './constants'
+export { DEFAULT_LABELS, useLabels } from './labels'
+export type { Labels } from './labels'
 
 // Headless: all the logic, none of the UI. Build your own editor / filler around these.
 export { useFormEditor } from './hooks/useFormEditor'

@@ -15,6 +15,7 @@ import BaseSignaturePad from './SignaturePad'
 import * as tag from './Tag'
 import type { FieldControlProps } from '../components/FieldControl'
 import type { FieldType } from '../../core/form-logic'
+import { LabelsProvider, useLabelOverrides, type Labels } from '../labels'
 
 const base = {
   Button: BaseButton,
@@ -46,16 +47,26 @@ export const defaultComponents: UIComponents = base
 
 const UIContext = createContext<Partial<UIComponents>>({})
 
-/** Replaces formlift's UI primitives for everything under it. Nested providers merge (inner wins). */
+/**
+ * Replaces formlift's UI primitives and texts (`labels`, any language) for everything under it.
+ * Nested providers merge (inner wins).
+ */
 export function FormliftProvider({
   components,
+  labels,
   children,
 }: {
   components?: Partial<UIComponents>
+  labels?: Partial<Labels>
   children: ReactNode
 }) {
   const outer = useContext(UIContext)
-  return <UIContext.Provider value={components ? { ...outer, ...components } : outer}>{children}</UIContext.Provider>
+  const outerLabels = useLabelOverrides()
+  return (
+    <UIContext.Provider value={components ? { ...outer, ...components } : outer}>
+      <LabelsProvider value={labels ? { ...outerLabels, ...labels } : outerLabels}>{children}</LabelsProvider>
+    </UIContext.Provider>
+  )
 }
 
 function slot<K extends keyof UIComponents>(name: K): UIComponents[K] {

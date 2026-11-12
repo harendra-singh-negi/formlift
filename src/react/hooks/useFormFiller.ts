@@ -2,6 +2,9 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   checkAnswer,
+  type AnswerMessages,
+  type AnswerOptions,
+  type Limits,
   defaultAnswers,
   fieldStates,
   validateAnswers,
@@ -13,6 +16,7 @@ import {
 import { toLines, type PdfTextItem, type TextLine } from '../../core/layout'
 import { toQuestions as builtinToQuestions, type PageText, type Question } from '../../core/questions'
 import type { PageSize } from '../components/PdfPages'
+import { useLabels, type Labels } from '../labels'
 
 /** A file answer (upload or signature PNG) as your storage knows it. The answer's value is its `id`. */
 export interface AnswerFileInfo {
@@ -52,8 +56,23 @@ export interface UseFormFillerOptions {
    * them, e.g. `(f, t) => toQuestions(f, t, { categoryCode: false }).map(setMyCategory)`.
    */
   toQuestions?: (fields: FieldDef[], textOf: PageText) => Question[]
+  /** Size limits for answers (use the same on your server). Default: DEFAULT_LIMITS. */
+  limits?: Partial<Limits>
+  /** Your own wording for answer errors (any language). Default: DEFAULT_ANSWER_MESSAGES. */
+  messages?: Partial<AnswerMessages>
+  /** Your own named rules that fields list in `rules` (same object as FormEditor's and your server's). */
+  rules?: AnswerOptions['rules']
+  /** Full control: runs first for every field (see AnswerOptions.validate). */
+  validate?: AnswerOptions['validate']
+  /**
+   * Every change of the answers, as plain JSON. With this you need no onSave: keep, send or store the answers
+   * however you like.
+   */
+  onChange?: (answers: Answers) => void
   notify?: (message: string) => void
   onError?: (error: unknown) => void
+  /** Your own text for every button, heading and message (any language). Default: DEFAULT_LABELS (English). */
+  labels?: Partial<Labels>
 }
 
 function download(blob: Blob, name: string) {
@@ -82,9 +101,16 @@ export function useFormFiller({
   onUpload,
   loadFile,
   toQuestions = builtinToQuestions,
+  limits,
+  messages,
+  rules,
+  validate,
+  onChange,
   notify = () => {},
   onError: notifyError = (e) => console.error(e),
+  labels,
 }: UseFormFillerOptions) {
+  const L = useLabels(labels)
   const [answers, setAnswers] = useState<Answers>(() => initialAnswers ?? defaultAnswers(fields))
   const [files, setFiles] = useState<AnswerFileInfo[]>(initialFiles)
   // Stored signature images (file id → object URL).
@@ -96,9 +122,15 @@ export function useFormFiller({
   const [pdfSizes, setPdfSizes] = useState<PageSize[]>([])
   const queue = useRef<Promise<unknown>>(Promise.resolve())
   const latest = useRef<Answers>(answers)
+  const changed = useRef(onChange)
+  changed.current = onChange
+  const first = useRef(true)
   useEffect(() => {
     latest.current = answers
+    if (first.current) first.current = false
+    else changed.current?.(answers)
   }, [answers])
+  const answerOptions: AnswerOptions = { ...limits, messages, rules, validate }
 
   const states = useMemo(() => fieldStates(fields, answers), [fields, answers])
 
@@ -193,7 +225,7 @@ export function useFormFiller({
     setAnswers((a) => ({ ...a, [f.key]: v }))
     setSaveState('dirty')
     if (errors[f.key]) {
-      const err = checkAnswer(f, v, states[f.key]?.required)
+      const err = checkAnswer(f, v, states[f.key]?.required, answerOptions, { ...answers, [f.key]: v })
       setErrors((all) => {
         const rest = { ...all }
         delete rest[f.key]
@@ -216,7 +248,7 @@ export function useFormFiller({
   }
 
   const fetchFile = (id: string, then: (blob: Blob) => void) =>
-    loadFile?.(id).then(then, () => notifyError('Unable to open the file'))
+    loadFile?.(id).then(then, () => notifyError(L.fileOpenError))
   /** Opens a stored file in a new tab. */
   const openFile = (id: string) =>
     fetchFile(id, (blob) => {
@@ -229,14 +261,14 @@ export function useFormFiller({
 
   /** Validates everything; when clean, saves with `submit: true`. true = submitted. */
   async function submit() {
-    const found = validateAnswers(fields, answers)
+    const found = validateAnswers(fields, answers, answerOptions)
     setErrors(found)
     if (Object.keys(found).length) {
-      notifyError('Some answers need attention')
+      notifyError(L.answersNeedAttention)
       return false
     }
     if (!(await save(true))) return false
-    notify('Submitted')
+    notify(L.submitted)
     onSubmitted?.(latest.current)
     return true
   }

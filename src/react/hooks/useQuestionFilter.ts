@@ -1,18 +1,53 @@
 import { useMemo, useState } from 'react'
 import {
-  builtinFilters,
+  answeredFilter,
+  categoryFilter,
+  choiceFilter,
   filterQuestions,
+  partFilter,
+  pickedFilter,
   resolveFilters,
   type FilterOption,
   type FilterSource,
   type FilterValues,
+  tagFilters,
+  typeFilter,
 } from '../../core/filters'
 import type { Answers } from '../../core/form-logic'
 import type { Question } from '../../core/questions'
-import { TYPE_LABEL } from '../constants'
+import { DEFAULT_LABELS, typeName, useLabels, type Labels } from '../labels'
 
-/** The built-in filters (labels from formlift's UI). Pick from it by id, reorder it, add your own. */
-export const defaultFilters: FilterSource[] = builtinFilters({ type: (t) => TYPE_LABEL[t] })
+// The built-in filters, worded with these labels (same ids and order as core's builtinFilters).
+const labelledFilters = (L: Labels): FilterSource[] => [
+  answeredFilter({ title: L.filterAnswered, yes: L.filterAnswered, no: L.filterNotAnswered, section: L.sectionProgress }),
+  partFilter({
+    id: 'remarks',
+    title: L.filterRemarks,
+    match: /remark/i,
+    yes: L.filterWritten,
+    no: L.filterEmpty,
+    section: L.sectionProgress,
+  }),
+  partFilter({
+    id: 'comments',
+    title: L.filterComments,
+    match: /comment/i,
+    yes: L.filterWritten,
+    no: L.filterEmpty,
+    section: L.sectionProgress,
+  }),
+  choiceFilter({ title: L.filterHasOption, section: L.sectionAnswers }),
+  pickedFilter({ title: L.filterAnsweredWith, section: L.sectionAnswers }),
+  tagFilters({ section: L.sectionQuestionDetails }),
+  typeFilter({ title: L.filterAnswerType, section: L.sectionAnswerType, label: (t) => typeName(L, t) }),
+  categoryFilter({ title: L.filterCategory }),
+]
+
+/**
+ * The built-in filters (English). Pick from it by id, reorder it, add your own. Ids given as strings (and the
+ * default) are worded with the `labels` in effect.
+ */
+export const defaultFilters: FilterSource[] = labelledFilters(DEFAULT_LABELS)
 
 /** One filter, ready to draw: its options for this form, the picked value, and set(). */
 export interface FilterGroup {
@@ -44,9 +79,9 @@ export interface UseQuestionFilterOptions {
   onChange?: (state: { search: string; values: FilterValues }) => void
 }
 
-const byId = (id: string): FilterSource | undefined => {
-  if (id === 'tags') return defaultFilters.find((s) => typeof s === 'function')
-  return defaultFilters.find((s) => typeof s !== 'function' && s.id === id)
+const byId = (all: FilterSource[], id: string): FilterSource | undefined => {
+  if (id === 'tags') return all.find((s) => typeof s === 'function')
+  return all.find((s) => typeof s !== 'function' && s.id === id)
 }
 
 /**
@@ -58,8 +93,11 @@ const byId = (id: string): FilterSource | undefined => {
 export function useQuestionFilter(
   questions: Question[],
   answers: Answers,
-  { filters = defaultFilters, search: searchOn = true, initial, predicate, onChange }: UseQuestionFilterOptions = {},
+  { filters: chosen, search: searchOn = true, initial, predicate, onChange }: UseQuestionFilterOptions = {},
 ) {
+  const L = useLabels()
+  const builtin = useMemo(() => labelledFilters(L), [L])
+  const filters = chosen ?? builtin
   const [values, setValues] = useState<FilterValues>(initial?.values ?? {})
   const [search, setSearchState] = useState(initial?.search ?? '')
   // The answers the filter last looked at; the list follows new answers when the filter changes.
@@ -77,11 +115,11 @@ export function useQuestionFilter(
   const defs = useMemo(
     () =>
       resolveFilters(
-        filters.map((f) => (typeof f === 'string' ? byId(f) : f)).filter((f): f is FilterSource => !!f),
+        filters.map((f) => (typeof f === 'string' ? byId(builtin, f) : f)).filter((f): f is FilterSource => !!f),
         questions,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-resolve when the list's ids change, not on every render
-    [key, questions],
+    [key, questions, builtin],
   )
 
   const list = useMemo(() => {

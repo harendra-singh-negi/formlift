@@ -187,3 +187,19 @@ it('offers only the filters you list, and you decide on the ones this form has n
     { id: 'category', available: false },
   ])
 })
+
+it('shows your labels instead of the English ones', () => {
+  act(() =>
+    root.render(
+      <FormFiller
+        pdf="x.pdf"
+        fields={fields}
+        onSave={() => {}}
+        labels={{ submit: 'जमा करें', documentView: 'Doc', listView: 'Questions' }}
+      />,
+    ),
+  )
+  expect(button('जमा करें')).toBeTruthy()
+  expect(button('Questions')).toBeTruthy()
+  expect(button('Save draft')).toBeTruthy() // left out: stays English
+})

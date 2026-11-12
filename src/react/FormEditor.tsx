@@ -15,7 +15,7 @@ import {
   Undo2,
   Wand2,
 } from 'lucide-react'
-import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react'
+import { Fragment, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react'
 import ElementProperties from './components/ElementProperties'
 import { AnswerControl } from './components/FieldControl'
 import FieldProperties from './components/FieldProperties'
@@ -25,10 +25,10 @@ import PdfPages, { type PdfSource } from './components/PdfPages'
 import ZoomControls from './components/ZoomControls'
 import { useCompact, useFitZoom } from './hooks/useFitZoom'
 import { useFormEditor, type FormDoc, type UseFormEditorOptions } from './hooks/useFormEditor'
-import { TYPE_LABEL } from './constants'
+import { toolName, typeName, useLabels } from './labels'
 import { boxStyle } from '../core/coords'
 import type { FieldType } from '../core/form-logic'
-import { ELEMENT_TOOLS, type ElementTool } from '../core/layout'
+import type { ElementTool } from '../core/layout'
 import {
   Button,
   ConfirmModal,
@@ -92,6 +92,13 @@ export interface FormEditorProps extends UseFormEditorOptions {
   /** Extra classes on the root. It fills its container's height (`h-full`) by default: give the container a height. */
   className?: string
   ref?: Ref<FormEditorHandle>
+  /** Zoom steps of the − / + buttons. Default [0.5, 0.75, 1, 1.25, 1.5, 2]. */
+  zoomSteps?: readonly number[]
+  /**
+   * true (default): the toolbar stays on top when the page around the editor scrolls.
+   * false: it scrolls away with the page.
+   */
+  stickyToolbar?: boolean
 }
 
 /**
@@ -113,9 +120,12 @@ export default function FormEditor({
   hide = [],
   className = 'h-full',
   ref,
+  zoomSteps,
+  stickyToolbar = true,
   ...options
 }: FormEditorProps) {
   const shows = (p: EditorPart) => !hide.includes(p)
+  const L = useLabels(options.labels)
   const panelTabs = [
     ...(shows('propertiesTab') ? ['props'] : []),
     ...(shows('fieldsTab') ? ['fields'] : []),
@@ -138,7 +148,7 @@ export default function FormEditor({
   const [confirmDeletePage, setConfirmDeletePage] = useState<number | null>(null)
   const [loadError, setLoadError] = useState('')
   const scroller = useRef<HTMLDivElement>(null)
-  const { zoom, setZoom, ref: fitRef } = useFitZoom(Math.max(...(ed.pageSizes ?? [{ width: 595 }]).map((p) => p.width)))
+  const { zoom, setZoom, ref: fitRef } = useFitZoom(Math.max(...(ed.pageSizes ?? [{ width: 595 }]).map((p) => p.width)), zoomSteps)
   // A new selection shows its properties.
   useEffect(() => {
     if (selection) setTab('props')
@@ -187,18 +197,20 @@ export default function FormEditor({
   )
   const armedLabel = armed
     ? armed.startsWith('field:')
-      ? TYPE_LABEL[armed.slice(6) as FieldType]
-      : ELEMENT_TOOLS[armed.slice(8) as ElementTool]?.label
+      ? typeName(L, armed.slice(6) as FieldType)
+      : toolName(L, armed.slice(8) as ElementTool)
     : ''
 
   return (
-    <FormliftProvider components={components}>
+    <FormliftProvider components={components} labels={options.labels}>
       <div className={`fl-root flex min-h-[640px] flex-col bg-white text-ink ${className}`}>
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-white px-4 py-2.5">
+        <div
+          className={`flex flex-wrap items-center gap-2 border-b border-line bg-white px-4 py-2.5 max-sm:px-3 max-sm:py-2 ${stickyToolbar ? 'sticky top-0 z-20' : ''}`}
+        >
           {onBack && shows('back') && (
             <Button variant="secondary" size="sm" icon={ArrowLeft} onClick={onBack}>
-              Back
+              {L.back}
             </Button>
           )}
           {!preview && shows('tools') && (
@@ -209,7 +221,7 @@ export default function FormEditor({
               className="lg:hidden"
               onClick={() => setDrawer((d) => (d === 'tools' ? null : 'tools'))}
             >
-              Add
+              {L.add}
             </Button>
           )}
           {shows('panel') && (
@@ -220,41 +232,47 @@ export default function FormEditor({
               className="lg:hidden"
               onClick={() => setDrawer((d) => (d === 'panel' ? null : 'panel'))}
             >
-              {selection ? 'Properties' : 'Panel'}
+              {selection ? L.properties : L.panel}
             </Button>
           )}
           {title != null && shows('title') && (
-            <h2 className="m-0 min-w-0 truncate text-[17px] font-semibold">{title}</h2>
+            <h2 className="m-0 min-w-0 truncate text-[17px] font-semibold max-sm:flex-1 max-sm:text-[15px]">{title}</h2>
           )}
           {shows('status') && (
-            <span className="text-[12px] text-muted">{ed.dirty ? 'Unsaved changes' : 'All changes saved'}</span>
+            // phones: the Save button being enabled already says "unsaved"
+            <span className="text-[12px] text-muted max-sm:hidden">{ed.dirty ? L.unsavedChanges : L.allChangesSaved}</span>
           )}
-          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          {/* phones: one row that scrolls sideways instead of wrapping into several */}
+          <div className="ml-auto flex flex-wrap items-center gap-1.5 max-sm:w-full max-sm:flex-nowrap max-sm:overflow-x-auto">
             {shows('undo') && (
               <>
-                <IconButton icon={Undo2} title="Undo (Ctrl+Z)" disabled={!ed.canUndo || preview} onClick={ed.undo} />
-                <IconButton icon={Redo2} title="Redo (Ctrl+Y)" disabled={!ed.canRedo || preview} onClick={ed.redo} />
+                <IconButton icon={Undo2} title={L.undo} disabled={!ed.canUndo || preview} onClick={ed.undo} />
+                <IconButton icon={Redo2} title={L.redo} disabled={!ed.canRedo || preview} onClick={ed.redo} />
               </>
             )}
             {shows('snap') && (
               <IconButton
                 icon={Grid3x3}
-                title={snapOn ? 'Snap to grid: on' : 'Snap to grid: off'}
+                title={snapOn ? L.snapOn : L.snapOff}
                 className={snapOn ? '!text-primary' : ''}
                 onClick={() => ed.setSnapOn(!snapOn)}
               />
             )}
-            {shows('zoom') && <ZoomControls zoom={zoom} onChange={setZoom} />}
+            {shows('zoom') && (
+              <div className="max-sm:hidden">
+                <ZoomControls zoom={zoom} onChange={setZoom} steps={zoomSteps} />
+              </div>
+            )}
             {!preview && shows('editText') && (
               <Button
                 variant={editText ? 'primary' : 'secondary'}
                 size="sm"
                 icon={Type}
                 disabled={!layout}
-                title="Click any line of the document to change its text"
+                title={L.editTextHint}
                 onClick={() => ed.setEditText(!editText)}
               >
-                <span className="max-sm:hidden">Edit text</span>
+                <span className="max-sm:hidden">{L.editText}</span>
               </Button>
             )}
             {!preview && shows('autoDetect') && (
@@ -263,10 +281,10 @@ export default function FormEditor({
                 size="sm"
                 icon={Wand2}
                 disabled={!ed.pdf || !layout || !!ed.detecting}
-                title="Find answer lines, checkboxes and table cells and suggest fields for them"
+                title={L.autoDetectHint}
                 onClick={() => void ed.detect()}
               >
-                <span className="max-sm:hidden">Auto-detect</span>
+                <span className="max-sm:hidden">{L.autoDetect}</span>
               </Button>
             )}
             {shows('preview') && (
@@ -274,15 +292,22 @@ export default function FormEditor({
                 variant="secondary"
                 size="sm"
                 icon={preview ? Pencil : Eye}
-                title={preview ? 'Back to editing' : 'Preview'}
+                title={preview ? L.backToEditing : L.preview}
                 onClick={() => ed.setPreview(!preview)}
               >
-                <span className="max-sm:hidden">{preview ? 'Edit' : 'Preview'}</span>
+                <span className="max-sm:hidden">{preview ? L.edit : L.preview}</span>
               </Button>
             )}
             {shows('save') && (
-              <Button size="sm" icon={Save} title="Save" disabled={!ed.dirty || ed.busy} onClick={() => void ed.save()}>
-                <span className="max-sm:hidden">Save</span>
+              <Button
+                size="sm"
+                icon={Save}
+                title={L.save}
+                className="max-sm:ml-auto"
+                disabled={!ed.dirty || ed.busy}
+                onClick={() => void ed.save()}
+              >
+                <span className="max-sm:hidden">{L.save}</span>
               </Button>
             )}
             {toolbar}
@@ -291,7 +316,7 @@ export default function FormEditor({
         {banner}
         {ed.detecting && (
           <div className="flex items-center gap-3 bg-folder/15 px-4 py-1.5 text-[12.5px] text-ink-2" role="status">
-            Detecting fields… page {ed.detecting.done} of {ed.detecting.total}
+            {L.detecting(ed.detecting.done, ed.detecting.total)}
             <div className="h-1.5 w-40 overflow-hidden rounded bg-white">
               <div
                 className="h-full bg-folder"
@@ -303,26 +328,25 @@ export default function FormEditor({
               className="cursor-pointer text-primary hover:underline"
               onClick={() => ed.detecting?.stop.abort()}
             >
-              Stop
+              {L.stop}
             </button>
           </div>
         )}
         {armed && !preview && (
           <p className="m-0 flex items-center gap-3 bg-primary-soft px-4 py-1.5 text-[12.5px] text-ink-2" role="status">
-            Tap the page where the {armedLabel} should go.
+            {L.tapToPlace(armedLabel)}
             <button
               type="button"
               className="cursor-pointer text-primary hover:underline"
               onClick={() => ed.setArmed(null)}
             >
-              Cancel
+              {L.cancel}
             </button>
           </p>
         )}
         {editText && (
           <p className="m-0 bg-folder/15 px-4 py-1.5 text-[12.5px] text-ink-2">
-            Edit text: click a line of the document to replace it with an editable copy (same place and size). The
-            uploaded file itself never changes.
+            {L.editTextBanner}
           </p>
         )}
 
@@ -336,20 +360,20 @@ export default function FormEditor({
             >
               {shows('fieldTools') && ed.fieldTools.length > 0 && (
                 <>
-                  <PanelHeading>FIELDS</PanelHeading>
+                  <PanelHeading>{L.fieldsHeading}</PanelHeading>
                   <p className="m-0 px-3 pt-2 text-[11.5px] text-muted">
-                    Drag onto the document, or tap one, then the page
+                    {L.dragHint}
                   </p>
                   <div className="space-y-1 p-2">
-                    {ed.fieldTools.map((k) => toolItem(k, TYPE_LABEL[k.slice(6) as FieldType]))}
+                    {ed.fieldTools.map((k) => toolItem(k, typeName(L, k.slice(6) as FieldType)))}
                   </div>
                 </>
               )}
               {shows('layoutTools') && ed.elementTools.length > 0 && (
                 <>
-                  <PanelHeading>LAYOUT</PanelHeading>
+                  <PanelHeading>{L.layoutHeading}</PanelHeading>
                   <div className="space-y-1 p-2">
-                    {ed.elementTools.map((k) => toolItem(k, ELEMENT_TOOLS[k.slice(8) as ElementTool].label))}
+                    {ed.elementTools.map((k) => toolItem(k, toolName(L, k.slice(8) as ElementTool)))}
                   </div>
                 </>
               )}
@@ -374,7 +398,7 @@ export default function FormEditor({
               pages={layout?.pages}
               withText={editText && !preview}
               onLoaded={ed.onPdfLoaded}
-              onError={() => setLoadError('The document could not be shown')}
+              onError={() => setLoadError(L.documentLoadError)}
               overlay={(page, lines) => (
                 <div
                   className="absolute inset-0"
@@ -404,7 +428,7 @@ export default function FormEditor({
                     <button
                       key={i}
                       type="button"
-                      title={`Edit: ${line.text}`}
+                      title={L.editLine(line.text)}
                       className="absolute cursor-text rounded-[1px] outline-1 outline-folder/60 hover:bg-folder/25 hover:outline-folder"
                       style={boxStyle({ page, ...line })}
                       onPointerDown={(e) => e.stopPropagation()}
@@ -422,7 +446,7 @@ export default function FormEditor({
                           key={el.id}
                           role="button"
                           tabIndex={0}
-                          aria-label={`${el.type} ${el.text ?? ''}`}
+                          aria-label={`${toolName(L, el.type)} ${el.text ?? ''}`}
                           className={`absolute cursor-move touch-none select-none ${
                             selection?.id === el.id
                               ? 'z-10 outline-2 outline-primary'
@@ -443,7 +467,7 @@ export default function FormEditor({
                           />
                           {selection?.id === el.id && (
                             <span
-                              aria-label="Resize"
+                              aria-label={L.resize}
                               className="absolute -right-1 -bottom-1 h-2.5 w-2.5 cursor-se-resize rounded-sm border border-white bg-primary"
                               onPointerDown={(e) =>
                                 ed.startDrag(e, { kind: 'element', id: el.id }, { page, ...el.position }, 'resize')
@@ -477,8 +501,8 @@ export default function FormEditor({
                           key={f.id}
                           role="button"
                           tabIndex={0}
-                          aria-label={`${TYPE_LABEL[f.type]} field ${f.label || f.key}`}
-                          title={`${f.label || f.key} (${TYPE_LABEL[f.type]})`}
+                          aria-label={L.fieldOnPage(typeName(L, f.type), f.label || f.key)}
+                          title={`${f.label || f.key} (${typeName(L, f.type)})`}
                           className={`absolute cursor-move touch-none rounded-sm border text-[10px] select-none [container-type:size] ${
                             selection?.id === f.id
                               ? 'z-10 border-primary bg-primary/20 ring-2 ring-primary/40'
@@ -498,7 +522,7 @@ export default function FormEditor({
                           </span>
                           {selection?.id === f.id && (
                             <span
-                              aria-label="Resize"
+                              aria-label={L.resize}
                               className="absolute -right-1 -bottom-1 h-2.5 w-2.5 cursor-se-resize rounded-sm border border-white bg-primary"
                               onPointerDown={(e) => ed.startDrag(e, { kind: 'field', id: f.id }, f.position, 'resize')}
                               onPointerMove={ed.onDrag}
@@ -523,9 +547,9 @@ export default function FormEditor({
               <div className="overflow-x-auto border-b border-line p-2 [&_button]:px-2.5">
                 <SegmentedTabs
                   options={[
-                    { value: 'props', label: 'Properties' },
-                    { value: 'fields', label: `Fields (${fields.length})` },
-                    { value: 'pages', label: `Pages (${pageCount})` },
+                    { value: 'props', label: L.propertiesTab },
+                    { value: 'fields', label: L.fieldsTab(fields.length) },
+                    { value: 'pages', label: L.pagesTab(pageCount) },
                     ...tabs.map((t) => ({ value: t.id, label: t.label })),
                   ].filter((o) => panelTabs.includes(o.value))}
                   value={tab}
@@ -548,14 +572,14 @@ export default function FormEditor({
                           <>
                             <IconButton
                               icon={Copy}
-                              title="Duplicate (Ctrl+D)"
+                              title={L.duplicate}
                               light
                               iconSize={16}
                               onClick={ed.duplicateSelected}
                             />
                             <IconButton
                               icon={Trash2}
-                              title="Delete (Del)"
+                              title={L.deleteSelected}
                               light
                               iconSize={16}
                               onClick={ed.removeSelected}
@@ -564,7 +588,11 @@ export default function FormEditor({
                         )
                       }
                     >
-                      {selectedField ? 'FIELD' : selectedElement ? selectedElement.type.toUpperCase() : 'PROPERTIES'}
+                      {selectedField
+                        ? L.fieldHeading
+                        : selectedElement
+                          ? toolName(L, selectedElement.type).toUpperCase()
+                          : L.propertiesHeading}
                     </PanelHeading>
                     {selectedField ? (
                       <FieldProperties
@@ -573,6 +601,7 @@ export default function FormEditor({
                         fields={fields}
                         pageCount={pageCount}
                         onChange={ed.updateField}
+                        rules={options.rules}
                       />
                     ) : selectedElement ? (
                       <ElementProperties
@@ -583,8 +612,12 @@ export default function FormEditor({
                       />
                     ) : (
                       <EmptyText>
-                        Select something on the document, drag a field or layout item in from the left, or use{' '}
-                        <b>Edit text</b> to change the document's own text.
+                        {L.nothingSelected.split(L.editText).map((part, i) => (
+                          <Fragment key={i}>
+                            {i > 0 && <b>{L.editText}</b>}
+                            {part}
+                          </Fragment>
+                        ))}
                       </EmptyText>
                     )}
                   </>
@@ -592,8 +625,8 @@ export default function FormEditor({
 
                 {tab === 'fields' && (
                   <>
-                    <PanelHeading>FILL ORDER</PanelHeading>
-                    {!fields.length && <EmptyText>No fields yet.</EmptyText>}
+                    <PanelHeading>{L.fillOrderHeading}</PanelHeading>
+                    {!fields.length && <EmptyText>{L.noFields}</EmptyText>}
                     <ol className="m-0 list-none p-0">
                       {fields.map((f, i) => (
                         <li
@@ -608,20 +641,20 @@ export default function FormEditor({
                               goToPage(f.position.page)
                             }}
                           >
-                            <span className="text-faint">p{f.position.page}</span> {f.label || f.key}{' '}
-                            <span className="text-muted">· {TYPE_LABEL[f.type]}</span>
-                            {f.source === 'ai' && <span className="text-folder"> · AI</span>}
+                            <span className="text-faint">{L.pageShort(f.position.page)}</span> {f.label || f.key}{' '}
+                            <span className="text-muted">· {typeName(L, f.type)}</span>
+                            {f.source === 'ai' && <span className="text-folder"> · {L.suggestedTag}</span>}
                           </button>
                           <IconButton
                             icon={ArrowUp}
-                            title="Move up"
+                            title={L.moveUp}
                             iconSize={13}
                             disabled={i === 0}
                             onClick={() => ed.reorderField(f.id, -1)}
                           />
                           <IconButton
                             icon={ArrowDown}
-                            title="Move down"
+                            title={L.moveDown}
                             iconSize={13}
                             disabled={i === fields.length - 1}
                             onClick={() => ed.reorderField(f.id, 1)}
@@ -643,7 +676,7 @@ export default function FormEditor({
                       onDelete={(n) => (counts[n] ? setConfirmDeletePage(n) : ed.deletePage(n))}
                     />
                   ) : (
-                    <EmptyText>Loading pages…</EmptyText>
+                    <EmptyText>{L.loadingPages}</EmptyText>
                   ))}
 
                 {tabs.find((t) => t.id === tab)?.content}
@@ -655,7 +688,7 @@ export default function FormEditor({
         {confirmDeletePage != null && (
           <ConfirmModal
             danger
-            confirmLabel="Delete page"
+            confirmLabel={L.deletePage}
             onCancel={() => setConfirmDeletePage(null)}
             onConfirm={() => {
               const n = confirmDeletePage
@@ -663,8 +696,7 @@ export default function FormEditor({
               ed.deletePage(n)
             }}
           >
-            Delete page {confirmDeletePage}? Its {counts[confirmDeletePage]} fields and items go with it. (Undo brings
-            them back; the uploaded file is not changed.)
+            {L.confirmDeletePage(confirmDeletePage, counts[confirmDeletePage])}
           </ConfirmModal>
         )}
       </div>

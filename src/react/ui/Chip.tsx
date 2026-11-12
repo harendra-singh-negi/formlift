@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import { useLabels } from '../labels'
 
 export interface ChipOption {
   value: string
@@ -76,12 +77,13 @@ export function ChipGroup({
 
 /** A filter in use, with × to take it off. */
 export function RemovableChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  const L = useLabels()
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-primary-tint py-0.5 pr-1 pl-2.5 text-[12px] font-medium text-primary">
       {label}
       <button
         type="button"
-        aria-label={`Remove ${label}`}
+        aria-label={L.remove(label)}
         onClick={onRemove}
         className="inline-flex h-4.5 w-4.5 cursor-pointer items-center justify-center rounded-full hover:bg-primary hover:text-white"
       >
