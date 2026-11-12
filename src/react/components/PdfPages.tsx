@@ -82,7 +82,7 @@ export default function PdfPages({
       .catch((err) => live && callbacks.current.onError?.(err))
     return () => {
       live = false
-      void opened?.destroy()
+      void opened?.loadingTask.destroy() // pdf.js 5 and 6 (6 dropped PDFDocumentProxy.destroy)
     }
   }, [])
 

@@ -6,10 +6,13 @@
 // (unlike `@scope`, which older Firefox / Safari drop entirely, and which never matches the scoping root itself).
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { transform } from 'lightningcss'
 
 const out = 'dist/style.css'
-execFileSync('npx', ['@tailwindcss/cli', '-i', 'src/style.css', '-o', out, '--minify'], { stdio: 'inherit' })
+// Run the CLI's entry with this node: spawning `npx` fails on Windows (it's npx.cmd, which needs a shell).
+const tailwind = fileURLToPath(new URL('../node_modules/@tailwindcss/cli/dist/index.mjs', import.meta.url))
+execFileSync(process.execPath, [tailwind, '-i', 'src/style.css', '-o', out, '--minify'], { stdio: 'inherit' })
 const css = readFileSync(out, 'utf8')
 
 // The utilities layer's content: @layer utilities{ ... }
