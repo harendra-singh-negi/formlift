@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test'
 
+// These checks place fields on the plain "Form" sample (the demo opens on the Basic tour).
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fl-sample', JSON.stringify('sample.pdf')))
+})
+
+
 // Every new field type: placed from the toolbox, then answered in Preview the way a person would.
 test('new field types can be placed and answered', async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 1000 })

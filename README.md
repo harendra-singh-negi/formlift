@@ -39,7 +39,13 @@ The original file is never modified. The whole form is plain JSON that you store
 
 **[Try it in your browser →](https://harendra-singh-negi.github.io/formlift/)**
 
-The demo runs the same components you install from npm:
+The demo runs the same components you install from npm. Pick what to see:
+
+- **Basic**: *Every field type* (all 20, each next to what it is for), or a real *Form* and a *Form with a table*.
+- **Advanced**: *Form logic*: groups of boxes, show / required / read-only conditions, follow-up dialogs,
+  comments, and `onFieldChange` (your own code next to the editor's settings).
+
+Each tour row says how to try it. Then:
 
 1. **Build**: open a sample PDF or upload your own, review the suggested fields and edit them.
 2. **Fill**: answer the form on the page or in the list view, then download the completed PDF.

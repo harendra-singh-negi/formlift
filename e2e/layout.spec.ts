@@ -1,6 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 
+// These checks place fields on the plain "Form" sample (the demo opens on the Basic tour).
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fl-sample', JSON.stringify('sample.pdf')))
+})
+
+
 // What jsdom can't see: who scrolls, who stays put, and that the CSS stays inside the editor.
 
 const openTab = async (page: Page, name: RegExp) => {

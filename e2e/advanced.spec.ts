@@ -1,5 +1,11 @@
 import { expect, test, type Page } from '@playwright/test'
 
+// These checks place fields on the plain "Form" sample (the demo opens on the Basic tour).
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fl-sample', JSON.stringify('sample.pdf')))
+})
+
+
 /** Tap a toolbox item, then the page at (fx, fy) of its width / height. The new field is selected. */
 async function place(page: Page, tool: string, fx: number, fy: number) {
   await page.locator('aside').getByRole('button', { name: tool, exact: true }).click()
