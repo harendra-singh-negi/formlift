@@ -102,7 +102,7 @@ npm install github:harendra-singh-negi/formlift#v0.1.0
 npm install github:harendra-singh-negi/formlift          # latest main
 ```
 
-pdf.js (`pdfjs-dist` 5.x) is a peer dependency: npm 7+ and pnpm install it for you, and an app that already has
+pdf.js (`pdfjs-dist` 5.x or 6.x) is a peer dependency: npm 7+ and pnpm install it for you, and an app that already has
 it shares that one copy (no second pdf.js, no worker version mismatch). Yarn 1 or an older npm: `npm install pdfjs-dist`.
 Add only what your app does not have yet:
 
