@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import Button from './Button'
 import { useLabels } from '../labels'
 
@@ -9,10 +10,55 @@ interface ModalProps {
   width: string
 }
 
-// Centered dialog over a dimmed backdrop; a click on the backdrop calls onClose.
+// Keep in step with the --fl-* variables in style.css (a test checks it).
+export const THEME_VARS = [
+  '--fl-font', '--fl-primary', '--fl-primary-hover', '--fl-primary-soft', '--fl-primary-tint', '--fl-brand',
+  '--fl-brand-hover', '--fl-success', '--fl-success-hover', '--fl-danger', '--fl-heading', '--fl-heading-hover',
+  '--fl-ink', '--fl-ink-2', '--fl-ink-3', '--fl-muted', '--fl-faint', '--fl-line', '--fl-line-strong',
+  '--fl-line-soft', '--fl-hover', '--fl-surface', '--fl-accent', '--fl-z-modal',
+]
+
+// The host's theme, read where the modal opens and carried into the portal (variables set on a parent of the
+// editor would not reach document.body).
+const themeVars = (el: Element): CSSProperties => {
+  const cs = getComputedStyle(el)
+  const out: Record<string, string> = {}
+  for (const name of THEME_VARS) {
+    const v = cs.getPropertyValue(name)
+    if (v) out[name] = v
+  }
+  return out
+}
+
+// Centered dialog over a dimmed backdrop; a click on the backdrop or Escape calls onClose. Rendered into
+// document.body (or the shadow root the editor lives in, whose styles it needs), so a transformed or clipping host
+// ancestor can't misplace or cut it.
 export default function Modal({ children, onClose, width }: ModalProps) {
+  const [anchor, setAnchor] = useState<HTMLSpanElement | null>(null)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+  const root = anchor?.getRootNode()
   return (
-    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-[rgba(15,23,42,0.45)]" onClick={onClose}>
+    <span ref={setAnchor} hidden>
+      {anchor &&
+        createPortal(
+          <div className="fl-root" style={themeVars(anchor)}>
+            <Backdrop onClose={onClose} width={width}>
+              {children}
+            </Backdrop>
+          </div>,
+          root instanceof ShadowRoot ? root : document.body,
+        )}
+    </span>
+  )
+}
+
+function Backdrop({ children, onClose, width }: ModalProps) {
+  return (
+    <div className="fixed inset-0 z-[var(--fl-z-modal)] flex items-center justify-center bg-[rgba(15,23,42,0.45)]" onClick={onClose}>
       <div
         role="dialog"
         aria-modal

@@ -1,8 +1,13 @@
 import type { LucideIcon } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
+import { useCompact } from '../hooks/useFitZoom'
+import Modal, { ModalBody, ModalHeader } from './Modal'
 import { useOutsideClose } from './useOutsideClose'
 
-/** A button that opens a panel under it (closes on a click outside or Escape). `badge`: a count on the button. */
+/**
+ * A button that opens a panel under it (closes on a click outside or Escape); on phones and touch screens, a dialog
+ * instead, so it is never cut off or pushed off-screen. `badge`: a count on the button.
+ */
 export default function Popover({
   label,
   icon: Icon,
@@ -18,7 +23,9 @@ export default function Popover({
 }) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
-  useOutsideClose(box, open, () => setOpen(false))
+  const compact = useCompact()
+  // the dialog lives in a portal outside `box`: its own backdrop and Escape close it
+  useOutsideClose(box, open && !compact, () => setOpen(false))
   return (
     <div ref={box} className="relative">
       <button
@@ -40,11 +47,19 @@ export default function Popover({
           </span>
         )}
       </button>
-      {open && (
+      {open && compact && (
+        <Modal onClose={() => setOpen(false)} width="w-[560px]">
+          <ModalHeader title={label} onClose={() => setOpen(false)} />
+          <div className="max-h-[70dvh] overflow-y-auto">
+            <ModalBody>{children}</ModalBody>
+          </div>
+        </Modal>
+      )}
+      {open && !compact && (
         <div
           role="dialog"
           aria-label={label}
-          className={`absolute z-30 mt-1.5 w-[min(560px,calc(100vw-24px))] max-sm:fixed max-sm:inset-x-3 max-sm:max-h-[70dvh] max-sm:w-auto max-sm:overflow-y-auto rounded-lg border border-line bg-white p-4 shadow-xl ${
+          className={`absolute z-30 mt-1.5 w-[min(560px,calc(100vw-24px))] rounded-lg border border-line bg-white p-4 shadow-xl ${
             align === 'right' ? 'right-0' : 'left-0'
           }`}
         >

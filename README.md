@@ -574,6 +574,7 @@ The styles live inside `.fl-root` and have no global reset. Override any variabl
   --fl-heading: #8b5cf6;   /* panel headings */
   --fl-accent: #f59e0b;    /* suggested fields */
   --fl-font: 'Inter', sans-serif;
+  --fl-z-modal: 1200;     /* dialogs; raise it if your header or overlays cover them */
 }
 ```
 

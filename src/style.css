@@ -59,6 +59,7 @@
     --fl-hover: #f1f5f9;
     --fl-surface: #f8fafc;
     --fl-accent: #f59e0b; /* suggested (auto-detected) fields, Edit text */
+    --fl-z-modal: 1200; /* raise it if the host's header or overlays cover dialogs */
     font-family: var(--fl-font);
     box-sizing: border-box;
   }
