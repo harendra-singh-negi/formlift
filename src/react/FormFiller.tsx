@@ -299,7 +299,7 @@ export default function FormFiller({
             />
           </div>
         )}
-        {/* Kept while the list shows, so the pages need not be drawn again. */}
+        {/* Kept mounted while the list shows (scroll position, loaded document); hidden, its pages free their canvases and are drawn again on return. */}
         <div
           ref={fitRef}
           className={`bg-hover ${stickyToolbar ? 'flex-1 overflow-auto' : 'flex-none'} ${view === 'list' ? 'hidden' : ''}`}

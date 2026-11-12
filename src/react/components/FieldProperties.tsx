@@ -55,6 +55,10 @@ export default function FieldProperties({
   const pickable = Object.entries(rules).filter(([, r]) => !r.types || r.types.includes(field.type))
   const others = fields.filter((f) => f.id !== field.id)
   const [optionsText, setOptionsText] = useState((field.options ?? []).join('\n'))
+  // options changed elsewhere (undo, a type change): show them, keeping the person's half-typed lines otherwise
+  const optionsKey = (field.options ?? []).join('\n')
+  const typed = [...new Set(optionsText.split('\n').map((x) => x.trim()).filter(Boolean))].join('\n')
+  if (typed !== optionsKey && optionsText !== optionsKey) setOptionsText(optionsKey)
   const hasOptions = OPTION_TYPES.includes(field.type)
   const isBool = BOOLEAN_TYPES.includes(field.type)
   // typed answers: placeholder, length, regex

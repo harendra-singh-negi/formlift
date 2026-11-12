@@ -39,7 +39,8 @@ export default function FieldOrderList({
     const box = el?.closest<HTMLElement>('[data-fl-scroll]')
     if (!el || !box) return
     const update = () => {
-      const top = box.scrollTop - el.offsetTop
+      // the list's top inside the box's scrolled content (offsetTop would count from some outer ancestor)
+      const top = box.scrollTop - (el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop)
       const from = Math.max(0, Math.floor(top / ROW) - OVERSCAN)
       const to = Math.ceil((top + box.clientHeight) / ROW) + OVERSCAN
       setRange((r) => (r.from === from && r.to === to ? r : { from, to }))
