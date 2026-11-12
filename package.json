@@ -1,6 +1,6 @@
 {
   "name": "formlift",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Turn any PDF into a fillable web form: auto-detect fields, drag-and-drop builder, conditional logic, validation, fill-in UI and a completed-PDF generator. React UI + framework-agnostic core.",
   "keywords": [
     "pdf",
