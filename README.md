@@ -12,7 +12,7 @@ Auto-detect fields · Drag-and-drop builder · Conditional logic · Validation �
 [![license](https://img.shields.io/npm/l/formlift?color=0f766e)](./LICENSE)
 [![CI](https://github.com/harendra-singh-negi/formlift/actions/workflows/ci.yml/badge.svg)](https://github.com/harendra-singh-negi/formlift/actions/workflows/ci.yml)
 
-**[▶ Live demo](https://harendra-singh-negi.github.io/formlift/)** · [Quick start](#quick-start) · [API](#api-reference) · [Server](#server-side) · [Theming](#theming) · [FAQ](#faq)
+**[▶ Live demo](https://harendra-singh-negi.github.io/formlift/)** · [Quick start](#quick-start) · [API](#api-reference) · [Server](#server-side) · [Theming](#theming) · [Your own UI](#your-own-ui) · [FAQ](#faq)
 
 <img src="./docs/builder.png" alt="formlift builder: suggested fields over a PDF page" width="860" />
 
@@ -242,6 +242,13 @@ uploads are embedded as PDF attachments.
 | `onError` | `(err: unknown) => void` | `console.error` | Error messages |
 | `className` | `string` | `'h-full'` | Classes on the root element |
 | `ref` | `Ref<FormEditorHandle>` | – | `{ save(), dirty, value }`, for example to save before a workflow step |
+| `hide` | `EditorPart[]` | `[]` | Parts to leave out: `back`, `title`, `status`, `undo`, `snap`, `zoom`, `editText`, `autoDetect`, `preview`, `save`, `tools`, `fieldTools`, `layoutTools`, `panel`, `propertiesTab`, `fieldsTab`, `pagesTab`, `problems` |
+| `fieldTypes` | `FieldType[]` | all | Field types that can be added |
+| `elementTools` | `ElementTool[]` | all | Layout tools that can be added (`[]` = none) |
+| `components` | `FormliftComponents` | – | Replacement UI components and answer controls ([Your own UI](#your-own-ui)) |
+| `keyboard` | `boolean` | `true` | Keyboard shortcuts |
+| `warnUnsaved` | `boolean` | `true` | Browser warning when leaving with unsaved changes |
+| `onDetected` | `(found: FieldDef[]) => void` | – | Called with the fields auto-detect suggested |
 
 **Keyboard:** <kbd>Del</kbd> delete · <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> undo/redo ·
 <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate · arrow keys nudge (hold <kbd>Shift</kbd> for larger steps) ·
@@ -262,7 +269,24 @@ uploads are embedded as PDF attachments.
 | `loadFile` | `(id) => Promise<Blob>` | – | Loads stored signatures and opens attachments |
 | `files` | `AnswerFileInfo[]` | `[]` | Files already attached to the draft |
 | `readOnly` | `boolean` | `false` | View a submitted form |
+| `hide` | `FillerPart[]` | `[]` | Parts to leave out: `back`, `title`, `views`, `zoom`, `saveStatus`, `saveDraft`, `submit`, `attachments`, `errors`, `requiredMark` |
+| `views` | `('document' \| 'list')[]` | both | Views offered; the first is shown first |
+| `confirmSubmit` | `boolean` | `true` | Ask "Submit this form?" first |
+| `listFilters` | `(FilterSource \| string)[]` | `defaultFilters` | The list view's filters ([Filters](#4-filters-you-choose-formlift-computes)) |
+| `listSearch` | `boolean` | `true` | Search box over the list |
+| `hideUnavailableFilters` | `boolean` | `true` | Leave out filters this form has nothing for |
+| `renderFilters` | `(fs: QuestionFilterState) => ReactNode` | – | Your own search / filter bar instead of the built-in one |
+| `toQuestions` | `(fields, textOf) => Question[]` | `toQuestions` | How fields become list questions |
+| `components` | `FormliftComponents` | – | Replacement UI components and answer controls |
 | `title`, `onBack`, `toolbar`, `notify`, `onError`, `className` | | | Same as `FormEditor` |
+
+### Hooks (`formlift/react`)
+
+| Hook | Gives |
+| --- | --- |
+| `useFormEditor(options)` | Everything `FormEditor` does, without UI: document, undo/redo, selection, drag/resize, pages, detect, save |
+| `useFormFiller(options)` | Everything `FormFiller` does, without UI: answers, conditions, validation, autosave, uploads, questions |
+| `useQuestionFilter(questions, answers, options)` | Search and filters as data: `groups`, `inUse`, `list` |
 
 ### Core functions (`formlift`)
 
@@ -278,7 +302,8 @@ uploads are embedded as PDF attachments.
 | `defaultAnswers(fields)` | `Answers` | The answers a new submission starts with |
 | `defaultLayout(pageSizes)` | `Layout` | The layout of an untouched document |
 | `detectDocument(pdf, OPS, pages, existing, onProgress?, signal?)` | `Promise<FieldDef[]>` | Suggests fields for a whole document |
-| `toQuestions(fields, textOf?)` | `Question[]` | Fields grouped as questions, used by the list view |
+| `toQuestions(fields, textOf?, { categoryCode? })` | `Question[]` | Fields grouped as questions, used by the list view |
+| `filterQuestions(questions, answers, filters, values, search?)` | `Question[]` | The questions passing a search and picked filter values (see [Filters](#4-filters-you-choose-formlift-computes)) |
 
 ### Server (`formlift/server`)
 
@@ -432,6 +457,185 @@ The styles live inside `.fl-root` and have no global reset. Override any variabl
 ```
 
 The full list of variables is in [`src/style.css`](./src/style.css).
+
+## Your own UI
+
+formlift's logic is separate from its look. Pick how much you replace:
+
+| Level | What you change | How |
+|---|---|---|
+| 1. Theme | colours, font | `--fl-*` CSS variables (above) |
+| 2. Parts and features | what shows, which field types / views exist | `hide`, `views`, `fieldTypes`, `listFilters`… |
+| 3. Components | any button, input, modal, chip…, the answer control, or one field type | `components` prop / `<FormliftProvider>` |
+| 4. Filters | which filters exist, your own filters, your own filter UI | `listFilters`, filter objects, `renderFilters` / `useQuestionFilter` |
+| 5. Headless | the whole screen | `useFormEditor` / `useFormFiller` + your own markup |
+
+### 2. Choose what shows
+
+```tsx
+<FormEditor
+  pdf={url}
+  onSave={save}
+  fieldTypes={['text', 'date', 'checkbox', 'signature']} // only these in the palette
+  elementTools={['text']}                                // layout tools offered ([] = none)
+  hide={['autoDetect', 'editText', 'pagesTab', 'snap']}  // EditorPart: leave these out
+  autoDetect={false}
+/>
+
+<FormFiller
+  pdf={url}
+  fields={fields}
+  views={['list']}                       // only the question list ('document', 'list'; first = default)
+  listFilters={['answered', 'category']} // only these filters (ids, or filter objects: see 4.)
+  hide={['saveDraft', 'attachments']}    // FillerPart: leave these out
+  confirmSubmit={false}
+/>
+```
+
+Everything hidden still works through the hooks and `ref` (hide `save` and call `ref.current.save()` from your
+own button). `EditorPart` and `FillerPart` list every part that can be hidden.
+
+### 3. Swap components
+
+Every building block formlift draws (`Button`, `IconButton`, `TextInput`, `Select`, `TextArea`, `Checkbox`,
+`FormField`, `Modal`, `ModalHeader`, `ModalBody`, `ModalFooter`, `ConfirmModal`, `SegmentedTabs`, `PanelHeading`,
+`EmptyText`, `Chip`, `ChipGroup`, `RemovableChip`, `Popover`, `Tag`, `SignaturePad`) can be replaced, inside the
+editor's panels too. A replacement gets the same props as the built-in one:
+
+```tsx
+import { FormliftProvider, FormFiller, type UIComponents } from 'formlift/react'
+import type { ComponentProps } from 'react'
+
+function MyButton({ variant, size, icon: Icon, children, ...rest }: ComponentProps<UIComponents['Button']>) {
+  return <button className={`my-btn my-btn--${variant ?? 'primary'}`} {...rest}>{Icon && <Icon size={14} />}{children}</button>
+}
+
+// One screen…
+<FormFiller pdf={url} fields={fields} components={{ Button: MyButton, FieldControl: MyAnswerControl }} />
+
+// …or the whole app.
+<FormliftProvider components={{ Button: MyButton, Select: MySelect }}>
+  <App />
+</FormliftProvider>
+```
+
+The answer controls are swappable too, all at once (`FieldControl`) or per field type (`fields`, which wins). Each
+gets `FieldControlProps` (`field`, `value`, `onChange`, `readOnly`, `error`…):
+
+```tsx
+<FormFiller
+  pdf={url}
+  fields={fields}
+  components={{ fields: { date: MyDatePicker, signature: MySignaturePad } }} // other types stay built-in
+/>
+```
+
+### 4. Filters: you choose, formlift computes
+
+formlift decides nothing about which filters a form gets. A filter is a plain object (`id`, `title`, `options()`,
+`test()`); the built-ins are presets you pick from, and you can write your own. For each filter you pass,
+formlift returns its options **for this form** with counts and an `available` flag (does this form have anything
+to filter on?). Whether to show it is your call.
+
+| Built-in (`formlift`) | id | Offers |
+|---|---|---|
+| `answeredFilter()` | `answered` | Answered / Not answered |
+| `partFilter({ id, title, match })` | yours | Written / Empty for parts whose name matches `match` (presets: `remarks` = `/remark/i`, `comments` = `/comment/i`) |
+| `choiceFilter()` / `pickedFilter()` | `choices` / `picked` | answer choices offered / ticked ("Yes", "NA"…) |
+| `categoryFilter()` | `category` | category codes read from the form (`Question.category`) |
+| `tagFilters()` / `tagFilter(key)` | `tag:<key>` | "Risk: H" style tags read from the form |
+| `typeFilter()` | `type` | answer types |
+| `customFilter(id, title, valuesOf)` | yours | anything you compute from a question |
+
+```tsx
+import { categoryFilter, customFilter, partFilter } from 'formlift'
+
+const hasCategories = form.kind === 'inspection' // your rule, not formlift's
+
+<FormFiller
+  pdf={url}
+  fields={fields}
+  listFilters={[
+    'answered',                                                  // a built-in, by id
+    partFilter({ id: 'finding', title: 'Finding', match: /finding|observation/i }),
+    ...(hasCategories ? [categoryFilter({ title: 'Chapter' })] : []),
+    customFilter('deck', 'Deck', (q) => [q.page <= 2 ? 'Upper' : 'Lower']),
+  ]}
+  listSearch={true}
+  hideUnavailableFilters={false} // show listed filters even when this form has nothing for them
+/>
+```
+
+What counts as a category is yours too: `toQuestions(fields, text, { categoryCode: /^(HW|PR|HF)$/ })`, or
+`categoryCode: false` and set `Question.category` yourself through `useFormFiller`'s `toQuestions` option.
+
+**Your own filter UI.** `renderFilters` replaces the built-in bar; `fs.groups` has every filter you passed, each
+with `options` (label + count), `available`, `value`, `set`, and a `section` hint:
+
+```tsx
+<FormFiller
+  pdf={url}
+  fields={fields}
+  renderFilters={(fs) => (
+    <MyToolbar>
+      <MySearch value={fs.search ?? ''} onChange={fs.setSearch} />
+      {fs.groups
+        .filter((g) => g.available)
+        .map((g) => <MySelect key={g.id} label={g.title} options={g.options} value={g.value} onChange={g.set} />)}
+      {fs.inUse.map((c) => <MyChip key={c.id} label={c.label} onRemove={c.clear} />)}
+      <span>{fs.list.length} of {fs.total}</span>
+    </MyToolbar>
+  )}
+/>
+```
+
+Headless: `useQuestionFilter(f.questions, f.answers, { filters, search, initial, predicate, onChange })` gives the
+same object; render `fs.list` yourself or pass it to `<QuestionList questions={…} filter={fs} toolbar={false} />`.
+On the server (no React): `filterQuestions(questions, answers, resolveFilters(filters, questions), values, search)`.
+
+### 5. Headless: hooks only
+
+`useFormFiller` and `useFormEditor` hold everything the built-in screens do (answers, conditions, validation, queued
+saves and autosave, uploads; the document with undo / redo, selection, drag / resize, pages, auto-detect, save). Draw
+whatever you like around them. `PdfPages` renders the pages and gives you an overlay per page.
+
+```tsx
+import { boxStyle } from 'formlift'
+import { PdfPages, useFormFiller } from 'formlift/react'
+
+function MyFiller({ pdfUrl, fields }) {
+  const f = useFormFiller({ fields, onSave: (answers, { submit }) => api.save(answers, submit) })
+  return (
+    <>
+      <header>
+        {f.saveState} <button onClick={() => f.submit()}>Send</button>
+      </header>
+      <PdfPages
+        load={pdfUrl}
+        zoom={1}
+        onLoaded={f.onPdfLoaded}
+        overlay={(page) =>
+          fields
+            .filter((x) => x.position.page === page && f.states[x.key].visible)
+            .map((x) => (
+              <input
+                key={x.id}
+                style={{ position: 'absolute', ...boxStyle(x.position) }}
+                value={String(f.answers[x.key] ?? '')}
+                onChange={(e) => f.change(x, e.target.value)}
+              />
+            ))
+        }
+      />
+    </>
+  )
+}
+```
+
+Or skip the PDF and show `f.questions` (fields grouped into questions, tables and option groups) as a plain list.
+For the editor, `useFormEditor` gives `fields`, `layout`, `selection`, `placeNew`, `startDrag` / `onDrag` /
+`endDrag`, `updateField`, `undo` / `redo`, `detect`, `save` and the rest. Hover the hook in your editor for the
+full list.
 
 ## Security
 

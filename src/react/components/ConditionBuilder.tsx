@@ -1,8 +1,6 @@
 import { Plus, X } from 'lucide-react'
-import Button from '../ui/Button'
-import IconButton from '../ui/IconButton'
-import { Select, TextInput } from '../ui/FormField'
 import { OPERATORS, type Condition, type FieldDef, type Operator, type Rule } from '../../core/form-logic'
+import { Button, IconButton, Select, TextInput } from '../ui/slots'
 
 const OP_LABEL: Record<Operator, string> = {
   equals: 'equals',

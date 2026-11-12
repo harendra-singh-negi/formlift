@@ -1,10 +1,9 @@
 import { useState, type ReactNode } from 'react'
-import Checkbox from '../ui/Checkbox'
-import { FormField, Select, TextArea, TextInput } from '../ui/FormField'
 import { FIELD_TYPES, type Condition, type FieldDef, type FieldType } from '../../core/form-logic'
 import { fitInPage } from '../../core/coords'
 import { TYPE_LABEL } from '../constants'
 import ConditionBuilder from './ConditionBuilder'
+import { Checkbox, FormField, Select, TextArea, TextInput } from '../ui/slots'
 
 const num = (s: string) => (s.trim() === '' || !Number.isFinite(Number(s)) ? undefined : Number(s))
 const pct = (n: number) => Math.round(n * 1000) / 10

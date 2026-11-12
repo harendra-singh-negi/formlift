@@ -1,22 +1,9 @@
 import { Search, SlidersHorizontal } from 'lucide-react'
-import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
-import Button from '../ui/Button'
-import { Chip, ChipGroup, RemovableChip } from '../ui/Chip'
-import { EmptyText } from '../ui/Panel'
-import Popover from '../ui/Popover'
-import SegmentedTabs from '../ui/SegmentedTabs'
-import { Tag } from '../ui/Tag'
-import { TYPE_LABEL } from '../constants'
+import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useQuestionFilter, type QuestionFilterState, type UseQuestionFilterOptions } from '../hooks/useQuestionFilter'
+import { Button, Chip, ChipGroup, RemovableChip, EmptyText, Popover, Tag } from '../ui/slots'
 import type { Answers, FieldDef, FieldType } from '../../core/form-logic'
-import {
-  choicesOf,
-  matches,
-  NO_FILTER,
-  pickedOf,
-  type Filled,
-  type Question,
-  type QuestionFilter,
-} from '../../core/questions'
+import type { Question } from '../../core/questions'
 
 const PAGE = 100
 
@@ -34,223 +21,116 @@ const wide = (t: FieldType) => t === 'textarea' || t === 'radio' || t === 'file'
 
 /**
  * The form as questions with search and filters: only the questions that match are shown. Answers are the
- * same as on the document; `control(field)` draws a field's answer control.
+ * same as on the document; `control(field)` draws a field's answer control. Filters come from useQuestionFilter:
+ * `filters` / `search` choose them, `filter` drives the list from your own useQuestionFilter, `renderToolbar`
+ * draws your own bar, `toolbar={false}` none. Filters with nothing to offer in this form are left out unless
+ * `hideUnavailable={false}`.
  */
 export default function QuestionList({
   questions,
   answers,
   control,
+  filter: external,
+  filters,
+  search,
+  hideUnavailable = true,
+  toolbar = true,
+  renderToolbar,
 }: {
   questions: Question[]
   answers: Answers
   control: (f: FieldDef) => ReactNode
+  filter?: QuestionFilterState
+  filters?: UseQuestionFilterOptions['filters']
+  search?: boolean
+  hideUnavailable?: boolean
+  toolbar?: boolean
+  renderToolbar?: (fs: QuestionFilterState) => ReactNode
 }) {
-  const [filter, setFilter] = useState<QuestionFilter>(NO_FILTER)
+  const own = useQuestionFilter(questions, answers, { filters, search })
+  const fs = external ?? own
+  const { list } = fs
   const [shown, setShown] = useState(PAGE)
-  // The answers the filter last looked at: typing into a remark while "Remark empty" is on must not make the
-  // question vanish mid-word. The list follows new answers when a filter changes.
-  const [seen, setSeen] = useState(answers)
-  const set = (patch: Partial<QuestionFilter>) => {
-    setFilter((f) => ({ ...f, ...patch }))
-    setSeen(answers)
-    setShown(PAGE)
-  }
-  const list = useMemo(() => questions.filter((q) => matches(q, seen, filter)), [questions, seen, filter])
-  const count = (f: (q: Question) => boolean) => questions.filter(f).length
-  const types = useMemo(() => [...new Set(questions.flatMap((q) => q.parts.map((p) => p.field.type)))], [questions])
-  const categories = useMemo(
-    () => [...new Set(questions.map((q) => q.category).filter((c): c is string => !!c))],
-    [questions],
-  )
-  // Tag filters ("Classification", "Risk", "Assigned to"): every key read from the form, with its values.
-  const tagValues = useMemo(() => {
-    const m = new Map<string, Set<string>>()
-    for (const q of questions)
-      for (const [k, v] of Object.entries(q.tags ?? {})) m.set(k, (m.get(k) ?? new Set()).add(v))
-    return [...m].map(
-      ([k, vs]) => [k, [...vs].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))] as const,
-    )
-  }, [questions])
-  // Remarks / Comments filters only for forms that have such boxes.
-  const has = (re: RegExp) => questions.some((q) => q.parts.some((p) => re.test(p.name) || re.test(p.field.label)))
-  const progress = (
-    [
-      ['answered', 'Answered', 'Answered', 'Not answered'],
-      ['remarks', 'Remarks', 'Written', 'Empty'],
-      ['comments', 'Comments', 'Written', 'Empty'],
-    ] as const
-  ).filter(([key]) => key === 'answered' || has(key === 'remarks' ? /remark/i : /comment/i))
-  const setTag = (key: string, value: string | null) => {
-    const tags = { ...filter.tags }
-    if (value == null) delete tags[key]
-    else tags[key] = value
-    set({ tags })
-  }
-
-  // Answer choices, each on its own ("Yes", "No", "NA", "As Expected"…), in the form's order: those offered by
-  // two questions or more, with how many offer them.
-  const choiceCount = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const q of questions) for (const c of new Set(choicesOf(q))) m.set(c, (m.get(c) ?? 0) + 1)
-    return [...m].filter(([, n]) => n >= 2).slice(0, 40)
-  }, [questions])
-  const [choiceMode, setChoiceMode] = useState<'offered' | 'picked'>('offered')
-  const choiceValue = choiceMode === 'picked' ? filter.picked : filter.choices
-  // Ticked counts follow the answers as they are given.
-  const pickedCount = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const q of questions) for (const c of new Set(pickedOf(q, answers))) m.set(c, (m.get(c) ?? 0) + 1)
-    return m
-  }, [questions, answers])
-
-  // The filters in use, as chips to take them off one by one.
-  const inUse: { label: string; clear: () => void }[] = [
-    ...progress
-      .filter(([key]) => filter[key] !== 'all')
-      .map(([key, title, yes, no]) => ({
-        label: `${title}: ${filter[key] === 'filled' ? yes : no}`,
-        clear: () => set({ [key]: 'all' }),
-      })),
-    ...(filter.type !== 'all'
-      ? [{ label: `Type: ${TYPE_LABEL[filter.type]}`, clear: () => set({ type: 'all' }) }]
-      : []),
-    ...Object.entries(filter.tags).map(([k, v]) => ({ label: `${k}: ${v}`, clear: () => setTag(k, null) })),
-    ...(filter.choices !== 'all'
-      ? [{ label: `Has option: ${filter.choices}`, clear: () => set({ choices: 'all' }) }]
-      : []),
-    ...(filter.picked !== 'all' ? [{ label: `Answered: ${filter.picked}`, clear: () => set({ picked: 'all' }) }] : []),
-  ]
-  const active = JSON.stringify(filter) !== JSON.stringify(NO_FILTER)
+  useEffect(() => setShown(PAGE), [fs.version])
+  const groups = fs.groups.filter((g) => g.available || !hideUnavailable)
+  const bar = groups.filter((g) => g.section === 'bar')
+  const menu = groups.filter((g) => g.section !== 'bar')
+  const sections = [...new Set(menu.map((g) => g.section ?? ''))]
 
   return (
     <div className="w-full p-3 sm:p-4 lg:px-6">
-      <div className="sticky top-0 z-10 -mx-3 mb-3 flex flex-col gap-2 border-b border-line bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="relative min-w-0 flex-1 basis-full sm:basis-72">
-            <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
-            <input
-              type="search"
-              aria-label="Search questions"
-              placeholder="Search questions, sections, answers…"
-              value={filter.search}
-              onChange={(e) => set({ search: e.target.value })}
-              className="w-full rounded-full border border-line-strong bg-surface py-1.5 pr-3 pl-9 text-[13px] outline-none focus:border-primary focus:bg-white max-sm:text-base"
-            />
-          </label>
-          <Popover label="Filters" icon={SlidersHorizontal} badge={inUse.length} align="right">
-            <div className="flex flex-col gap-4">
-              <FilterSection title="Progress">
-                {progress.map(([key, title, yes, no]) => (
-                  <ChipGroup
-                    key={key}
-                    title={title}
-                    value={filter[key] === 'all' ? null : filter[key]}
-                    onChange={(v) => set({ [key]: (v ?? 'all') as Filled })}
-                    options={[
-                      { value: 'filled', label: yes },
-                      { value: 'empty', label: no },
-                    ]}
-                  />
-                ))}
-              </FilterSection>
-              {choiceCount.length > 0 && (
-                <FilterSection
-                  title="Answers"
-                  action={
-                    <SegmentedTabs
-                      size="sm"
-                      value={choiceMode}
-                      onChange={(m) => {
-                        setChoiceMode(m)
-                        // The picked choice carries over to the other way of filtering on it.
-                        const c = filter.choices !== 'all' ? filter.choices : filter.picked
-                        if (c !== 'all')
-                          set(m === 'picked' ? { picked: c, choices: 'all' } : { choices: c, picked: 'all' })
-                      }}
-                      options={[
-                        { value: 'offered', label: 'Has option' },
-                        { value: 'picked', label: 'Answered' },
-                      ]}
+      {renderToolbar
+        ? renderToolbar(fs)
+        : toolbar && (
+            <div className="sticky top-0 z-10 -mx-3 mb-3 flex flex-col gap-2 border-b border-line bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6">
+              <div className="flex flex-wrap items-center gap-2">
+                {fs.search != null && (
+                  <label className="relative min-w-0 flex-1 basis-full sm:basis-72">
+                    <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
+                    <input
+                      type="search"
+                      aria-label="Search questions"
+                      placeholder="Search questions, sections, answers…"
+                      value={fs.search}
+                      onChange={(e) => fs.setSearch(e.target.value)}
+                      className="w-full rounded-full border border-line-strong bg-surface py-1.5 pr-3 pl-9 text-[13px] outline-none focus:border-primary focus:bg-white max-sm:text-base"
                     />
-                  }
-                >
-                  {/* One row of choices: questions that offer it, or that were answered with it. */}
-                  <ChipGroup
-                    value={choiceValue === 'all' ? null : choiceValue}
-                    onChange={(v) => set(choiceMode === 'picked' ? { picked: v ?? 'all' } : { choices: v ?? 'all' })}
-                    options={choiceCount.map(([c, n]) => ({
-                      value: c,
-                      label: c,
-                      count: choiceMode === 'picked' ? (pickedCount.get(c) ?? 0) : n,
-                    }))}
-                  />
-                </FilterSection>
-              )}
-              {tagValues.length > 0 && (
-                <FilterSection title="Question details">
-                  {tagValues.map(([key, values]) => (
-                    <ChipGroup
-                      key={key}
-                      title={key}
-                      value={filter.tags[key] ?? null}
-                      onChange={(v) => setTag(key, v)}
-                      options={values.map((v) => ({ value: v, label: v, count: count((q) => q.tags?.[key] === v) }))}
+                  </label>
+                )}
+                {menu.length > 0 && (
+                  <Popover label="Filters" icon={SlidersHorizontal} badge={fs.inUse.length} align="right">
+                    <div className="flex flex-col gap-4">
+                      {sections.map((sec) => (
+                        <FilterSection key={sec} title={sec}>
+                          {menu
+                            .filter((g) => (g.section ?? '') === sec)
+                            .map((g) => (
+                              <ChipGroup
+                                key={g.id}
+                                title={g.title}
+                                value={g.value}
+                                onChange={g.set}
+                                options={g.options}
+                              />
+                            ))}
+                        </FilterSection>
+                      ))}
+                    </div>
+                  </Popover>
+                )}
+                <span className="text-[12.5px] text-muted sm:ml-auto" aria-live="polite">
+                  <b className="font-semibold text-ink-2">{list.length}</b> of {fs.total} questions
+                </span>
+                {fs.active && (
+                  <Button variant="secondary" size="sm" onClick={fs.clear}>
+                    Clear all
+                  </Button>
+                )}
+              </div>
+              {bar.map((g) => (
+                <div key={g.id} role="group" aria-label={g.title} className="flex flex-wrap items-center gap-1.5">
+                  <span className="mr-1 text-[11.5px] font-semibold tracking-wide text-muted uppercase">{g.title}</span>
+                  <Chip label="All" count={fs.total} active={g.value == null} onClick={() => g.set(null)} />
+                  {g.options.map((o) => (
+                    <Chip
+                      key={o.value}
+                      label={o.label}
+                      count={o.count}
+                      active={g.value === o.value}
+                      onClick={() => g.set(g.value === o.value ? null : o.value)}
                     />
                   ))}
-                </FilterSection>
-              )}
-              {types.length > 1 && (
-                <FilterSection title="Answer type">
-                  <ChipGroup
-                    value={filter.type === 'all' ? null : filter.type}
-                    onChange={(v) => set({ type: (v ?? 'all') as QuestionFilter['type'] })}
-                    options={types.map((t) => ({
-                      value: t,
-                      label: TYPE_LABEL[t],
-                      count: count((q) => q.parts.some((p) => p.field.type === t)),
-                    }))}
-                  />
-                </FilterSection>
+                </div>
+              ))}
+              {fs.inUse.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {fs.inUse.map((f) => (
+                    <RemovableChip key={f.id} label={f.label} onRemove={f.clear} />
+                  ))}
+                </div>
               )}
             </div>
-          </Popover>
-          <span className="text-[12.5px] text-muted sm:ml-auto" aria-live="polite">
-            <b className="font-semibold text-ink-2">{list.length}</b> of {questions.length} questions
-          </span>
-          {active && (
-            <Button variant="secondary" size="sm" onClick={() => set(NO_FILTER)}>
-              Clear all
-            </Button>
           )}
-        </div>
-        {categories.length > 0 && (
-          <div role="group" aria-label="Category" className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-[11.5px] font-semibold tracking-wide text-muted uppercase">Category</span>
-            <Chip
-              label="All"
-              count={questions.length}
-              active={filter.category === 'all'}
-              onClick={() => set({ category: 'all' })}
-            />
-            {categories.map((c) => (
-              <Chip
-                key={c}
-                label={c}
-                count={count((q) => q.category === c)}
-                active={filter.category === c}
-                onClick={() => set({ category: filter.category === c ? 'all' : c })}
-              />
-            ))}
-          </div>
-        )}
-        {inUse.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {inUse.map((f) => (
-              <RemovableChip key={f.label} label={f.label} onRemove={f.clear} />
-            ))}
-          </div>
-        )}
-      </div>
 
       {list.length === 0 && <EmptyText>No question matches these filters.</EmptyText>}
       <ul className="m-0 flex list-none flex-col gap-2 p-0">

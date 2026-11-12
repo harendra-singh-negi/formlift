@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react'
-import Checkbox from '../ui/Checkbox'
-import { FormField, Select, TextArea, TextInput } from '../ui/FormField'
 import { FONTS, type LayoutElement } from '../../core/form-logic'
 import { fitInPage } from '../../core/coords'
+import { Checkbox, FormField, Select, TextArea, TextInput } from '../ui/slots'
 
 const num = (s: string) => (s.trim() === '' || !Number.isFinite(Number(s)) ? undefined : Number(s))
 const pct = (n: number) => Math.round(n * 1000) / 10

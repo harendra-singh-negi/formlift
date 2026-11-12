@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, FilePlus2, Trash2 } from 'lucide-react'
-import IconButton from '../ui/IconButton'
 import type { LayoutPage } from '../../core/form-logic'
+import { IconButton } from '../ui/slots'
 
 /**
  * The document's pages in order: original pages (with their number in the uploaded PDF) and blank ones.

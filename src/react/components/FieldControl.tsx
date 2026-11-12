@@ -1,10 +1,8 @@
+import type { FormliftComponents } from '../ui/slots'
 import { Paperclip, PenLine } from 'lucide-react'
 import { useRef, useState } from 'react'
-import Button from '../ui/Button'
-import { inputClass } from '../ui/FormField'
-import Modal, { ModalBody, ModalFooter, ModalHeader } from '../ui/Modal'
-import SignaturePad from '../ui/SignaturePad'
 import type { AnswerValue, FieldDef, FieldType } from '../../core/form-logic'
+import { Button, inputClass, Modal, ModalBody, ModalFooter, ModalHeader, SignaturePad } from '../ui/slots'
 
 // Text scales with the field's box (container query height), so it zooms with the page.
 const box =
@@ -85,6 +83,21 @@ function SheetInput({
   )
 }
 
+export interface FieldControlProps {
+  field: FieldDef
+  value: AnswerValue | undefined
+  onChange: (v: AnswerValue) => void
+  readOnly?: boolean
+  error?: string
+  fileName?: string
+  onFile?: (file: File) => void
+  onOpenFile?: () => void
+  /** Image of a stored signature (the answer is its file id); signatures from before are data URLs. */
+  signatureSrc?: string
+  /** Phone / touch: typed answers open in a full-size box (the page's boxes are too small to type in). */
+  compact?: boolean
+}
+
 /**
  * One answer control drawn inside its box on the page. `error` outlines it red; the message shows as a tooltip
  * and in the page's error list.
@@ -100,20 +113,7 @@ export default function FieldControl({
   onOpenFile,
   signatureSrc,
   compact,
-}: {
-  field: FieldDef
-  value: AnswerValue | undefined
-  onChange: (v: AnswerValue) => void
-  readOnly?: boolean
-  error?: string
-  fileName?: string
-  onFile?: (file: File) => void
-  onOpenFile?: () => void
-  /** Image of a stored signature (the answer is its file id); signatures from before are data URLs. */
-  signatureSrc?: string
-  /** Phone / touch: typed answers open in a full-size box (the page's boxes are too small to type in). */
-  compact?: boolean
-}) {
+}: FieldControlProps) {
   const [signing, setSigning] = useState(false)
   const [editing, setEditing] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -306,4 +306,10 @@ export default function FieldControl({
       )
     }
   }
+}
+
+/** FieldControl, or the replacement from `components` (per field type first, then FieldControl). */
+export function AnswerControl({ components, ...props }: FieldControlProps & { components?: FormliftComponents }) {
+  const C = components?.fields?.[props.field.type] ?? components?.FieldControl ?? FieldControl
+  return <C {...props} />
 }

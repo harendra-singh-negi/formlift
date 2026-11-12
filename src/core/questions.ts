@@ -143,7 +143,7 @@ function heading(lines: TextLine[], line: FieldDef[], fields: FieldDef[]) {
   if (!above || !free(above)) return rowText(lines, line)
   // A heading of a few lines ("Qualifications" over "(tick all boxes that apply)"): the lines set tight above.
   const block = [above]
-  for (let l = above; block.length < 3;) {
+  for (let l = above; block.length < 3; ) {
     const up = upFrom(l.y, (u) => 0.6 * u.height)
     if (!up || !free(up)) break
     block.unshift((l = up))
@@ -174,7 +174,19 @@ function headerRow(lines: TextLine[], first: FieldDef[]) {
 }
 
 /** Questions in document order: page, then top to bottom. */
-export function toQuestions(fields: FieldDef[], textOf: PageText = () => undefined): Question[] {
+export interface ToQuestionsOptions {
+  /**
+   * Category headings: a line that is only a code like this ("HW", "PR", "HF") marks the questions under it, when
+   * two codes or more come back. Default /^[A-Z]{2,4}$/. false = no categories (set Question.category yourself).
+   */
+  categoryCode?: RegExp | false
+}
+
+export function toQuestions(
+  fields: FieldDef[],
+  textOf: PageText = () => undefined,
+  { categoryCode = CODE }: ToQuestionsOptions = {},
+): Question[] {
   const sorted = [...fields].sort(
     (a, b) => a.position.page - b.position.page || a.position.y - b.position.y || a.position.x - b.position.x,
   )
@@ -383,7 +395,7 @@ export function toQuestions(fields: FieldDef[], textOf: PageText = () => undefin
     })
   const at = (q: Question) => top(q.parts.map((p) => p.field).filter((f) => f.position.page === q.page))
   out.sort((a, b) => a.page - b.page || at(a) - at(b))
-  setCategories(out, sorted, textOf)
+  if (categoryCode) setCategories(out, sorted, textOf, categoryCode)
   setSections(out, sorted, textOf)
   setScales(out, textOf)
   return mergeBlocks(out)
@@ -539,10 +551,10 @@ const CODE = /^[A-Z]{2,4}$/
 // Codes first on their line, with no other code after them (a header row "RANK NAME DATE" is not), and not a
 // running header or footer (same text at the same height on 3+ pages). The form has categories when at
 // least two codes come back at least twice each; a question takes the last one above it, across page breaks.
-function setCategories(out: Question[], fields: FieldDef[], textOf: PageText) {
+function setCategories(out: Question[], fields: FieldDef[], textOf: PageText, code: RegExp) {
   const last = Math.max(0, ...fields.map((f) => f.position.page))
   const found: { page: number; y: number; code: string }[] = []
-  const isCode = (t: string) => CODE.test(t.trim()) && !COLUMN.test(t.trim())
+  const isCode = (t: string) => code.test(t.trim()) && !COLUMN.test(t.trim())
   for (let page = 1; page <= last; page++) {
     const lines = textOf(page) ?? []
     for (const l of lines) {
@@ -673,7 +685,7 @@ const escape = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 // above the first row says what they ask (its column names aside), and a legend on the page ("5 “excellent”
 // means…", "1 = Poor") says what each choice means, written after the choice's name ("5 – excellent").
 function setScales(out: Question[], textOf: PageText) {
-  for (let i = 0; i < out.length;) {
+  for (let i = 0; i < out.length; ) {
     const choices = choicesOf(out[i]).map(fold)
     let j = i + 1
     while (
@@ -762,46 +774,8 @@ function tagsOf(text: string) {
   return Object.fromEntries(pairs.map((m) => [m![1].trim(), m![2].trim()]))
 }
 
-export type Filled = 'all' | 'filled' | 'empty'
-export interface QuestionFilter {
-  search: string
-  answered: Filled
-  remarks: Filled
-  comments: Filled
-  type: FieldType | 'all'
-  category: string
-  /** Tag key → value ("Risk" → "H"). */
-  tags: Record<string, string>
-  /** Questions that offer this answer choice ("Yes", "As Expected"). */
-  choices: string
-  /** Questions answered with this choice ("Not as Expected"). */
-  picked: string
-}
-export const NO_FILTER: QuestionFilter = {
-  search: '',
-  answered: 'all',
-  remarks: 'all',
-  comments: 'all',
-  type: 'all',
-  category: 'all',
-  tags: {},
-  choices: 'all',
-  picked: 'all',
-}
-
 export const isFilled = (v: AnswerValue | undefined) => v != null && v !== '' && v !== false
 
-// "Remarks" / "Comments" parts, by their column name or label.
-const partsLike = (q: Question, re: RegExp) => q.parts.filter((p) => re.test(p.name) || re.test(p.field.label))
-
-function check(parts: Question['parts'], answers: Answers, want: Filled) {
-  if (want === 'all') return true
-  if (!parts.length) return false // filtering on remarks: questions without a remarks box are not shown
-  const any = parts.some((p) => isFilled(answers[p.field.key]))
-  return want === 'filled' ? any : !any
-}
-
-/** Whether a question passes every filter. */
 // The boxes that are a question's answer choices: its option grid, else its boxes ("Y / N / NA" on one line, or
 // a lone "☐ Human").
 function choiceParts(q: Question) {
@@ -827,25 +801,4 @@ export function pickedOf(q: Question, answers: Answers): string[] {
   const radio = radioOf(q)
   const v = radio && answers[radio.key]
   return typeof v === 'string' && v ? [v] : []
-}
-
-export function matches(q: Question, answers: Answers, f: QuestionFilter) {
-  const text = f.search.trim().toLowerCase()
-  if (
-    text &&
-    !`${q.section ?? ''} ${q.intro ?? ''} ${q.title} ${q.parts.map((p) => p.field.label).join(' ')}`
-      .toLowerCase()
-      .includes(text)
-  )
-    return false
-  if (f.type !== 'all' && !q.parts.some((p) => p.field.type === f.type)) return false
-  if (f.category !== 'all' && q.category !== f.category) return false
-  if (Object.entries(f.tags).some(([k, v]) => q.tags?.[k] !== v)) return false
-  if (f.choices !== 'all' && !choicesOf(q).includes(f.choices)) return false
-  if (f.picked !== 'all' && !pickedOf(q, answers).includes(f.picked)) return false
-  return (
-    check(q.parts, answers, f.answered) &&
-    check(partsLike(q, /remark/i), answers, f.remarks) &&
-    check(partsLike(q, /comment/i), answers, f.comments)
-  )
 }
