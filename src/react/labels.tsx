@@ -84,6 +84,7 @@ export const DEFAULT_LABELS = {
     "Select something on the document, drag a field or layout item in from the left, or use Edit text to change the document's own text.",
   fillOrderHeading: 'FILL ORDER',
   noFields: 'No fields yet.',
+  searchFields: 'Search fields',
   pageShort: (n: number) => `p${n}`,
   suggestedTag: 'AI',
   moveUp: 'Move up',

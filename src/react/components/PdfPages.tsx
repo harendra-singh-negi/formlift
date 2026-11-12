@@ -134,7 +134,9 @@ function PdfPage({
   useEffect(() => {
     const el = box.current
     if (!el || typeof IntersectionObserver === 'undefined') return setVisible(true)
-    const io = new IntersectionObserver(([e]) => e.isIntersecting && setVisible(true), { rootMargin: '600px' })
+    // Near the screen: drawn, with its fields. Far away: the canvas is freed and the fields unmounted, so a long
+    // document (hundreds of pages, thousands of fields) costs only the pages around the one being read.
+    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { rootMargin: '1200px 0px' })
     io.observe(el)
     return () => io.disconnect()
   }, [])
@@ -156,6 +158,9 @@ function PdfPage({
     return () => {
       live = false
       task?.cancel()
+      // free the bitmap (a 155% page is ~10 MB); it is drawn again when the page comes back
+      el.width = 0
+      el.height = 0
     }
   }, [doc, source, visible, zoom])
 
@@ -190,9 +195,9 @@ function PdfPage({
       className="relative mx-auto flex-none bg-white shadow-[0_1px_6px_rgba(15,23,42,0.18)]"
       style={{ width, height }}
     >
-      {source && <canvas ref={canvas} className="absolute inset-0 h-full w-full" aria-label={`Page ${pageNo}`} />}
+      {source && visible && <canvas ref={canvas} className="absolute inset-0 h-full w-full" aria-label={`Page ${pageNo}`} />}
       <div className="absolute inset-0 [container-type:size]">
-        {overlay?.(pageNo, withText && lines?.source === source ? lines.lines : undefined)}
+        {visible && overlay?.(pageNo, withText && lines?.source === source ? lines.lines : undefined)}
       </div>
     </div>
   )

@@ -1,7 +1,5 @@
 import {
-  ArrowDown,
   ArrowLeft,
-  ArrowUp,
   Copy,
   Eye,
   Grid3x3,
@@ -18,6 +16,7 @@ import {
 import { Fragment, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react'
 import ElementProperties from './components/ElementProperties'
 import { AnswerControl } from './components/FieldControl'
+import FieldOrderList from './components/FieldOrderList'
 import FieldProperties from './components/FieldProperties'
 import LayoutElementView from './components/LayoutElementView'
 import PagesPanel from './components/PagesPanel'
@@ -571,7 +570,7 @@ export default function FormEditor({
                   ))}
                 </ul>
               )}
-              <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="min-h-0 flex-1 overflow-y-auto" data-fl-scroll>
                 {tab === 'props' && (
                   <>
                     <PanelHeading
@@ -635,41 +634,15 @@ export default function FormEditor({
                   <>
                     <PanelHeading>{L.fillOrderHeading}</PanelHeading>
                     {!fields.length && <EmptyText>{L.noFields}</EmptyText>}
-                    <ol className="m-0 list-none p-0">
-                      {fields.map((f, i) => (
-                        <li
-                          key={f.id}
-                          className={`flex items-center gap-1 border-b border-line-soft px-2 py-1 text-[12.5px] ${selection?.id === f.id ? 'bg-primary-tint' : ''}`}
-                        >
-                          <button
-                            type="button"
-                            className="min-w-0 flex-1 cursor-pointer truncate text-left"
-                            onClick={() => {
-                              ed.setSelection({ kind: 'field', id: f.id })
-                              goToPage(f.position.page)
-                            }}
-                          >
-                            <span className="text-faint">{L.pageShort(f.position.page)}</span> {f.label || f.key}{' '}
-                            <span className="text-muted">· {typeName(L, f.type)}</span>
-                            {f.source === 'ai' && <span className="text-folder"> · {L.suggestedTag}</span>}
-                          </button>
-                          <IconButton
-                            icon={ArrowUp}
-                            title={L.moveUp}
-                            iconSize={13}
-                            disabled={i === 0}
-                            onClick={() => ed.reorderField(f.id, -1)}
-                          />
-                          <IconButton
-                            icon={ArrowDown}
-                            title={L.moveDown}
-                            iconSize={13}
-                            disabled={i === fields.length - 1}
-                            onClick={() => ed.reorderField(f.id, 1)}
-                          />
-                        </li>
-                      ))}
-                    </ol>
+                    <FieldOrderList
+                      fields={fields}
+                      selectedId={selection?.id}
+                      onPick={(f) => {
+                        ed.setSelection({ kind: 'field', id: f.id })
+                        goToPage(f.position.page)
+                      }}
+                      onMove={ed.reorderField}
+                    />
                   </>
                 )}
 
