@@ -151,7 +151,13 @@ export function useFormFiller({
   const [files, setFiles] = useState<AnswerFileInfo[]>(initialFiles)
   // Stored signature images (file id → object URL).
   const [signatures, setSignatures] = useState<Record<string, string>>({})
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [errors, setErrorsState] = useState<Record<string, string>>({})
+  // the errors as of now (not as of the last render): several changes can run before React draws again
+  const errorsNow = useRef(errors)
+  const setErrors = useCallback((next: Record<string, string> | ((cur: Record<string, string>) => Record<string, string>)) => {
+    errorsNow.current = typeof next === 'function' ? next(errorsNow.current) : next
+    setErrorsState(errorsNow.current)
+  }, [])
   const [saveState, setSaveState] = useState<SaveState>('saved')
   const [hasSaved, setHasSaved] = useState(!!initialAnswers)
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
@@ -267,7 +273,7 @@ export function useFormFiller({
     setAnswers(next)
     setSaveState('dirty')
     const related = f.group ? fields.filter((x) => x.group?.id === f.group!.id).map((x) => x.key) : [f.key]
-    if (related.some((k) => errors[k])) {
+    if (related.some((k) => errorsNow.current[k])) {
       const found = validateAnswers(fields, next, answerOptions)
       setErrors((all) => {
         const rest = { ...all }
