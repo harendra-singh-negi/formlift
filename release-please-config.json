@@ -39,8 +39,7 @@
         },
         {
           "type": "build",
-          "section": "Build System",
-          "hidden": true
+          "section": "Dependencies and Build"
         },
         {
           "type": "ci",

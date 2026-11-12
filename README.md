@@ -737,6 +737,24 @@ const fields = await detectDocument(pdf, OPS as unknown as Ops, pages, [])
 
 </details>
 
+## Upgrading
+
+What changed for your code, per release. The full list of changes is in the
+[CHANGELOG](./CHANGELOG.md).
+
+### 0.3 → 0.4
+
+Nothing breaks. Check these:
+
+| What | Who | What to do |
+| --- | --- | --- |
+| `pdfjs-dist` is a **peer dependency** | everyone | npm 7+ / pnpm install it for you. Yarn 1 or npm 6: `npm install pdfjs-dist`. |
+| pdf.js **legacy build** | `formlift/react` apps that call `setPdfWorker` | Point it at `pdfjs-dist/legacy/build/pdf.worker.min.mjs` (was `build/`). Otherwise browsers without `Promise.try` (before Chrome 128, Firefox 134, Safari 18.2) stop partway through a document. formlift warns in the console. |
+| `formlift/element` needs **no setup** | Angular / Vue / plain JS apps | Optional cleanup: remove `formlift/style.css` from your global styles, the worker asset you copied and your `setPdfWorker` call. Keeping them still works. Under a strict CSP, allow `worker-src blob:` (or keep your `setPdfWorker`). |
+| `onSave(answers, info)` | filler users | `info` now also has `comments` (empty unless fields allow comments). Nothing to change. |
+| Editor height | everyone | The editor never grows past its container (`min-height` is now `min(640px, 100%)`). Give the container a height, as before. |
+| 9 new field types, groups, follow-ups, comments, `onFieldChange` | – | New, opt-in. See the [Guide](#guide-groups-follow-ups-comments-and-your-own-logic). A server that validates with `validateAnswers` / `validateFields` needs the new formlift version too, so it accepts the new types and rules. |
+
 ## Theming
 
 The styles live inside `.fl-root` and have no global reset. Override any variable to match your brand:
