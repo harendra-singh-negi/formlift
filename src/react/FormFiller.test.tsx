@@ -1,9 +1,8 @@
-import { act, type ReactNode } from 'react'
+import { act, type MouseEventHandler, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { FieldDef } from '../core/form-logic'
 import FormFiller from './FormFiller'
-
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 // pdf.js needs a real canvas and worker: the overlay is what this test is about.
@@ -111,4 +110,80 @@ it('Save draft sends the latest answers; server field errors show at the fields'
   await act(async () => button('Save draft').click())
   await flush()
   expect(el.textContent).toContain('Name is taken')
+})
+
+it('draws the given components instead of the built-in ones', () => {
+  const MyButton = ({
+    children,
+    onClick,
+  }: {
+    children?: ReactNode
+    onClick?: MouseEventHandler<HTMLButtonElement>
+  }) => (
+    <button data-custom onClick={onClick}>
+      {children}
+    </button>
+  )
+  act(() => root.render(<FormFiller pdf="x.pdf" fields={fields} onSave={() => {}} components={{ Button: MyButton }} />))
+  expect(button('Submit').hasAttribute('data-custom')).toBe(true)
+})
+
+it('hides the parts listed in hide and offers only the given views', () => {
+  act(() =>
+    root.render(<FormFiller pdf="x.pdf" fields={fields} onSave={() => {}} hide={['saveDraft']} views={['document']} />),
+  )
+  expect(button('Save draft')).toBeUndefined()
+  expect(button('Submit')).toBeDefined()
+  expect(button('List')).toBeUndefined()
+})
+
+it('draws a field type with its own renderer, the rest with the built-in control', () => {
+  const MyText = ({ field }: { field: FieldDef }) => <span data-mine>{field.key}</span>
+  act(() => root.render(<FormFiller pdf="x.pdf" fields={fields} components={{ fields: { text: MyText } }} />))
+  expect([...el.querySelectorAll('[data-mine]')].map((n) => n.textContent)).toEqual(['name'])
+  expect(input('Status')).not.toBeNull()
+})
+
+it('lets you draw the list filters yourself', () => {
+  act(() =>
+    root.render(
+      <FormFiller
+        pdf="x.pdf"
+        fields={fields}
+        views={['list']}
+        renderFilters={(fs) => (
+          <button data-my-filter onClick={() => fs.setSearch('zzz')}>
+            {fs.list.length}/{fs.total}
+          </button>
+        )}
+      />,
+    ),
+  )
+  const mine = el.querySelector<HTMLButtonElement>('[data-my-filter]')!
+  expect(mine.textContent).toBe('2/2')
+  expect(el.querySelector('[aria-label="Search questions"]')).toBeNull()
+  act(() => mine.click())
+  expect(mine.textContent).toBe('0/2')
+})
+
+it('offers only the filters you list, and you decide on the ones this form has nothing for', () => {
+  let groups: { id: string; available: boolean }[] = []
+  act(() =>
+    root.render(
+      <FormFiller
+        pdf="x.pdf"
+        fields={fields}
+        views={['list']}
+        listFilters={['answered', 'category']}
+        renderFilters={(fs) => {
+          groups = fs.groups.map(({ id, available }) => ({ id, available }))
+          return null
+        }}
+      />,
+    ),
+  )
+  expect(groups).toEqual([
+    { id: 'answered', available: true },
+    { id: 'category', available: false },
+  ])
 })

@@ -1,7 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import type { FieldDef, FieldType } from './form-logic'
 import type { TextLine } from './layout'
-import { choicesOf, matches, NO_FILTER, pickedOf, toQuestions } from './questions'
+import { builtinFilters, filterQuestions, resolveFilters, tagFilter } from './filters'
+import { choicesOf, pickedOf, toQuestions, type Question } from './questions'
+import type { Answers } from './form-logic'
+
+// The filters as the list used them before the registry: 'all' = not filtering on it.
+const NO_FILTER = {
+  search: '',
+  answered: 'all',
+  remarks: 'all',
+  comments: 'all',
+  type: 'all',
+  category: 'all',
+  choices: 'all',
+  picked: 'all',
+  tags: {} as Record<string, string>,
+}
+function matches(q: Question, answers: Answers, { search, tags, ...rest }: typeof NO_FILTER) {
+  const values: Record<string, string> = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== 'all'))
+  for (const [k, v] of Object.entries(tags)) values[`tag:${k}`] = v
+  const defs = [...resolveFilters(builtinFilters(), [q]), ...Object.keys(tags).map((k) => tagFilter(k))]
+  return filterQuestions([q], answers, defs, values, search).length === 1
+}
 
 let n = 0
 const f = (label: string, type: FieldType, x: number, y: number, height = 0.015): FieldDef => ({
