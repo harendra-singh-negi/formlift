@@ -99,6 +99,11 @@ export interface FormEditorProps extends UseFormEditorOptions {
    * false: it scrolls away with the page.
    */
   stickyToolbar?: boolean
+  /**
+   * true (default): only the document scrolls; the tools and the right panel stay in view.
+   * false: the whole editor scrolls as one page, panels included.
+   */
+  stickyPanels?: boolean
 }
 
 /**
@@ -122,6 +127,7 @@ export default function FormEditor({
   ref,
   zoomSteps,
   stickyToolbar = true,
+  stickyPanels = true,
   ...options
 }: FormEditorProps) {
   const shows = (p: EditorPart) => !hide.includes(p)
@@ -203,7 +209,9 @@ export default function FormEditor({
 
   return (
     <FormliftProvider components={components} labels={options.labels}>
-      <div className={`fl-root flex min-h-[min(640px,100%)] flex-col bg-white text-ink ${className}`}>
+      <div
+        className={`fl-root flex min-h-[min(640px,100%)] flex-col bg-white text-ink ${stickyPanels ? '' : 'overflow-auto'} ${className}`}
+      >
         {/* Toolbar */}
         <div
           className={`flex flex-wrap items-center gap-2 border-b border-line bg-white px-4 py-2.5 max-sm:px-3 max-sm:py-2 ${stickyToolbar ? 'sticky top-0 z-20' : ''}`}
@@ -350,7 +358,7 @@ export default function FormEditor({
           </p>
         )}
 
-        <div className="relative flex min-h-0 flex-1">
+        <div className={`relative flex ${stickyPanels ? 'min-h-0 flex-1' : 'flex-none'}`}>
           {/* Toolbox: a column on large screens, a drawer from the left below lg. */}
           {!preview && shows('tools') && (
             <aside
@@ -386,7 +394,7 @@ export default function FormEditor({
               scroller.current = n
               fitRef(n)
             }}
-            className="min-w-0 flex-1 overflow-auto bg-hover"
+            className={`min-w-0 flex-1 bg-hover ${stickyPanels ? 'overflow-auto' : 'overflow-x-auto'}`}
             onPointerDown={() => {
               if (!preview) ed.setSelection(null)
               setDrawer(null)

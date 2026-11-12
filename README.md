@@ -289,6 +289,7 @@ uploads are embedded as PDF attachments.
 | `undoLimit` | `number` | `100` | Undo steps kept |
 | `zoomSteps` | `number[]` | `[0.5, 0.75, 1, 1.25, 1.5, 2]` | Steps of the zoom − / + buttons |
 | `stickyToolbar` | `boolean` | `true` | Keep the toolbar on top when the page around the editor scrolls |
+| `stickyPanels` | `boolean` | `true` | Only the document scrolls; the tools and right panel stay in view. `false` scrolls the whole editor as one page |
 
 **Keyboard:** <kbd>Del</kbd> delete · <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> undo/redo ·
 <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate · arrow keys nudge (hold <kbd>Shift</kbd> for larger steps) ·
