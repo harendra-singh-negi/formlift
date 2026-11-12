@@ -24,6 +24,6 @@ body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; co
 .card pre { margin: 0; padding: 14px; font-size: 12px; line-height: 1.5; overflow: auto; max-height: 460px; background: #0b1220; color: #e2e8f0; }
 .btn { border: 1px solid #0f766e; background: #0f766e; color: #fff; border-radius: 6px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
 .btn.ghost { background: #fff; color: #0f766e; }
-@media (max-width: 640px) { .pick { margin-left: 0; } .links { display: none; } .code { padding: 12px; grid-template-columns: 1fr; } .brand small { display: none; } }
+@media (max-width: 640px) { .pick { margin-left: 0; width: 100%; flex-wrap: wrap; } .pick select { flex: 1 1 100%; min-width: 0; max-width: 100%; } .links { display: none; } .code { padding: 12px; grid-template-columns: 1fr; } .brand small { display: none; } }
 .toast { position: fixed; right: 16px; bottom: 16px; z-index: 2000; margin: 0; max-width: min(420px, calc(100vw - 32px)); padding: 10px 14px; border-radius: 8px; background: #042f2e; color: #fff; font-size: 13.5px; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
 .loading { padding: 24px; color: #6b7280; }
