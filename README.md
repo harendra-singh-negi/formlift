@@ -124,15 +124,21 @@ import { setPdfWorker } from 'formlift/react'
 import 'formlift/style.css'
 
 // Vite
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 setPdfWorker(workerUrl)
 
 // webpack 5 / Next.js
-// setPdfWorker(new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString())
+// setPdfWorker(new URL('pdfjs-dist/legacy/build/pdf.worker.min.mjs', import.meta.url).toString())
 ```
 
 > If you skip this step, the worker is loaded from unpkg.com for the installed pdfjs-dist version. That works,
 > but it needs internet access and is blocked by a strict CSP.
+>
+> Use the **legacy** worker, as above. formlift loads pdf.js's legacy build, which carries polyfills for browsers
+> without `Promise.try` (before Chrome 128, Firefox 134, Safari 18.2, e.g. Firefox ESR 128). The modern worker
+> stops on those browsers partway through a document ("Promise.try is not a function"); formlift warns in the
+> console when it sees that pairing. Angular: copy `node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs` as an
+> asset and pass its URL.
 
 ### 2. Build a form (admin)
 

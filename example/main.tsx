@@ -8,7 +8,7 @@ import { FormEditor, FormFiller, setPdfWorker, type FormDoc } from 'formlift/rea
 import { completedPdf } from 'formlift/server'
 import 'formlift/style.css'
 import './demo.css'
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 
 setPdfWorker(workerUrl)
 
