@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import { moveBy, resizeBy, snap, toPage } from '../../core/coords'
 import { detectDocument, type Ops } from '../../core/detect'
 import { duplicate, newField, reorder, withField, withoutField } from '../../core/fields'
+import { layerOpen } from '../ui/useOutsideClose'
 import {
   defaultLayout,
   FIELD_TYPES,
@@ -218,7 +219,8 @@ export function useFormEditor({
     if (!keyboard) return
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement
-      if (preview || t.closest('input, textarea, select, [contenteditable]')) return
+      // typing, or a dialog / dropdown is open on top: the editor's shortcuts wait
+      if (preview || layerOpen() || t.closest('input, textarea, select, [contenteditable]')) return
       const mod = e.ctrlKey || e.metaKey
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()

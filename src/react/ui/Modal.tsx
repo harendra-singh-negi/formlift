@@ -1,4 +1,5 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
+import { useEscapeLayer } from './useOutsideClose'
 import { createPortal } from 'react-dom'
 import Button from './Button'
 import { useLabels } from '../labels'
@@ -37,11 +38,7 @@ const themeVars = (el: Element): CSSProperties => {
 // ancestor can't misplace or cut it.
 export default function Modal({ children, onClose, width, label }: ModalProps) {
   const [anchor, setAnchor] = useState<HTMLSpanElement | null>(null)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  useEscapeLayer(true, onClose)
   const root = anchor?.getRootNode()
   return (
     <span ref={setAnchor} hidden>
