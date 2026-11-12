@@ -64,7 +64,7 @@ export interface FormFillerProps extends UseFormFillerOptions {
    */
   stickyToolbar?: boolean
   /**
-   * Your own things next to a field (React only): an icon, a button, a status. Drawn at the box's right edge, on
+   * Your own things next to a field (React only): an icon, a button, a status. Drawn on the box's bottom-right corner (with the follow-up and comment badges), on
    * the page and in the list.
    */
   renderFieldExtras?: (field: FieldDef, ctx: { answers: Answers; readOnly: boolean }) => ReactNode
@@ -163,7 +163,8 @@ export default function FormFiller({
     const asked = fields.filter((x) => askedKeys.includes(x.key))
     const hasError = asked.some((x) => errors[x.key])
     return (
-      <div className="absolute top-1/2 left-full z-10 ml-1 flex -translate-y-1/2 items-center gap-1">
+      // on the box's bottom-right corner: never outside the page, so never off-screen near its edge
+      <div className="absolute right-1 bottom-0 z-10 flex translate-y-1/2 items-center gap-1">
         {followUpOn && (
           <button
             type="button"
