@@ -9,6 +9,7 @@ import FormFiller, { type FormFillerProps } from '../react/FormFiller'
 export { setPdfWorker } from '../react/pdfjs'
 export { DEFAULT_LABELS, type Labels } from '../react/labels'
 export type { FormDoc, FormEditorHandle } from '../react/FormEditor'
+export type { FieldChangeApi } from '../react/hooks/useFormFiller'
 export * from '../index'
 
 /** Props that take React content are left out; `title` is plain text here. */
