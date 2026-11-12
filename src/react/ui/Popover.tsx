@@ -48,7 +48,7 @@ export default function Popover({
         )}
       </button>
       {open && compact && (
-        <Modal onClose={() => setOpen(false)} width="w-[560px]">
+        <Modal onClose={() => setOpen(false)} width="w-[560px]" label={label}>
           <ModalHeader title={label} onClose={() => setOpen(false)} />
           <div className="max-h-[70dvh] overflow-y-auto">
             <ModalBody>{children}</ModalBody>

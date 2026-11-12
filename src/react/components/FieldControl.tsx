@@ -269,7 +269,7 @@ export default function FieldControl({
           </span>
         </button>
         {editing && (
-          <Modal onClose={() => setEditing(false)} width="w-[480px]">
+          <Modal onClose={() => setEditing(false)} width="w-[480px]" label={name}>
             <ModalHeader title={name} onClose={() => setEditing(false)} />
             <ModalBody>
               <SheetInput field={field} text={text} onChange={onChange} onDone={() => setEditing(false)} />
@@ -302,7 +302,7 @@ export default function FieldControl({
           </span>
         </button>
         {editing && (
-          <Modal onClose={() => setEditing(false)} width="w-[480px]">
+          <Modal onClose={() => setEditing(false)} width="w-[480px]" label={name}>
             <ModalHeader title={name} onClose={() => setEditing(false)} />
             <ModalBody>
               <div className="max-h-[60dvh] overflow-y-auto">
@@ -492,7 +492,7 @@ export default function FieldControl({
             )}
           </button>
           {signing && (
-            <Modal onClose={() => setSigning(false)} width="w-[640px]">
+            <Modal onClose={() => setSigning(false)} width="w-[640px]" label={L.signTitle(field.label || field.key)}>
               <ModalHeader title={L.signTitle(field.label || field.key)} onClose={() => setSigning(false)} />
               <ModalBody>
                 <SignaturePad

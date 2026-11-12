@@ -8,6 +8,8 @@ interface ModalProps {
   onClose: () => void
   /** Tailwind width class, e.g. 'w-[560px]' */
   width: string
+  /** The dialog's accessible name (usually its heading). */
+  label?: string
 }
 
 // Keep in step with the --fl-* variables in style.css (a test checks it).
@@ -33,7 +35,7 @@ const themeVars = (el: Element): CSSProperties => {
 // Centered dialog over a dimmed backdrop; a click on the backdrop or Escape calls onClose. Rendered into
 // document.body (or the shadow root the editor lives in, whose styles it needs), so a transformed or clipping host
 // ancestor can't misplace or cut it.
-export default function Modal({ children, onClose, width }: ModalProps) {
+export default function Modal({ children, onClose, width, label }: ModalProps) {
   const [anchor, setAnchor] = useState<HTMLSpanElement | null>(null)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -46,7 +48,7 @@ export default function Modal({ children, onClose, width }: ModalProps) {
       {anchor &&
         createPortal(
           <div className="fl-root" style={themeVars(anchor)}>
-            <Backdrop onClose={onClose} width={width}>
+            <Backdrop onClose={onClose} width={width} label={label}>
               {children}
             </Backdrop>
           </div>,
@@ -56,12 +58,13 @@ export default function Modal({ children, onClose, width }: ModalProps) {
   )
 }
 
-function Backdrop({ children, onClose, width }: ModalProps) {
+function Backdrop({ children, onClose, width, label }: ModalProps) {
   return (
     <div className="fixed inset-0 z-[var(--fl-z-modal)] flex items-center justify-center bg-[rgba(15,23,42,0.45)]" onClick={onClose}>
       <div
         role="dialog"
         aria-modal
+        aria-label={label}
         className={`${width} max-w-[calc(100vw-32px)] rounded-[10px] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.25)]`}
         onClick={(e) => e.stopPropagation()}
       >
