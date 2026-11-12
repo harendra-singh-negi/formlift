@@ -39,6 +39,7 @@
   "include": [
     "src",
     "example",
+    "e2e",
     "*.config.ts"
   ]
 }
