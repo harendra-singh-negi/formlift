@@ -116,3 +116,25 @@ test('cleanComments: only fields that take comments, well-formed, newest maxComm
   const out = cleanComments(f, { a: [c(1), c(2), { id: 'x', text: '', at: 'now' }, 'junk'], b: [c(3)], z: [c(4)] }, { maxComments: 1 })
   expect(out).toEqual({ a: [{ id: 'c2', text: 'hi 2', by: 'Asha', at: '2026-11-12T10:00:00Z' }] })
 })
+
+test('nested follow-ups: a question of a closed follow-up never counts, however deep', () => {
+  const a = { ...newField('radio', 1, 0.5, 0.5, []), key: 'a', label: 'A', options: ['Yes', 'No'] }
+  let f = newFollowUpField('text', a, [a]) // A asks B
+  const b = f[1]
+  f = f.map((x) => (x.key === 'a' ? { ...x, followUp: { ...x.followUp!, when: { logic: 'and', rules: [{ fieldKey: 'a', op: 'equals', value: 'No' }] } } } : x))
+  f = newFollowUpField('text', f[1], f) // B asks C
+  const c = f[2]
+  // B's follow-up is "on" by itself (B is empty, so B notEquals 'x'); C is required
+  f = f.map((x) =>
+    x.key === b.key
+      ? { ...x, followUp: { ...x.followUp!, when: { logic: 'and', rules: [{ fieldKey: b.key, op: 'notEquals', value: 'x' }] } } }
+      : x.key === c.key
+        ? { ...x, required: true }
+        : x,
+  )
+  expect(validateFields(f, 1)).toEqual([])
+  expect(fieldStates(f, { a: 'Yes' })[c.key].visible).toBe(false) // A's follow-up closed: B and C never asked
+  expect(validateAnswers(f, { a: 'Yes' })).toEqual({})
+  expect(fieldStates(f, { a: 'No' })[c.key].visible).toBe(true)
+  expect(validateAnswers(f, { a: 'No' })).toEqual({ [c.key]: `${c.label} is required` })
+})

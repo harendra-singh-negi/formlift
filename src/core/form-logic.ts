@@ -412,16 +412,26 @@ export function evaluate(cond: Condition | undefined, answers: Answers): boolean
 /** What the conditions make of each field for these answers. A field hidden by its condition is never required. */
 export function fieldStates(fields: FieldDef[], answers: Answers) {
   const states: Record<string, { visible: boolean; required: boolean; readOnly: boolean }> = {};
-  // A follow-up's fields count only while it is open: its field shows and its condition holds.
-  const asked = new Map<string, boolean>();
-  for (const t of fields)
-    if (t.followUp) {
-      const on = !t.hidden && (!t.visibleWhen || evaluate(t.visibleWhen, answers)) && evaluate(t.followUp.when, answers);
-      for (const k of t.followUp.fields) asked.set(k, (asked.get(k) ?? false) || on);
-    }
+  // A follow-up's fields count only while it is open: its field shows (itself asked, when it is a follow-up's
+  // question too) and its condition holds.
+  const byKey = new Map(fields.map((f) => [f.key, f]));
+  const askers = new Map<string, FieldDef[]>();
+  for (const t of fields) for (const k of t.followUp?.fields ?? []) askers.set(k, [...(askers.get(k) ?? []), t]);
+  const shown = new Map<string, boolean>();
+  const isShown = (f: FieldDef, path: Set<string>): boolean => {
+    const known = shown.get(f.key);
+    if (known !== undefined) return known;
+    if (path.has(f.key)) return false; // a follow-up asking itself, through others: never open
+    path.add(f.key);
+    const own = !f.hidden && (!f.visibleWhen || evaluate(f.visibleWhen, answers));
+    const by = askers.get(f.key);
+    const asked = !by || by.some((t) => isShown(t, path) && evaluate(t.followUp!.when, answers));
+    path.delete(f.key);
+    shown.set(f.key, own && asked);
+    return own && asked;
+  };
   for (const f of fields) {
-    const visible =
-      !f.hidden && (!f.visibleWhen || evaluate(f.visibleWhen, answers)) && asked.get(f.key) !== false;
+    const visible = isShown(byKey.get(f.key) ?? f, new Set());
     states[f.key] = {
       visible,
       required: visible && (!!f.required || (!!f.requiredWhen && evaluate(f.requiredWhen, answers))),
