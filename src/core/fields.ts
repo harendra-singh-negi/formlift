@@ -69,6 +69,12 @@ export function withField(fields: FieldDef[], f: FieldDef): FieldDef[] {
     const y = { ...(x.id === f.id ? next : x) }
     for (const k of ['visibleWhen', 'requiredWhen', 'readOnlyWhen'] as const)
       if (y[k]) y[k] = renameIn(y[k], old.key, key)
+    if (y.followUp)
+      y.followUp = {
+        ...y.followUp,
+        when: renameIn(y.followUp.when, old.key, key)!,
+        fields: y.followUp.fields.map((k) => (k === old.key ? key : k)),
+      }
     return y
   })
 }
@@ -89,6 +95,33 @@ export function newField(type: FieldType, page: number, x: number, y: number, fi
   }
 }
 
+/**
+ * `fields` without the field with this id: its follow-up's dialog-only fields go with it, and follow-ups stop
+ * asking it.
+ */
+export function withoutField(fields: FieldDef[], id: string): FieldDef[] {
+  const gone = fields.find((f) => f.id === id)
+  if (!gone) return fields
+  const drop = new Set([gone.key, ...(gone.followUp?.fields ?? [])])
+  return fields
+    .filter((f) => !drop.has(f.key))
+    .map((f) =>
+      f.followUp && f.followUp.fields.some((k) => drop.has(k))
+        ? { ...f, followUp: { ...f.followUp, fields: f.followUp.fields.filter((k) => !drop.has(k)) } }
+        : f,
+    )
+}
+
+/** A dialog-only field asked by `trigger`'s follow-up (added to it), on the trigger's page. */
+export function newFollowUpField(type: FieldType, trigger: FieldDef, fields: FieldDef[]): FieldDef[] {
+  const f = { ...newField(type, trigger.position.page, 0.5, 0.5, fields), dialogOnly: true }
+  const followUp = trigger.followUp ?? {
+    when: { logic: 'and' as const, rules: [{ fieldKey: trigger.key, op: 'equals' as const, value: '' }] },
+    fields: [],
+  }
+  return [...fields.map((x) => (x.id === trigger.id ? { ...x, followUp: { ...followUp, fields: [...followUp.fields, f.key] } } : x)), f]
+}
+
 /** A copy a little lower, with its own id and key. */
 export function duplicate(f: FieldDef, fields: FieldDef[]): FieldDef {
   return {
@@ -97,6 +130,8 @@ export function duplicate(f: FieldDef, fields: FieldDef[]): FieldDef {
     key: uniqueKey(f.key.replace(/_\d+$/, ''), fields),
     source: 'manual',
     confidence: undefined,
+    // its follow-up's fields belong to the original (a field is asked by one follow-up)
+    followUp: undefined,
     position: fitInPage({ ...f.position, y: f.position.y + f.position.height + 0.005 }),
   }
 }

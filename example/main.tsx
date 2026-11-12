@@ -172,6 +172,7 @@ function Demo() {
             fields={form.fields}
             layout={form.layout}
             title="Fill the form"
+            commentAuthor="Demo user"
             initialAnswers={answers}
             onSave={(a) => {
               setAnswers(a)

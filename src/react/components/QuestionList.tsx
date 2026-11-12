@@ -9,7 +9,8 @@ import { useLabels } from '../labels'
 const PAGE = 100
 
 // Box for a control in the list (controls size their text to the box, as on the page).
-const SIZE: Partial<Record<FieldType, string>> = {
+/** A field control's box outside the page (list view, dialogs): controls size themselves to it. */
+export const SIZE: Partial<Record<FieldType, string>> = {
   checkbox: 'h-7 w-7 lg:h-8 lg:w-8',
   textarea: 'h-20 w-full',
   signature: 'h-16 w-56',

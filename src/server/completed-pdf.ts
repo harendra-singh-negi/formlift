@@ -11,7 +11,32 @@ import {
   type PDFPage,
   type PDFRef,
 } from 'pdf-lib';
-import { answerText, defaultLayout, fieldStates, type Answers, type FieldDef, type Layout, type LayoutElement } from '../core/form-logic';
+import {
+  answerText,
+  defaultLayout,
+  fieldStates,
+  type Answers,
+  type Comments,
+  type FieldDef,
+  type Layout,
+  type LayoutElement,
+} from '../core/form-logic';
+
+/** Options of completedPdf. */
+export interface CompletedPdfOptions {
+  /** Comments to print on the "Comments" pages (fields with `comments: true`). */
+  comments?: Comments;
+  /** Headings and words of the added pages (any language). */
+  text?: Partial<typeof APPENDIX_TEXT>;
+}
+
+const APPENDIX_TEXT = {
+  moreAnswers: 'Additional answers',
+  comments: 'Comments',
+  page: (n: number) => `page ${n}`,
+  yes: 'Yes',
+  no: 'No',
+};
 
 // The document as users see it, as a new PDF: the layout's pages (original pages copied, blank ones added), the
 // admin's text / boxes / lines, then the answers at their fields. The original file stays as it is.
@@ -30,6 +55,56 @@ const printable = (font: PDFFont, s: string) =>
       }
     })
     .join('');
+
+/** `text` cut into lines no wider than `width` at this size (words kept whole where they fit). */
+function wrap(font: PDFFont, text: string, size: number, width: number): string[] {
+  const out: string[] = [];
+  for (const para of text.split('\n')) {
+    let line = '';
+    for (const word of para.split(/\s+/)) {
+      const next = line ? `${line} ${word}` : word;
+      if (font.widthOfTextAtSize(next, size) <= width || !line) line = next;
+      else {
+        out.push(line);
+        line = word;
+      }
+      while (font.widthOfTextAtSize(line, size) > width && line.length > 1) {
+        let cut = line.length - 1;
+        while (cut > 1 && font.widthOfTextAtSize(line.slice(0, cut), size) > width) cut--;
+        out.push(line.slice(0, cut));
+        line = line.slice(cut);
+      }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+type Block = { heading?: string; lines: string[] };
+
+/** A4 pages at the end with headed blocks of text: follow-up answers and comments that have no box on a page. */
+function appendPages(doc: PDFDocument, fonts: Fonts, title: string, blocks: Block[]) {
+  if (!blocks.length) return;
+  const [W, H, M] = [595, 842, 50];
+  let page = doc.addPage([W, H]);
+  let y = H - M;
+  const line = (text: string, font: PDFFont, size: number, gap = 4, indent = 0) => {
+    for (const l of wrap(font, printable(font, text), size, W - 2 * M - indent)) {
+      if (y - size < M) {
+        page = doc.addPage([W, H]);
+        y = H - M;
+      }
+      page.drawText(l, { x: M + indent, y: y - size, size, font, color: rgb(0.12, 0.16, 0.22) });
+      y -= size + gap;
+    }
+  };
+  line(title, fonts['sans-b'], 16, 12);
+  for (const b of blocks) {
+    y -= 6;
+    if (b.heading) line(b.heading, fonts['sans-b'], 11, 5);
+    for (const l of b.lines) line(l, fonts.sans, 10, 4, 10);
+  }
+}
 
 const fromBase64 = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
@@ -197,7 +272,9 @@ export async function completedPdf(
   answers: Answers,
   files: Record<string, AnswerFile> = {},
   layout: Layout | null = null,
+  options: CompletedPdfOptions = {},
 ): Promise<Uint8Array> {
+  const T = { ...APPENDIX_TEXT, ...options.text };
   const src = await PDFDocument.load(original, { updateMetadata: false });
   const plan = layout ?? defaultLayout(src.getPages().map((p) => p.getSize()));
   const doc = layout ? await PDFDocument.create() : src;
@@ -219,7 +296,7 @@ export async function completedPdf(
   const embedded: Embedded[] = [];
   for (const f of fields) {
     const v = answers[f.key];
-    if (!states[f.key]?.visible || v == null || v === '' || v === false) continue;
+    if (f.dialogOnly || !states[f.key]?.visible || v == null || v === '' || v === false) continue;
     const page = pages[f.position.page - 1];
     if (!page) continue;
     const { x, top, w, h } = boxOn(page, f.position);
@@ -247,6 +324,32 @@ export async function completedPdf(
       ...(multiline ? { maxWidth: w - 4, lineHeight: size * 1.2 } : {}),
     });
   }
+  // Answers asked in dialogs have no box on a page: they go on pages at the end, under the field that asked them.
+  const name = (f: FieldDef) => `${f.label || f.key} (${T.page(f.position.page)})`;
+  const answered = (f: FieldDef) => states[f.key]?.visible && answers[f.key] != null && answers[f.key] !== '';
+  const said = (f: FieldDef) =>
+    `${f.label || f.key}: ${f.type === 'file' ? (files[String(answers[f.key])]?.fileName ?? '') : answerText(f, answers[f.key], T.yes, T.no)}`;
+  const asked = new Set<string>();
+  const blocks: Block[] = [];
+  for (const t of fields) {
+    const qs = (t.followUp?.fields ?? [])
+      .map((k) => fields.find((f) => f.key === k))
+      .filter((f): f is FieldDef => !!f && f.type !== 'signature' && !!answered(f));
+    t.followUp?.fields.forEach((k) => asked.add(k));
+    if (qs.length) blocks.push({ heading: name(t), lines: qs.map(said) });
+  }
+  const loose = fields.filter((f) => f.dialogOnly && !asked.has(f.key) && f.type !== 'signature' && answered(f));
+  if (loose.length) blocks.push({ lines: loose.map(said) });
+  appendPages(doc, fonts, T.moreAnswers, blocks);
+
+  const notes = fields
+    .filter((f) => f.comments && options.comments?.[f.key]?.length)
+    .map((f) => ({
+      heading: name(f),
+      lines: options.comments![f.key].map((c) => `${[c.by, c.at.slice(0, 16).replace('T', ' ')].filter(Boolean).join(', ')}: ${c.text}`),
+    }));
+  appendPages(doc, fonts, T.comments, notes);
+
   listAttachments(doc, embedded);
   return doc.save();
 }

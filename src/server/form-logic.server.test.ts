@@ -244,3 +244,32 @@ test('completedPdf: the new types print as people read them', async () => {
   const text = (await page.getTextContent()).items.map((i) => ('str' in i ? i.str : '')).join('|');
   for (const want of ['Fire, Flood', 'B', '$12.50', '4 / 5', '2026-11-12 14:05', 'Yes']) assert.ok(text.includes(want), `${want} in ${text}`);
 });
+
+test('completedPdf: follow-up answers and comments go on pages at the end', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([600, 800]);
+  const fields: FieldDef[] = [
+    field('ok', {
+      type: 'radio',
+      label: 'Certificates OK',
+      options: ['Yes', 'No'],
+      comments: true,
+      followUp: { when: { logic: 'and', rules: [{ fieldKey: 'ok', op: 'equals', value: 'No' }] }, fields: ['why'] },
+    }),
+    field('why', { type: 'textarea', label: 'Why not', dialogOnly: true }),
+  ];
+  const long = 'Survey overdue '.repeat(40);
+  const out = await completedPdf(await doc.save(), fields, { ok: 'No', why: long }, {}, null, {
+    comments: { ok: [{ id: 'c1', text: 'Checked with class', by: 'Asha', at: '2026-11-12T10:05:00Z' }] },
+  });
+  const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const pdf = await getDocument({ data: out }).promise;
+  const pageText = async (n: number) =>
+    (await (await pdf.getPage(n)).getTextContent()).items.map((i) => ('str' in i ? i.str : '')).join(' ');
+  assert.equal(pdf.numPages, 3); // the form, additional answers, comments
+  assert.ok(!(await pageText(1)).includes('Survey overdue')); // the dialog answer has no box on the page
+  const extra = await pageText(2);
+  assert.ok(extra.includes('Additional answers') && extra.includes('Certificates OK (page 1)') && extra.includes('Why not: Survey overdue'));
+  const notes = await pageText(3);
+  assert.ok(notes.includes('Comments') && notes.includes('Asha, 2026-11-12 10:05: Checked with class'), notes);
+});

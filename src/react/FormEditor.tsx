@@ -26,7 +26,7 @@ import { useCompact, useFitZoom } from './hooks/useFitZoom'
 import { useFormEditor, type FormDoc, type UseFormEditorOptions } from './hooks/useFormEditor'
 import { toolName, typeName, useLabels } from './labels'
 import { boxStyle } from '../core/coords'
-import type { FieldType } from '../core/form-logic'
+import { applyAnswer, type FieldType } from '../core/form-logic'
 import type { ElementTool } from '../core/layout'
 import {
   Button,
@@ -488,7 +488,7 @@ export default function FormEditor({
                     )}
 
                   {fields
-                    .filter((f) => f.position.page === page)
+                    .filter((f) => f.position.page === page && !f.dialogOnly)
                     .map((f) =>
                       preview ? (
                         previewStates[f.key]?.visible && (
@@ -499,7 +499,7 @@ export default function FormEditor({
                               value={previewAnswers[f.key]}
                               readOnly={previewStates[f.key].readOnly}
                               compact={compact}
-                              onChange={(v) => ed.setPreviewAnswers((a) => ({ ...a, [f.key]: v }))}
+                              onChange={(v) => ed.setPreviewAnswers((a) => applyAnswer(fields, a, f, v))}
                             />
                           </div>
                         )
@@ -608,6 +608,8 @@ export default function FormEditor({
                         fields={fields}
                         pageCount={pageCount}
                         onChange={ed.updateField}
+                        onFieldsChange={ed.setFields}
+                        onSelect={(id) => ed.setSelection({ kind: 'field', id })}
                         rules={options.rules}
                       />
                     ) : selectedElement ? (

@@ -12,7 +12,7 @@ export type { FormDoc, FormEditorHandle } from '../react/FormEditor'
 export * from '../index'
 
 /** Props that take React content are left out; `title` is plain text here. */
-type ReactOnly = 'title' | 'toolbar' | 'banner' | 'tabs' | 'components' | 'ref'
+type ReactOnly = 'title' | 'toolbar' | 'banner' | 'tabs' | 'components' | 'ref' | 'renderFieldExtras'
 export type EditorOptions = Omit<FormEditorProps, ReactOnly> & { title?: string }
 export type FillerOptions = Omit<FormFillerProps, ReactOnly | 'renderFilters'> & { title?: string }
 

@@ -88,7 +88,7 @@ it('fields sit on the page by percentage, conditions show/hide, submit is blocke
   act(() => button('Submit').click())
   await act(async () => button('Submit').click())
   await flush()
-  expect(save).toHaveBeenCalledWith({ name: 'Asha', status: 'Employed', company: 'SailCo' }, { submit: true })
+  expect(save).toHaveBeenCalledWith({ name: 'Asha', status: 'Employed', company: 'SailCo' }, { submit: true, comments: {} })
   expect(onSubmitted).toHaveBeenCalled()
 })
 
@@ -202,4 +202,41 @@ it('shows your labels instead of the English ones', () => {
   expect(button('जमा करें')).toBeTruthy()
   expect(button('Questions')).toBeTruthy()
   expect(button('Save draft')).toBeTruthy() // left out: stays English
+})
+
+it('onFieldChange: sees the answers after the change, sets other answers, opens a dialog of dialog-only fields', async () => {
+  const withExtra: FieldDef[] = [
+    ...fields,
+    { id: '4', key: 'why', type: 'text', label: 'Why', source: 'manual', position: pos(0.4), dialogOnly: true },
+  ]
+  const seen: unknown[] = []
+  const save = vi.fn().mockResolvedValue(undefined)
+  await act(async () =>
+    root.render(
+      <FormFiller
+        pdf="x.pdf"
+        fields={withExtra}
+        onSave={save}
+        onError={vi.fn()}
+        onFieldChange={(f, v, api) => {
+          seen.push([f.key, v, api.answers.status])
+          if (f.key === 'status' && v === 'Other') {
+            api.setAnswer('company', 'n/a')
+            api.openDialog(['why'], 'Tell us more')
+          }
+        }}
+      />,
+    ),
+  )
+  await flush()
+  expect(input('Why')).toBeNull() // dialog-only: not on the page
+  act(() => type(input('Status')!, 'Other'))
+  expect(seen).toEqual([['status', 'Other', 'Other']])
+  const dialog = document.querySelector('[role="dialog"][aria-label="Tell us more"]')!
+  expect(dialog).not.toBeNull()
+  act(() => type(dialog.querySelector<HTMLInputElement>('[aria-label="Why"]')!, 'Retired'))
+  expect(seen).toHaveLength(2) // the dialog's field reports its change too; setAnswer did not
+  await act(async () => button('Save draft').click())
+  await flush()
+  expect(save).toHaveBeenLastCalledWith({ status: 'Other', company: 'n/a', why: 'Retired' }, { submit: false, comments: {} })
 })

@@ -55,6 +55,7 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 | 🧱 **Builder** | 20 field types (text, date & time, currency, multi-select, checklist, rating, slider, toggle, signature, file…), drag/resize/snap-to-grid, undo/redo, keyboard shortcuts, fill order, page reorder/insert/delete |
 | ✏️ **Layout editing** | Add text, boxes and lines, or click any line of the original text to replace it, all without touching the file |
 | 🔀 **Conditional logic** | `visibleWhen` / `requiredWhen` / `readOnlyWhen` with nested AND/OR groups and 10 operators. Circular rules are rejected. |
+| ☑️ **Groups, follow-ups, comments** | Boxes that allow exactly one or several ticks, follow-up dialogs ("No" → ask why), 💬 comments per field, and an `onFieldChange` hook for your own logic. [Guide](#guide-groups-follow-ups-comments-and-your-own-logic) |
 | ✅ **Validation** | Required, length, min/max, regex, email, phone, date and options. The **same code** runs in the browser and on your server. |
 | 📱 **Filler** | Fields stay pinned to the page at every zoom, plus a list view with search and filters for phones. Includes autosave, signatures and file uploads. |
 | 📄 **Completed PDF** | Answers, signature images and embedded attachments in a new PDF. Runs in Node, Bun, Deno, workers or the browser. |
@@ -219,13 +220,133 @@ Options are the same as the `<FormEditor>` / `<FormFiller>` props below, except 
 (`toolbar`, `banner`, `tabs`, `components`); `title` is plain text. `mountEditor` also returns `save()`, `dirty` and
 `value`. Give the element a height: the components fill it.
 
+## Guide: groups, follow-ups, comments and your own logic
+
+Four tools, from no code to full control. Pick the first one that does the job:
+
+| You want… | Use | Code needed |
+| --- | --- | --- |
+| Separate boxes where only one (or 2–3, or all) may be ticked | [Groups of boxes](#groups-of-boxes) | none: set in the editor |
+| More fields on the page when an answer is given | [`visibleWhen`](#data-model) | none: Conditions in the editor |
+| A dialog asking more questions ("No" → why, by when) | [Follow-up dialogs](#follow-up-dialogs) | none: set in the editor |
+| A 💬 per field where people leave remarks | [Comments](#comments) | store `info.comments` |
+| Anything else: fill other fields, call your API, your own dialog | [`onFieldChange`](#your-own-logic-onfieldchange) | a function |
+| Your own icon or button next to a field (React) | [`renderFieldExtras`](#your-own-logic-onfieldchange) | a component |
+
+Everything is part of the form JSON (`FieldDef`), checked by `validateFields`, and enforced by `validateAnswers` in the
+browser **and on your server**.
+
+### Groups of boxes
+
+A PDF often has "☐ Yes ☐ No ☐ N/A" as separate boxes. Put them in a group:
+
+- **Editor:** select a box → *Group of boxes* → **New group…**, then select each other box → pick the same group.
+  Choose *Exactly one* or *Several*, tick *An answer is required*, and for *Several* set *Choose at least / at most*.
+- **JSON:** every member carries the same `group`:
+
+```ts
+{ key: 'cert_yes', type: 'checkbox', group: { id: 'cert', mode: 'single', required: true }, /* … */ }
+{ key: 'cert_no',  type: 'checkbox', group: { id: 'cert', mode: 'single', required: true }, /* … */ }
+// mode 'multiple': any number, with min / max: { id: 'hazards', mode: 'multiple', min: 1, max: 3 }
+```
+
+| mode | While filling | Checked on submit (browser + server) |
+| --- | --- | --- |
+| `single` | Ticking one unticks the others | Exactly one when `required`; never two |
+| `multiple` | Free | At least `min` (1 when `required`), at most `max` |
+
+The error shows at the group's first visible box. Members hidden by a condition don't count. Answers stay one boolean
+per box. Groups work for `checkbox` and `toggle`. (`radio` is one-of-many already; `checklist` / `multiselect` have
+`min` / `max` built in.) Your own UI applies the rule with `applyAnswer(fields, answers, field, value)`.
+
+### Follow-up dialogs
+
+"If the answer is **No**, ask for the reason and a due date":
+
+- **Editor:** select the field → *Follow-up questions* → **Add a question** (pick a type; repeat for more). Set
+  *Ask when* (e.g. *this field* · *equals* · `No`) and optionally a *Dialog heading*. Click a question in the list
+  to edit its label, rules and so on.
+- **JSON:**
+
+```ts
+{
+  key: 'cert_ok', type: 'radio', options: ['Yes', 'No'], /* … */
+  followUp: {
+    when: { logic: 'and', rules: [{ fieldKey: 'cert_ok', op: 'equals', value: 'No' }] },
+    title: 'Why not?',
+    fields: ['cert_reason', 'cert_due'],
+  },
+}
+{ key: 'cert_reason', type: 'textarea', dialogOnly: true, required: true, /* … */ }
+{ key: 'cert_due',    type: 'date',     dialogOnly: true, /* … */ }
+```
+
+- **While filling:** the dialog opens when the person's change makes `when` true. A ⊕ badge next to the field shows
+  how many follow-up answers there are and reopens the dialog. It turns red when one of them has an error.
+- **Answers:** ordinary answers under their own keys (`cert_reason`, `cert_due`), with their own validation. They count
+  only while the follow-up is open: `required` applies then, and they are skipped otherwise. `fieldStates` and
+  `validateAnswers` handle this, so the server agrees.
+- **Completed PDF:** dialog-only fields have no box on the page. They are printed on an *Additional answers* page at the
+  end, under the field that asked them (e.g. "Certificates OK (page 3)").
+- Deleting a field removes its follow-up questions; renaming one keeps the follow-up pointing at it.
+
+### Comments
+
+- **Editor:** tick *Allow comments* on a field (JSON: `comments: true`).
+- **While filling:** a 💬 next to the field shows the count. Clicking it opens the comments: each with author and time,
+  plus a box to add one. Deleting is possible unless the filler is `readOnly`.
+- **Storing:** comments are kept apart from the answers (a conversation, not an answer):
+
+```tsx
+<FormFiller
+  fields={form.fields}
+  initialAnswers={draft.answers}
+  initialComments={draft.comments}      // Comments: { [fieldKey]: { id, text, by?, at }[] }
+  commentAuthor={currentUser.name}      // stored as `by`
+  onSave={(answers, { submit, comments }) => api.save({ answers, comments, submit })}
+  onCommentsChange={(comments) => {/* optional: live */}}
+/>
+```
+
+- **Server:** `cleanComments(form.fields, req.body.comments)` keeps only fields that allow comments and well-formed
+  entries (at most `limits.maxComments` per field, default 200).
+- **Completed PDF:** pass them to print a *Comments* page:
+  `completedPdf(original, fields, answers, files, layout, { comments })`.
+
+### Your own logic: `onFieldChange`
+
+Runs after the person changes a field (not after your own `setAnswer`), with the answers after the change:
+
+```tsx
+<FormFiller
+  fields={form.fields}
+  onFieldChange={(field, value, api) => {
+    // fill another field
+    if (field.key === 'vessel') api.setAnswer('imo', lookupImo(String(value)))
+    // ask dialog-only fields your way (they need no follow-up)
+    if (field.key === 'incident' && value === true) api.openDialog(['incident_time', 'incident_place'], 'Incident details')
+    // tell the person something
+    if (field.key === 'expiry' && String(value) < today) api.notify('This certificate has expired')
+  }}
+  renderFieldExtras={(field, { answers }) =>        // React only: your icon / button next to a field
+    field.key === 'imo' ? <a href={`https://registry.example/${answers.imo}`}>🔗</a> : null}
+/>
+```
+
+`api` = `{ answers, setAnswer(key, value), openDialog(keys, title?), notify(message) }`. Answers set this way are
+ordinary answers: saved, validated and printed like any other. Dialog-only fields not used by any follow-up are
+always counted, so give them `visibleWhen` if they apply only sometimes.
+
+**Angular / Vue / plain JS:** `onFieldChange`, comments and everything above work the same through
+`mountFiller(el, { ... })`. `renderFieldExtras` is React-only.
+
 ## Server side
 
 **Never trust the browser.** Run the same checks on your server with the core package:
 
 ```ts
 import express from 'express'
-import { cleanAnswers, validateAnswers, validateFields, validateLayout } from 'formlift'
+import { cleanAnswers, cleanComments, validateAnswers, validateFields, validateLayout } from 'formlift'
 import { completedPdf } from 'formlift/server'
 
 const app = express().use(express.json({ limit: '5mb' }))
@@ -244,24 +365,25 @@ app.put('/api/forms/:id', async (req, res) => {
 app.post('/api/forms/:id/answers', async (req, res) => {
   const form = await db.forms.get(req.params.id)
   const answers = cleanAnswers(form.fields, req.body.answers) // drops unknown keys, coerces types
+  const comments = cleanComments(form.fields, req.body.comments) // only fields with comments: true
   if (req.body.submit) {
-    const errors = validateAnswers(form.fields, answers) // {} = valid; hidden fields are skipped
+    const errors = validateAnswers(form.fields, answers) // {} = valid; hidden fields and closed follow-ups are skipped
     if (Object.keys(errors).length) return res.status(422).json({ errors })
   }
-  await db.submissions.save(req.params.id, answers, req.body.submit)
+  await db.submissions.save(req.params.id, { answers, comments }, req.body.submit)
   res.sendStatus(204)
 })
 
 // Download the completed PDF
 app.get('/api/submissions/:id/pdf', async (req, res) => {
-  const { form, answers, files } = await db.submissions.full(req.params.id)
-  const pdf = await completedPdf(form.originalPdf, form.fields, answers, files, form.layout)
+  const { form, answers, comments, files } = await db.submissions.full(req.params.id)
+  const pdf = await completedPdf(form.originalPdf, form.fields, answers, files, form.layout, { comments })
   res.type('application/pdf').send(Buffer.from(pdf))
 })
 ```
 
 `files` maps a file answer's id to `{ fileName, fileType, bytes }`. Signatures are drawn as images and
-uploads are embedded as PDF attachments.
+uploads are embedded as PDF attachments. Follow-up answers and comments go on pages at the end.
 
 ## API reference
 
@@ -310,7 +432,7 @@ uploads are embedded as PDF attachments.
 | `fields` | `FieldDef[]` | **required** | The form's fields |
 | `layout` | `Layout \| null` | `null` | The form's layout (`null` = the original pages) |
 | `initialAnswers` | `Answers` | field defaults | A draft to continue |
-| `onSave` | `(answers, { submit }) => unknown` | – | Called for drafts and autosave (`submit: false`) and for submit (`true`). Throw `{ errors }` to show field errors. |
+| `onSave` | `(answers, { submit, comments }) => unknown` | – | Called for drafts and autosave (`submit: false`) and for submit (`true`). Throw `{ errors }` to show field errors. |
 | `onSubmitted` | `(answers) => void` | – | Called after a successful submit |
 | `autosave` | `number \| false` | `2500` | Delay in ms after the last change |
 | `onUpload` | `(field, file) => Promise<AnswerFileInfo>` | – | Stores an uploaded file or a signature PNG and returns its `id`. Without it, file fields are read-only and signatures are kept as data URLs. |
@@ -333,6 +455,11 @@ uploads are embedded as PDF attachments.
 | `stickyToolbar` | `boolean` | `true` | Keep the toolbar on top while the content scrolls; `false` lets it scroll away |
 | `onChange` | `(answers: Answers) => void` | – | Every change of the answers as JSON. With it, `onSave` is optional |
 | `messages` | `Partial<AnswerMessages>` | English | Your own wording for answer errors (any language) |
+| `onFieldChange` | `(field, value, api) => void` | – | Your logic after each change: `api.setAnswer`, `api.openDialog`, `api.notify` ([Guide](#your-own-logic-onfieldchange)) |
+| `initialComments` | `Comments` | `{}` | Comments to start with ([Comments](#comments)) |
+| `onCommentsChange` | `(comments: Comments) => void` | – | Every change of the comments (they also reach `onSave` as `info.comments`) |
+| `commentAuthor` | `string` | – | Stored as `by` on new comments |
+| `renderFieldExtras` | `(field, { answers, readOnly }) => ReactNode` | – | Your own icon / button next to a field (React only) |
 | `title`, `onBack`, `toolbar`, `notify`, `onError`, `className` | | | Same as `FormEditor` |
 
 ### Hooks (`formlift/react`)
@@ -355,6 +482,12 @@ uploads are embedded as PDF attachments.
 | `fieldStates(fields, answers)` | `Record<key, { visible, required, readOnly }>` | Applies the conditions |
 | `evaluate(condition, answers)` | `boolean` | Evaluates one condition |
 | `defaultAnswers(fields)` | `Answers` | The answers a new submission starts with |
+| `applyAnswer(fields, answers, field, value)` | `Answers` | The answers after one change, with group rules applied (use it in your own UI) |
+| `openedFollowUps(fields, before, after)` | `FieldDef[]` | Fields whose follow-up this change opened |
+| `groupsOf(fields)` | `Map<id, { group, members }>` | Groups of boxes |
+| `cleanComments(fields, input, limits?)` | `Comments` | Comments kept to fields that allow them, well-formed |
+| `answerText(field, value)` | `string` | An answer as people read it ("Fire, Flood", "$12.50", "Yes") |
+| `withoutField(fields, id)` / `newFollowUpField(type, trigger, fields)` | `FieldDef[]` | Remove a field (with its follow-up questions) / add a follow-up question |
 | `defaultLayout(pageSizes)` | `Layout` | The layout of an untouched document |
 | `detectDocument(pdf, OPS, pages, existing, onProgress?, signal?)` | `Promise<FieldDef[]>` | Suggests fields for a whole document |
 | `toQuestions(fields, textOf?, { categoryCode? })` | `Question[]` | Fields grouped as questions, used by the list view |
@@ -442,6 +575,7 @@ completedPdf(
   answers: Answers,
   files?: Record<string, { fileName: string; fileType: string; bytes: Uint8Array }>,
   layout?: Layout | null,
+  options?: { comments?: Comments; text?: { moreAnswers, comments, page, yes, no } }, // headings in your language
 ): Promise<Uint8Array>
 ```
 
@@ -480,7 +614,13 @@ interface FieldDef {
   visibleWhen?: Condition
   requiredWhen?: Condition
   readOnlyWhen?: Condition
+  group?: { id: string; mode: 'single' | 'multiple'; required?: boolean; min?: number; max?: number } // checkbox / toggle
+  followUp?: { when: Condition; title?: string; fields: string[] } // keys of dialogOnly fields
+  dialogOnly?: boolean // asked in a dialog, no box on the page
+  comments?: boolean // people can comment on it
 }
+
+type Comments = Record<string, { id: string; text: string; by?: string; at: string }[]> // by field key
 
 interface Condition {
   logic: 'and' | 'or'

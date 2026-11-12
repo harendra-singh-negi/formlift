@@ -1,7 +1,10 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  checkAnswer,
+  applyAnswer,
+  openedFollowUps,
+  type Comments,
+  type FieldComment,
   type AnswerMessages,
   type AnswerOptions,
   type Limits,
@@ -29,6 +32,24 @@ export interface AnswerFileInfo {
 
 export type SaveState = 'saved' | 'dirty' | 'saving' | 'error'
 
+/** What onFieldChange can do. */
+export interface FieldChangeApi {
+  /** All answers after this change. */
+  answers: Answers
+  /** Set another field's answer (does not call onFieldChange again). */
+  setAnswer: (key: string, value: AnswerValue) => void
+  /** Ask these fields (usually dialog-only ones) in a dialog. */
+  openDialog: (keys: string[], title?: string) => void
+  /** Show a message through your notify. */
+  notify: (message: string) => void
+}
+
+/** The dialog asking more fields: a follow-up, or one onFieldChange opened. */
+export interface FieldDialog {
+  title: string
+  keys: string[]
+}
+
 export interface UseFormFillerOptions {
   fields: FieldDef[]
   layout?: Layout | null
@@ -42,7 +63,7 @@ export interface UseFormFillerOptions {
    * Save a draft (`submit: false`, also autosave) or submit (answers already pass validateAnswers — check again on
    * your server). Throw `{ errors: { fieldKey: message } }` to show errors at the fields.
    */
-  onSave?: (answers: Answers, info: { submit: boolean }) => unknown
+  onSave?: (answers: Answers, info: { submit: boolean; comments: Comments }) => unknown
   /** Called after a successful submit. */
   onSubmitted?: (answers: Answers) => void
   /** Autosave delay in ms after the last change; false = off. Default 2500. */
@@ -69,6 +90,17 @@ export interface UseFormFillerOptions {
    * however you like.
    */
   onChange?: (answers: Answers) => void
+  /**
+   * After the person changes a field (not after setAnswer): react with your own logic, e.g. open a dialog, fill
+   * another field, show a message. Follow-ups set in the editor need none of this.
+   */
+  onFieldChange?: (field: FieldDef, value: AnswerValue, api: FieldChangeApi) => void
+  /** Comments to start with (fields with `comments: true`). */
+  initialComments?: Comments
+  /** Every change of the comments. They are also passed to onSave as `info.comments`. */
+  onCommentsChange?: (comments: Comments) => void
+  /** Who writes new comments (name or id), stored as `by`. */
+  commentAuthor?: string
   notify?: (message: string) => void
   onError?: (error: unknown) => void
   /** Your own text for every button, heading and message (any language). Default: DEFAULT_LABELS (English). */
@@ -106,6 +138,10 @@ export function useFormFiller({
   rules,
   validate,
   onChange,
+  onFieldChange,
+  initialComments,
+  onCommentsChange,
+  commentAuthor,
   notify = () => {},
   onError: notifyError = (e) => console.error(e),
   labels,
@@ -120,8 +156,11 @@ export function useFormFiller({
   const [hasSaved, setHasSaved] = useState(!!initialAnswers)
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
   const [pdfSizes, setPdfSizes] = useState<PageSize[]>([])
+  const [comments, setComments] = useState<Comments>(initialComments ?? {})
+  const [dialog, setDialog] = useState<FieldDialog | null>(null)
   const queue = useRef<Promise<unknown>>(Promise.resolve())
   const latest = useRef<Answers>(answers)
+  const latestComments = useRef<Comments>(comments)
   const changed = useRef(onChange)
   changed.current = onChange
   const first = useRef(true)
@@ -164,7 +203,7 @@ export function useFormFiller({
       return source ? pageText?.[source] : undefined
     }
     return toQuestions(
-      fields.filter((f) => keys.has(f.key)),
+      fields.filter((f) => keys.has(f.key) && !f.dialogOnly),
       textOf,
     )
   }, [fields, layout, visibleKeys, pageText, toQuestions])
@@ -196,7 +235,7 @@ export function useFormFiller({
       const run = queue.current.then(async () => {
         setSaveState('saving')
         try {
-          await onSave(latest.current, { submit })
+          await onSave(latest.current, { submit, comments: latestComments.current })
           setHasSaved(true)
           setSaveState('saved')
           return true
@@ -220,18 +259,73 @@ export function useFormFiller({
     return () => clearTimeout(t)
   }, [answers, readOnly, autosave, onSave, saveState, save])
 
-  /** Sets one answer (re-checks it if it showed an error). */
-  function change(f: FieldDef, v: AnswerValue) {
-    setAnswers((a) => ({ ...a, [f.key]: v }))
+  // Sets one answer: a 'single' group unticks its other boxes; shown errors of the field / its group are re-checked.
+  function put(f: FieldDef, v: AnswerValue) {
+    const before = latest.current
+    const next = applyAnswer(fields, before, f, v)
+    latest.current = next
+    setAnswers(next)
     setSaveState('dirty')
-    if (errors[f.key]) {
-      const err = checkAnswer(f, v, states[f.key]?.required, answerOptions, { ...answers, [f.key]: v })
+    const related = f.group ? fields.filter((x) => x.group?.id === f.group!.id).map((x) => x.key) : [f.key]
+    if (related.some((k) => errors[k])) {
+      const found = validateAnswers(fields, next, answerOptions)
       setErrors((all) => {
         const rest = { ...all }
-        delete rest[f.key]
-        return err ? { ...rest, [f.key]: err } : rest
+        for (const k of related) delete rest[k]
+        for (const k of related) if (found[k]) rest[k] = found[k]
+        return rest
       })
     }
+    return { before, next }
+  }
+
+  /** The person's change of one field: sets it, opens a follow-up it triggers, calls onFieldChange. */
+  function change(f: FieldDef, v: AnswerValue) {
+    const { before, next } = put(f, v)
+    const opened = openedFollowUps(fields, before, next).find((t) => t.followUp!.fields.length)
+    if (opened) setDialog({ title: opened.followUp!.title || opened.label || opened.key, keys: opened.followUp!.fields })
+    onFieldChange?.(f, v, {
+      answers: next,
+      setAnswer: (key, value) => {
+        const target = fields.find((x) => x.key === key)
+        if (target) put(target, value)
+      },
+      openDialog: (keys, title) => setDialog({ title: title ?? '', keys }),
+      notify,
+    })
+  }
+
+  /** Opens a field's follow-up again (its 💬-like badge on the page). */
+  function openFollowUp(f: FieldDef) {
+    if (f.followUp?.fields.length) setDialog({ title: f.followUp.title || f.label || f.key, keys: f.followUp.fields })
+  }
+
+  function setAllComments(next: Comments) {
+    latestComments.current = next
+    setComments(next)
+    setSaveState('dirty')
+    onCommentsChange?.(next)
+  }
+  /** Adds a comment by commentAuthor to a field. */
+  function addComment(f: FieldDef, text: string) {
+    if (!text.trim()) return
+    const c: FieldComment = {
+      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `c${Date.now()}${Math.random()}`,
+      text: text.trim(),
+      at: new Date().toISOString(),
+      ...(commentAuthor ? { by: commentAuthor } : {}),
+    }
+    const cur = latestComments.current
+    setAllComments({ ...cur, [f.key]: [...(cur[f.key] ?? []), c] })
+  }
+  /** Removes one comment. */
+  function removeComment(f: FieldDef, id: string) {
+    const cur = latestComments.current
+    const list = (cur[f.key] ?? []).filter((c) => c.id !== id)
+    const next = { ...cur }
+    if (list.length) next[f.key] = list
+    else delete next[f.key]
+    setAllComments(next)
   }
 
   /** Uploads a file / signature PNG through onUpload and makes it the field's answer. */
@@ -285,6 +379,15 @@ export function useFormFiller({
     /** Fields with an error, in form order. */
     errorList: fields.filter((f) => errors[f.key]),
     change,
+    /** The open dialog of more questions, or null. */
+    dialog,
+    closeDialog: () => setDialog(null),
+    openDialog: (keys: string[], title = '') => setDialog({ title, keys }),
+    openFollowUp,
+    comments,
+    addComment,
+    removeComment,
+    commentAuthor,
     save,
     submit,
     saveState,

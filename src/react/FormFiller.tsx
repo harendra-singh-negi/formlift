@@ -1,9 +1,10 @@
-import { ArrowLeft, Download, Paperclip, Save, Send } from 'lucide-react'
+import { ArrowLeft, Download, ListPlus, MessageSquare, Paperclip, Save, Send } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useLabels } from './labels'
 import { boxStyle } from '../core/coords'
-import type { FieldDef, Layout } from '../core/form-logic'
+import { evaluate, type Answers, type FieldDef, type Layout } from '../core/form-logic'
 import { AnswerControl } from './components/FieldControl'
+import { CommentsDialog, FieldDialog } from './components/FieldDialogs'
 import LayoutElementView from './components/LayoutElementView'
 import PdfPages, { type PdfSource } from './components/PdfPages'
 import QuestionList from './components/QuestionList'
@@ -62,6 +63,11 @@ export interface FormFillerProps extends UseFormFillerOptions {
    * false: it scrolls away with the content.
    */
   stickyToolbar?: boolean
+  /**
+   * Your own things next to a field (React only): an icon, a button, a status. Drawn at the box's right edge, on
+   * the page and in the list.
+   */
+  renderFieldExtras?: (field: FieldDef, ctx: { answers: Answers; readOnly: boolean }) => ReactNode
 }
 
 const humanSize = (n?: number) => {
@@ -97,6 +103,7 @@ export default function FormFiller({
   zoomSteps,
   listPageSize,
   stickyToolbar = true,
+  renderFieldExtras,
   ...options
 }: FormFillerProps) {
   const shows = (p: FillerPart) => !hide.includes(p)
@@ -109,6 +116,7 @@ export default function FormFiller({
   const { zoom, setZoom, ref: fitRef } = useFitZoom(Math.max(...(layout?.pages.map((p) => p.width) ?? [pdfWidth])), zoomSteps)
   const compact = useCompact()
   const [confirmSubmit, setConfirmSubmit] = useState(false)
+  const [commentsOf, setCommentsOf] = useState<FieldDef | null>(null)
   const [loadError, setLoadError] = useState('')
   // Document = the PDF with the controls on it; List = the same answers as questions, with search and filters.
   const [view, setView] = useState<'document' | 'list'>(views[0] ?? 'document')
@@ -138,8 +146,52 @@ export default function FormFiller({
       {states[f.key].required && !readOnly && shows('requiredMark') && (
         <span className="pointer-events-none absolute -top-1.5 -right-1.5 text-[12px] font-bold text-danger">*</span>
       )}
+      {badges(f)}
     </>
   )
+
+  // Next to a field: its follow-up (once open, to reopen it), its comments, your extras.
+  function badges(f: FieldDef) {
+    const askedKeys = f.followUp?.fields ?? []
+    const followUpOn = askedKeys.length > 0 && evaluate(f.followUp!.when, answers)
+    const answered = askedKeys.filter((k) => answers[k] != null && answers[k] !== '' && answers[k] !== false).length
+    const list = ff.comments[f.key] ?? []
+    const extras = renderFieldExtras?.(f, { answers, readOnly })
+    if (!followUpOn && !f.comments && extras == null) return null
+    const chip =
+      'inline-flex h-5 cursor-pointer items-center gap-0.5 rounded-full border bg-white px-1.5 text-[11px] shadow-sm'
+    const asked = fields.filter((x) => askedKeys.includes(x.key))
+    const hasError = asked.some((x) => errors[x.key])
+    return (
+      <div className="absolute top-1/2 left-full z-10 ml-1 flex -translate-y-1/2 items-center gap-1">
+        {followUpOn && (
+          <button
+            type="button"
+            title={L.moreAnswers(answered)}
+            aria-label={L.moreAnswers(answered)}
+            className={`${chip} ${hasError ? 'border-danger text-danger' : 'border-primary/50 text-primary'}`}
+            onClick={() => ff.openFollowUp(f)}
+          >
+            <ListPlus size={12} />
+            {answered || ''}
+          </button>
+        )}
+        {f.comments && (
+          <button
+            type="button"
+            title={L.commentsButton(list.length)}
+            aria-label={L.commentsButton(list.length)}
+            className={`${chip} ${list.length ? 'border-folder text-ink-2' : 'border-line-strong text-muted'}`}
+            onClick={() => setCommentsOf(f)}
+          >
+            <MessageSquare size={12} />
+            {list.length || ''}
+          </button>
+        )}
+        {extras}
+      </div>
+    )
+  }
 
   return (
     <FormliftProvider components={components} labels={options.labels}>
@@ -265,7 +317,7 @@ export default function FormFiller({
                   <LayoutElementView key={el.id} element={el} pageHeight={layout!.pages[page - 1]?.height ?? 842} />
                 )),
               ...fields
-                .filter((f) => f.position.page === page && states[f.key]?.visible)
+                .filter((f) => f.position.page === page && !f.dialogOnly && states[f.key]?.visible)
                 .map((f) => (
                   <div key={f.id} className="absolute [container-type:size]" style={boxStyle(f.position)}>
                     {control(f)}
@@ -274,6 +326,27 @@ export default function FormFiller({
             ]}
           />
         </div>
+        {ff.dialog && (
+          <FieldDialog
+            title={ff.dialog.title}
+            fields={ff.dialog.keys
+              .map((k) => fields.find((x) => x.key === k))
+              .filter((x): x is FieldDef => !!x && !!states[x.key]?.visible)}
+            control={control}
+            errors={errors}
+            onClose={ff.closeDialog}
+          />
+        )}
+        {commentsOf && (
+          <CommentsDialog
+            field={commentsOf}
+            comments={ff.comments[commentsOf.key] ?? []}
+            readOnly={readOnly}
+            onAdd={(text) => ff.addComment(commentsOf, text)}
+            onRemove={(id) => ff.removeComment(commentsOf, id)}
+            onClose={() => setCommentsOf(null)}
+          />
+        )}
         {confirmSubmit && (
           <ConfirmModal
             confirmLabel={L.submit}

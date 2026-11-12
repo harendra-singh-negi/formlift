@@ -8,9 +8,11 @@ import {
   type AnswerRule,
   type Condition,
   type FieldDef,
+  type FieldGroup,
   type FieldType,
 } from '../../core/form-logic'
 import { fitInPage } from '../../core/coords'
+import { newFollowUpField } from '../../core/fields'
 import { typeName, useLabels } from '../labels'
 import ConditionBuilder from './ConditionBuilder'
 import { Checkbox, FormField, Select, TextArea, TextInput } from '../ui/slots'
@@ -33,12 +35,18 @@ export default function FieldProperties({
   fields,
   pageCount,
   onChange,
+  onFieldsChange,
+  onSelect,
   rules = {},
 }: {
   field: FieldDef
   fields: FieldDef[]
   pageCount: number
   onChange: (f: FieldDef) => void
+  /** Changes to several fields at once (a group's settings, a follow-up's new question). */
+  onFieldsChange?: (update: (fields: FieldDef[]) => FieldDef[]) => void
+  /** Select another field (a follow-up's question). */
+  onSelect?: (id: string) => void
   /** The app's own rules the admin can pick for this field. */
   rules?: Record<string, AnswerRule>
 }) {
@@ -122,6 +130,14 @@ export default function FieldProperties({
               {L[k]}
             </label>
           ))}
+          <label className="inline-flex items-center gap-1.5">
+            <Checkbox
+              label={L.allowComments}
+              checked={!!field.comments}
+              onChange={(e) => set({ comments: e.target.checked || undefined })}
+            />
+            {L.allowComments}
+          </label>
         </div>
       </Section>
 
@@ -275,6 +291,82 @@ export default function FieldProperties({
         )}
       </Section>
 
+      {onFieldsChange && (field.type === 'checkbox' || field.type === 'toggle') && (
+        <GroupSection field={field} fields={fields} onFieldsChange={onFieldsChange} />
+      )}
+
+      {onFieldsChange && !field.dialogOnly && (
+        <Section title={L.followUpSection}>
+          <p className="m-0 text-[12px] text-muted">{L.followUpHint}</p>
+          {field.followUp && (
+            <>
+              <FormField label={L.followUpWhen}>
+                <ConditionBuilder
+                  value={field.followUp.when}
+                  fields={fields.filter((f) => !f.dialogOnly)}
+                  onChange={(c: Condition) => set({ followUp: { ...field.followUp!, when: c } })}
+                />
+              </FormField>
+              <FormField label={L.followUpTitle}>
+                <TextInput
+                  value={field.followUp.title ?? ''}
+                  placeholder={field.label}
+                  onChange={(e) => set({ followUp: { ...field.followUp!, title: e.target.value || undefined } })}
+                />
+              </FormField>
+              <ol className="m-0 space-y-1 pl-5">
+                {field.followUp.fields.map((k) => {
+                  const q = fields.find((f) => f.key === k)
+                  return (
+                    <li key={k}>
+                      <button
+                        type="button"
+                        className="cursor-pointer text-primary hover:underline"
+                        onClick={() => q && onSelect?.(q.id)}
+                      >
+                        {q?.label || k}
+                      </button>{' '}
+                      <span className="text-muted">· {q ? typeName(L, q.type) : '?'}</span>
+                    </li>
+                  )
+                })}
+              </ol>
+            </>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              aria-label={L.followUpAdd}
+              value=""
+              onChange={(e) => {
+                const type = e.target.value as FieldType
+                if (type) onFieldsChange((l) => newFollowUpField(type, field, l))
+              }}
+            >
+              <option value="">{L.followUpAdd}</option>
+              {FIELD_TYPES.filter((t) => t !== 'signature').map((t) => (
+                <option key={t} value={t}>
+                  {typeName(L, t)}
+                </option>
+              ))}
+            </Select>
+            {field.followUp && (
+              <button
+                type="button"
+                className="cursor-pointer text-danger hover:underline"
+                onClick={() =>
+                  onFieldsChange((l) => {
+                    const drop = new Set(field.followUp!.fields)
+                    return l.filter((f) => !drop.has(f.key)).map((f) => (f.id === field.id ? { ...f, followUp: undefined } : f))
+                  })
+                }
+              >
+                {L.followUpRemove}
+              </button>
+            )}
+          </div>
+        </Section>
+      )}
+
       {CONDITIONS.map((key) => {
         const cond = field[key]
         return (
@@ -330,5 +422,94 @@ export default function FieldProperties({
         </div>
       </Section>
     </div>
+  )
+}
+
+/** A checkbox / toggle's group: join or leave one, and the group's settings (written to every member). */
+function GroupSection({
+  field,
+  fields,
+  onFieldsChange,
+}: {
+  field: FieldDef
+  fields: FieldDef[]
+  onFieldsChange: (update: (fields: FieldDef[]) => FieldDef[]) => void
+}) {
+  const L = useLabels()
+  const ids = [...new Set(fields.map((f) => f.group?.id).filter((x): x is string => !!x))]
+  const g = field.group
+  const members = g ? fields.filter((f) => f.group?.id === g.id) : []
+  const setGroup = (next: FieldGroup) =>
+    onFieldsChange((l) => l.map((f) => (f.group?.id === g!.id ? { ...f, group: next } : f)))
+  const join = (id: string) =>
+    onFieldsChange((l) => {
+      const settings = l.find((f) => f.group?.id === id)?.group ?? { id, mode: 'single' as const }
+      return l.map((f) => (f.id === field.id ? { ...f, group: id ? settings : undefined } : f))
+    })
+  return (
+    <Section title={L.groupSection}>
+      <Select
+        className="w-full"
+        aria-label={L.groupSection}
+        value={g?.id ?? ''}
+        onChange={(e) => {
+          if (e.target.value !== '\u0000new') return join(e.target.value)
+          let n = 1
+          while (ids.includes(`group_${n}`)) n++
+          join(`group_${n}`)
+        }}
+      >
+        <option value="">{L.groupNone}</option>
+        {ids.map((id) => (
+          <option key={id} value={id}>
+            {id}
+          </option>
+        ))}
+        <option value={'\u0000new'}>{L.groupNew}</option>
+      </Select>
+      {g && (
+        <>
+          <p className="m-0 text-[12px] text-muted">{L.groupMembers(members.length)}</p>
+          <FormField label={L.groupMode}>
+            <Select
+              className="w-full"
+              value={g.mode}
+              onChange={(e) =>
+                setGroup(
+                  e.target.value === 'single'
+                    ? { id: g.id, mode: 'single', required: g.required }
+                    : { ...g, mode: 'multiple' },
+                )
+              }
+            >
+              <option value="single">{L.groupSingle}</option>
+              <option value="multiple">{L.groupMultiple}</option>
+            </Select>
+          </FormField>
+          <label className="inline-flex items-center gap-1.5">
+            <Checkbox
+              label={L.groupRequired}
+              checked={!!g.required}
+              onChange={(e) => setGroup({ ...g, required: e.target.checked || undefined })}
+            />
+            {L.groupRequired}
+          </label>
+          {g.mode === 'multiple' && (
+            <div className="grid grid-cols-2 gap-2">
+              {(['min', 'max'] as const).map((k) => (
+                <FormField key={k} label={k === 'min' ? L.minChoices : L.maxChoices}>
+                  <TextInput
+                    type="number"
+                    min={0}
+                    value={g[k] ?? ''}
+                    onChange={(e) => setGroup({ ...g, [k]: num(e.target.value) })}
+                  />
+                </FormField>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </Section>
   )
 }

@@ -85,6 +85,7 @@ export default function FieldOrderList({
               <span className="text-faint">{L.pageShort(f.position.page)}</span> {f.label || f.key}{' '}
               <span className="text-muted">· {typeName(L, f.type)}</span>
               {f.source === 'ai' && <span className="text-folder"> · {L.suggestedTag}</span>}
+              {f.dialogOnly && <span className="text-primary"> · {L.dialogTag}</span>}
             </button>
             <IconButton icon={ArrowUp} title={L.moveUp} iconSize={13} disabled={i === 0} onClick={() => onMove(f.id, -1)} />
             <IconButton

@@ -21,5 +21,5 @@ export {
 } from './core/filters'
 export type { FilterOption, FilterSource, FilterValues, QuestionFilterDef } from './core/filters'
 export { toLines, type TextLine, type PdfTextItem } from './core/layout'
-export { newField, duplicate, reorder, withField, uniqueKey, keyFor } from './core/fields'
+export { newField, duplicate, reorder, withField, withoutField, newFollowUpField, uniqueKey, keyFor } from './core/fields'
 export { fitInPage, moveBy, resizeBy, snap } from './core/coords'

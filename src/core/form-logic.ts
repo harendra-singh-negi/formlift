@@ -98,7 +98,51 @@ export interface FieldDef {
   visibleWhen?: Condition;
   requiredWhen?: Condition;
   readOnlyWhen?: Condition;
+  /**
+   * checkbox / toggle: a member of a group of boxes. Every member carries the same settings. mode 'single': ticking
+   * one unticks the others (Yes / No / NA as separate boxes); 'multiple': any number, within min / max. required:
+   * at least one (or `min`).
+   */
+  group?: FieldGroup;
+  /**
+   * Opens a dialog with more questions when `when` turns true by the person's change (e.g. answer "No" → ask why).
+   * `fields`: keys of dialog-only fields (`dialogOnly: true`). Their answers are ordinary answers.
+   */
+  followUp?: FollowUp;
+  /** Not on the page: asked in a follow-up dialog (or one your onFieldChange opens). `position.page` = where it belongs. */
+  dialogOnly?: boolean;
+  /** People can leave comments on this field (a 💬 next to it). Stored apart from the answers: see Comments. */
+  comments?: boolean;
 }
+
+export interface FieldGroup {
+  /** Same id on every member. */
+  id: string;
+  mode: 'single' | 'multiple';
+  required?: boolean;
+  /** 'multiple': fewest ticked (default 1 when required). */
+  min?: number;
+  /** 'multiple': most ticked. */
+  max?: number;
+}
+
+export interface FollowUp {
+  when: Condition;
+  /** The dialog's heading. Default: the field's label. */
+  title?: string;
+  /** Keys of the dialog-only fields asked, in order. */
+  fields: string[];
+}
+
+/** One comment on a field. `by`: your user's name or id; `at`: ISO time. */
+export interface FieldComment {
+  id: string;
+  text: string;
+  by?: string;
+  at: string;
+}
+/** Field key → its comments, oldest first. Saved next to the answers (not inside them). */
+export type Comments = Record<string, FieldComment[]>;
 
 /**
  * checkbox and toggle = boolean, file and signature = stored file id (dffuid; a signature is a PNG file),
@@ -126,6 +170,8 @@ export interface Limits {
   maxSignatureChars: number
   /** Characters in one layout text item. Default 5000. */
   maxElementText: number
+  /** Comments on one field. Default 200. */
+  maxComments: number
 }
 
 export const DEFAULT_LIMITS: Readonly<Limits> = Object.freeze({
@@ -135,6 +181,7 @@ export const DEFAULT_LIMITS: Readonly<Limits> = Object.freeze({
   maxAnswerLength: 10_000,
   maxSignatureChars: 300_000,
   maxElementText: 5000,
+  maxComments: 200,
 });
 
 /** The defaults with your overrides applied. */
@@ -160,6 +207,9 @@ export interface AnswerMessages {
   datetime: string
   url: string
   decimals: (n: number) => string
+  groupOne: string
+  groupMin: (n: number) => string
+  groupMax: (n: number) => string
 }
 
 export const DEFAULT_ANSWER_MESSAGES: Readonly<AnswerMessages> = Object.freeze({
@@ -181,6 +231,9 @@ export const DEFAULT_ANSWER_MESSAGES: Readonly<AnswerMessages> = Object.freeze({
   datetime: 'Must be a date and time',
   url: 'Must be a web address (https://…)',
   decimals: (n: number) => (n ? `At most ${n} digits after the decimal point` : 'Must be a whole number'),
+  groupOne: 'Tick exactly one',
+  groupMin: (n: number) => (n === 1 ? 'Tick at least one' : `Tick at least ${n}`),
+  groupMax: (n: number) => `Tick at most ${n}`,
 });
 
 /** One of your own validation rules. Give the same rules to FormEditor (to pick them), FormFiller and your server. */
@@ -259,6 +312,64 @@ export function answerText(f: FieldDef, v: AnswerValue | undefined, yesText = 'Y
   return v;
 }
 
+/** Groups of boxes by id: their members (form order) and settings (the first member's). */
+export function groupsOf(fields: FieldDef[]): Map<string, { group: FieldGroup; members: FieldDef[] }> {
+  const out = new Map<string, { group: FieldGroup; members: FieldDef[] }>();
+  for (const f of fields) {
+    if (!f.group?.id) continue;
+    const g = out.get(f.group.id);
+    if (g) g.members.push(f);
+    else out.set(f.group.id, { group: f.group, members: [f] });
+  }
+  return out;
+}
+
+/**
+ * The answers after setting one field: what every UI should use instead of `{ ...answers, [key]: v }`. Ticking a
+ * box of a 'single' group unticks the other members.
+ */
+export function applyAnswer(fields: FieldDef[], answers: Answers, field: FieldDef, value: AnswerValue): Answers {
+  const next: Answers = { ...answers, [field.key]: value };
+  if (value === true && field.group?.mode === 'single')
+    for (const m of fields) if (m.group?.id === field.group.id && m.key !== field.key && next[m.key] === true) next[m.key] = false;
+  return next;
+}
+
+/** The follow-ups that `before` → `after` opened: fields whose followUp condition just turned true. */
+export function openedFollowUps(fields: FieldDef[], before: Answers, after: Answers): FieldDef[] {
+  return fields.filter((f) => f.followUp && !evaluate(f.followUp.when, before) && evaluate(f.followUp.when, after));
+}
+
+/**
+ * Comments kept to the fields that take them, each a short text with a time: what to store on your server
+ * (comments come from the browser, like answers).
+ */
+export function cleanComments(fields: FieldDef[], comments: unknown, limits?: Partial<Limits>): Comments {
+  const { maxComments, maxAnswerLength } = resolveLimits(limits);
+  const input = (comments && typeof comments === 'object' ? comments : {}) as Record<string, unknown>;
+  const out: Comments = {};
+  for (const f of fields) {
+    const list = input[f.key];
+    if (!f.comments || !Array.isArray(list)) continue;
+    const kept = list
+      .filter(
+        (c): c is FieldComment =>
+          !!c &&
+          typeof c === 'object' &&
+          typeof c.id === 'string' &&
+          typeof c.text === 'string' &&
+          c.text.trim() !== '' &&
+          c.text.length <= maxAnswerLength &&
+          typeof c.at === 'string' &&
+          (c.by == null || typeof c.by === 'string'),
+      )
+      .slice(-maxComments)
+      .map(({ id, text, by, at }) => (by == null ? { id, text, at } : { id, text, by, at }));
+    if (kept.length) out[f.key] = kept;
+  }
+  return out;
+}
+
 const isGroup = (r: Rule | Condition): r is Condition => 'rules' in r;
 const isEmpty = (v: AnswerValue | undefined) => v == null || v === '' || v === false || v === '[]';
 const str = (v: AnswerValue | undefined) => (v == null ? '' : String(v));
@@ -301,8 +412,16 @@ export function evaluate(cond: Condition | undefined, answers: Answers): boolean
 /** What the conditions make of each field for these answers. A field hidden by its condition is never required. */
 export function fieldStates(fields: FieldDef[], answers: Answers) {
   const states: Record<string, { visible: boolean; required: boolean; readOnly: boolean }> = {};
+  // A follow-up's fields count only while it is open: its field shows and its condition holds.
+  const asked = new Map<string, boolean>();
+  for (const t of fields)
+    if (t.followUp) {
+      const on = !t.hidden && (!t.visibleWhen || evaluate(t.visibleWhen, answers)) && evaluate(t.followUp.when, answers);
+      for (const k of t.followUp.fields) asked.set(k, (asked.get(k) ?? false) || on);
+    }
   for (const f of fields) {
-    const visible = !f.hidden && (!f.visibleWhen || evaluate(f.visibleWhen, answers));
+    const visible =
+      !f.hidden && (!f.visibleWhen || evaluate(f.visibleWhen, answers)) && asked.get(f.key) !== false;
     states[f.key] = {
       visible,
       required: visible && (!!f.required || (!!f.requiredWhen && evaluate(f.requiredWhen, answers))),
@@ -454,6 +573,20 @@ export function validateAnswers(
     const err = checkAnswer(f, answers[f.key], states[f.key].required, options, answers);
     if (err) errors[f.key] = err;
   }
+  // Groups of boxes: how many are ticked, shown at the first visible member.
+  const m: AnswerMessages = { ...DEFAULT_ANSWER_MESSAGES, ...options?.messages };
+  for (const { group, members } of groupsOf(fields).values()) {
+    const shown = members.filter((f) => states[f.key].visible);
+    if (!shown.length || shown.some((f) => errors[f.key])) continue;
+    const ticked = shown.filter((f) => answers[f.key] === true).length;
+    const min = group.min ?? (group.required ? 1 : 0);
+    let err: string | null = null;
+    if (group.mode === 'single') {
+      if (ticked > 1 || (group.required && ticked === 0)) err = m.groupOne;
+    } else if (ticked < min && (ticked > 0 || group.required)) err = m.groupMin(min);
+    else if (group.max != null && ticked > group.max) err = m.groupMax(group.max);
+    if (err) errors[shown[0].key] = err;
+  }
   return errors;
 }
 
@@ -529,14 +662,41 @@ export function validateFields(fields: unknown, pageCount: number, limits?: Part
     if (f.min != null && f.max != null && f.min > f.max) errors.push(`${name}: min is greater than max`);
     if (f.minLength != null && f.maxLength != null && f.minLength > f.maxLength)
       errors.push(`${name}: min length is greater than max length`);
+    if (f.group != null) {
+      const g = f.group;
+      if (!['checkbox', 'toggle'].includes(f.type)) errors.push(`${name}: only checkboxes and toggles can be grouped`);
+      if (typeof g.id !== 'string' || !g.id || (g.mode !== 'single' && g.mode !== 'multiple'))
+        errors.push(`${name}: group needs an id and mode single or multiple`);
+      if (g.min != null && g.max != null && g.min > g.max) errors.push(`${name}: group min is greater than max`);
+    }
+    if (f.followUp != null && !(Array.isArray(f.followUp.fields) && f.followUp.when && Array.isArray(f.followUp.when.rules)))
+      errors.push(`${name}: follow-up needs a condition and a list of fields`);
   }
   if (errors.length) return errors;
+
+  // Groups share settings; follow-ups ask existing dialog-only fields, each in one follow-up.
+  for (const { group, members } of groupsOf(fields as FieldDef[]).values())
+    if (members.some((x) => JSON.stringify(x.group) !== JSON.stringify(group)))
+      errors.push(`Group "${group.id}": its members have different settings`);
+  const byKey = new Map((fields as FieldDef[]).map((f) => [f.key, f]));
+  const askedBy = new Map<string, string>();
+  for (const f of fields as FieldDef[])
+    for (const k of f.followUp?.fields ?? []) {
+      const target = byKey.get(k);
+      if (!target) errors.push(`Field "${f.label || f.key}": follow-up asks unknown field "${k}"`);
+      else if (!target.dialogOnly) errors.push(`Field "${f.label || f.key}": follow-up field "${k}" must be dialog-only`);
+      else if (askedBy.has(k)) errors.push(`Field "${k}" is asked by two follow-ups`);
+      askedBy.set(k, f.key);
+    }
 
   // Conditions may only point at other existing fields, and never in a circle (A depends on B depends on A).
   const deps = new Map<string, Set<string>>();
   for (const f of fields as FieldDef[]) {
     const refs = new Set<string>();
     for (const c of [f.visibleWhen, f.requiredWhen, f.readOnlyWhen]) conditionKeys(c, refs);
+    // a follow-up's condition may use the field itself (answer "No" → ask why)
+    for (const k of conditionKeys(f.followUp?.when, new Set()))
+      if (!keys.has(k)) errors.push(`Field "${f.label || f.key}": follow-up uses unknown field "${k}"`);
     for (const k of refs) {
       if (!keys.has(k)) errors.push(`Field "${f.label || f.key}": condition uses unknown field "${k}"`);
       if (k === f.key) errors.push(`Field "${f.label || f.key}": condition uses the field itself`);

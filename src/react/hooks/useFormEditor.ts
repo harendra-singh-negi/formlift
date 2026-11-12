@@ -2,7 +2,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { moveBy, resizeBy, snap, toPage } from '../../core/coords'
 import { detectDocument, type Ops } from '../../core/detect'
-import { duplicate, newField, reorder, withField } from '../../core/fields'
+import { duplicate, newField, reorder, withField, withoutField } from '../../core/fields'
 import {
   defaultLayout,
   FIELD_TYPES,
@@ -185,7 +185,7 @@ export function useFormEditor({
   )
   const removeSelected = useCallback(() => {
     if (!selection) return
-    if (selection.kind === 'field') setFields((l) => l.filter((x) => x.id !== selection.id))
+    if (selection.kind === 'field') setFields((l) => withoutField(l, selection.id))
     else setElements((l) => l.filter((x) => x.id !== selection.id))
     setSelection(null)
   }, [selection, setFields, setElements])
