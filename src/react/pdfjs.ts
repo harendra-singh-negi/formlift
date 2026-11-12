@@ -20,15 +20,23 @@ export function setPdfWorker(src: string | Worker) {
   else workerPort = src
 }
 
+// formlift/element brings its own worker (same pdf.js version, no asset to copy): used when the app set none.
+let builtinWorker: (() => Promise<Worker | undefined>) | undefined
+/** @internal formlift/element's own worker. */
+export function setBuiltinPdfWorker(make: () => Promise<Worker | undefined>) {
+  builtinWorker = make
+}
+
 const hasPromiseTry = () => typeof (Promise as { try?: unknown }).try === 'function'
 
 let pdfjs: Promise<PdfJs> | null = null
 export const loadPdfJs = () =>
-  (pdfjs ??= (import('pdfjs-dist/legacy/build/pdf.mjs') as Promise<PdfJs>).then((lib) => {
+  (pdfjs ??= (import('pdfjs-dist/legacy/build/pdf.mjs') as Promise<PdfJs>).then(async (lib) => {
     const o = lib.GlobalWorkerOptions
     if (workerPort) o.workerPort = workerPort
     else if (workerSrc) o.workerSrc = workerSrc
-    else if (!o.workerSrc && !o.workerPort)
+    else if (!o.workerSrc && !o.workerPort && builtinWorker) o.workerPort = (await builtinWorker()) ?? null
+    if (!o.workerSrc && !o.workerPort)
       // ponytail: CDN fallback needs internet; self-host via setPdfWorker for offline / strict CSP.
       o.workerSrc = `https://unpkg.com/pdfjs-dist@${lib.version}/legacy/build/pdf.worker.min.mjs`
     if (!hasPromiseTry() && typeof o.workerSrc === 'string' && !o.workerSrc.includes('legacy'))

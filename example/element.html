@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>formlift/element · no setup</title>
+    <style>
+      html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
+      #editor { height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <!-- An app without React (Angular, Vue, plain JS): no stylesheet, no worker asset, no setPdfWorker. -->
+    <div id="editor"></div>
+    <script type="module">
+      import { mountEditor } from 'formlift/element'
+      window.editor = mountEditor(document.getElementById('editor'), {
+        pdf: './sample.pdf',
+        title: 'formlift/element, zero setup',
+        onSave: (doc) => console.log('saved', doc),
+      })
+    </script>
+  </body>
+</html>

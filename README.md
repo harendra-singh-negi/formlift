@@ -197,11 +197,11 @@ That's it. Both components fill the height of their container.
 
 ### Angular, Vue, Svelte or plain JS
 
-`formlift/element` has React inside, so your app installs only `formlift`:
+`formlift/element` has React, pdf.js (with its worker) and its CSS inside. **No setup in your app**: no
+stylesheet in `angular.json`, no worker asset to copy, no `setPdfWorker`. Install `formlift` and mount:
 
 ```ts
-import { mountEditor, mountFiller, setPdfWorker } from 'formlift/element'
-import 'formlift/style.css' // or add it to your global styles
+import { mountEditor, mountFiller } from 'formlift/element'
 
 // Builder: the form is plain JSON, store it wherever you like
 const editor = mountEditor(element, {
@@ -225,6 +225,15 @@ const filler = mountFiller(element, {
 Options are the same as the `<FormEditor>` / `<FormFiller>` props below, except the ones that take React content
 (`toolbar`, `banner`, `tabs`, `components`); `title` is plain text. `mountEditor` also returns `save()`, `dirty` and
 `value`. Give the element a height: the components fill it.
+
+- **CSS** is added to the page (or the shadow root) on the first mount, once. If your app already loads
+  `formlift/style.css`, formlift sees it and adds nothing. Your own CSS still overrides it (theme variables etc.).
+- **pdf.js** is a lazy chunk, loaded with the first document, and runs its worker from a `blob:` URL. With a strict
+  Content-Security-Policy, allow `worker-src blob:`, or serve the worker yourself:
+  `setPdfWorker('/assets/pdf.worker.min.mjs')` (copy `pdfjs-dist/legacy/build/pdf.worker.min.mjs`, same version
+  as formlift's `pdfjs-dist`).
+- React apps use `formlift/react` instead: there your bundler handles the stylesheet import and the worker URL
+  ([Configure pdf.js](#1-configure-pdfjs-once-at-app-start)).
 
 ## Guide: groups, follow-ups, comments and your own logic
 

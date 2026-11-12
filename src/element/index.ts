@@ -1,12 +1,18 @@
 // formlift/element: FormEditor and FormFiller for any framework (Angular, Vue, Svelte, plain JS).
 // React, react-dom and the icons are bundled in, so the app installs only `formlift`.
-// Import 'formlift/style.css' once, like with formlift/react.
+// Nothing to set up: the CSS is added on the first mount and pdf.js (with its worker) is built in. You may still
+// import 'formlift/style.css' yourself or call setPdfWorker; formlift then uses yours.
 import { createElement, createRef, type ComponentType } from 'react'
 import { createRoot } from 'react-dom/client'
 import FormEditor, { type FormEditorHandle, type FormEditorProps } from '../react/FormEditor'
 import FormFiller, { type FormFillerProps } from '../react/FormFiller'
 
+import { setBuiltinPdfWorker } from '../react/pdfjs'
+import { builtinWorker, ensureStyles } from './builtin'
+
 export { setPdfWorker } from '../react/pdfjs'
+
+setBuiltinPdfWorker(builtinWorker)
 export { DEFAULT_LABELS, type Labels } from '../react/labels'
 export type { FormDoc, FormEditorHandle } from '../react/FormEditor'
 export type { FieldChangeApi } from '../react/hooks/useFormFiller'
@@ -34,6 +40,7 @@ export interface MountedEditor extends Mounted<EditorOptions> {
 }
 
 function mount<O extends object>(component: ComponentType<any>, el: HTMLElement, options: O, extra: object = {}) {
+  ensureStyles(el)
   const root = createRoot(el)
   let current = options
   const render = () => root.render(createElement(component, { ...current, ...extra }))

@@ -13,9 +13,15 @@ export default defineConfig({
     alias: [
       { find: 'formlift/style.css', replacement: at('./dist/style.css') },
       { find: 'formlift/react', replacement: at('./src/react/index.ts') },
+      // the built package, as an app gets it (npm run build first): zero-setup check in e2e/element.spec.ts
+      { find: 'formlift/element', replacement: at('./dist/element/index.js') },
       { find: 'formlift/server', replacement: at('./src/server/index.ts') },
       { find: /^formlift$/, replacement: at('./src/index.ts') },
     ],
   },
-  build: { outDir: '../public', emptyOutDir: true },
+  build: {
+    outDir: '../public',
+    emptyOutDir: true,
+    rollupOptions: { input: { main: at('./example/index.html'), element: at('./example/element.html') } },
+  },
 })
