@@ -26,3 +26,16 @@ test('an app that imports formlift/style.css itself does not get it twice', asyn
   await expect(page.locator('.fl-root').first()).toBeVisible()
   await expect(page.locator('style[data-formlift]')).toHaveCount(0)
 })
+
+test('an app that themes formlift on :root (no stylesheet) still gets the CSS', async ({ page }) => {
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const s = document.createElement('style')
+      s.textContent = ':root { --fl-primary: #7c3aed }'
+      document.head.append(s)
+    })
+  })
+  await page.goto('/element.html')
+  await expect(page.locator('.fl-root').first()).toHaveCSS('display', 'flex')
+  await expect(page.locator('style[data-formlift]')).toHaveCount(1)
+})

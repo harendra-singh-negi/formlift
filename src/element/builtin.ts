@@ -13,12 +13,13 @@ export function ensureStyles(el: HTMLElement) {
   const root = el.getRootNode()
   const into = root instanceof ShadowRoot ? root : document.head
   if (into.querySelector('style[data-formlift]')) return
-  // Already there (the app imports formlift/style.css)? Its theme variables show on a probe.
+  // Already there (the app imports formlift/style.css)? A formlift utility works on a probe. Not a theme variable:
+  // those inherit, so an app that themes :root would look "loaded" without the stylesheet.
   const probe = document.createElement('div')
-  probe.className = 'fl-root'
-  probe.hidden = true
+  probe.className = 'fl-root bg-primary-soft'
+  probe.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;--fl-primary-soft:rgb(1, 2, 3)'
   el.appendChild(probe)
-  const loaded = getComputedStyle(probe).getPropertyValue('--fl-primary').trim() !== ''
+  const loaded = getComputedStyle(probe).backgroundColor === 'rgb(1, 2, 3)'
   probe.remove()
   if (loaded) return
   const style = document.createElement('style')
