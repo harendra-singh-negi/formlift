@@ -102,6 +102,10 @@ npm install react react-dom   # formlift/react, if your app is not already a Rea
 npm install pdf-lib           # formlift/server (completed PDF)
 ```
 
+**Works in** Chrome / Edge 111+, Firefox 128+ and Safari 16.4+ (the CSS baseline of Tailwind v4, which builds the styles), React 18 and 19, Next.js App Router
+(`formlift/react` is marked `"use client"`; `formlift/server` stays server-safe) and TypeScript with any
+`moduleResolution` (`bundler`, `node16`, `nodenext`). Long documents stay light: only the pages near the screen are
+drawn and carry their fields, so a 300-page form with thousands of fields scrolls like a short one.
 Angular, Vue, Svelte or plain JS: use `formlift/element`, which needs nothing else.
 
 **Requirements:** React 18 or 19 (only for `formlift/react`) · Node 18+ · browsers with CSS `@scope` support (Chrome/Edge 118+,

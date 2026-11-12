@@ -9,6 +9,20 @@ export default defineConfig([
     entry: { index: 'src/index.ts', 'react/index': 'src/react/index.ts', 'server/index': 'src/server/index.ts' },
     external: ['react', 'react-dom', 'pdfjs-dist', 'pdf-lib'],
     noExternal: ['lucide-react'], // only the icons used, so apps need not install it
+    // Next.js App Router: formlift/react is client-only (hooks, DOM). Only that entry, so formlift/server stays
+    // usable in server code. Added after the build since esbuild drops a directive on bundling.
+    onSuccess: async () => {
+      const { readFileSync, writeFileSync } = await import('node:fs')
+      for (const f of ['dist/react/index.js', 'dist/react/index.cjs']) {
+        const code = readFileSync(f, 'utf8')
+        if (code.startsWith('"use client"')) continue
+        writeFileSync(f, `"use client";\n${code}`)
+        // keep the source map in line: one more generated line at the top
+        const map = JSON.parse(readFileSync(`${f}.map`, 'utf8'))
+        map.mappings = `;${map.mappings}`
+        writeFileSync(`${f}.map`, JSON.stringify(map))
+      }
+    },
   },
   // formlift/element: for apps without React, so React and the icons are bundled in
   {
