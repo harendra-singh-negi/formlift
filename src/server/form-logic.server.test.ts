@@ -219,3 +219,28 @@ test('completedPdf with a layout: reordered + blank pages, replaced text, origin
   );
   assert.ok(original.equals(copy));
 });
+
+test('completedPdf: the new types print as people read them', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([600, 800]);
+  const at = (i: number) => ({ page: 1, x: 0.1, y: 0.05 + i * 0.07, width: 0.6, height: 0.05 });
+  const fields: FieldDef[] = [
+    field('multi', { type: 'multiselect', options: ['Fire', 'Flood'], position: at(0) }),
+    field('list', { type: 'checklist', options: ['A', 'B'], position: at(1) }),
+    field('money', { type: 'currency', currency: '$', decimals: 2, position: at(2) }),
+    field('stars', { type: 'rating', position: at(3) }),
+    field('when', { type: 'datetime', position: at(4) }),
+    field('on', { type: 'toggle', position: at(5) }),
+  ];
+  const out = await completedPdf(
+    await doc.save(),
+    fields,
+    { multi: '["Fire","Flood"]', list: '["B"]', money: '12.5', stars: '4', when: '2026-11-12T14:05', on: true },
+    {},
+  );
+  const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const pdf = await getDocument({ data: out }).promise;
+  const page = await pdf.getPage(1);
+  const text = (await page.getTextContent()).items.map((i) => ('str' in i ? i.str : '')).join('|');
+  for (const want of ['Fire, Flood', 'B', '$12.50', '4 / 5', '2026-11-12 14:05', 'Yes']) assert.ok(text.includes(want), `${want} in ${text}`);
+});

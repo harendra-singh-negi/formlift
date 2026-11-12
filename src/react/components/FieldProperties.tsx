@@ -1,5 +1,15 @@
 import { useState, type ReactNode } from 'react'
-import { FIELD_TYPES, type AnswerRule, type Condition, type FieldDef, type FieldType } from '../../core/form-logic'
+import {
+  BOOLEAN_TYPES,
+  FIELD_TYPES,
+  MULTI_TYPES,
+  OPTION_TYPES,
+  rangeOf,
+  type AnswerRule,
+  type Condition,
+  type FieldDef,
+  type FieldType,
+} from '../../core/form-logic'
 import { fitInPage } from '../../core/coords'
 import { typeName, useLabels } from '../labels'
 import ConditionBuilder from './ConditionBuilder'
@@ -37,8 +47,17 @@ export default function FieldProperties({
   const pickable = Object.entries(rules).filter(([, r]) => !r.types || r.types.includes(field.type))
   const others = fields.filter((f) => f.id !== field.id)
   const [optionsText, setOptionsText] = useState((field.options ?? []).join('\n'))
-  const hasOptions = field.type === 'dropdown' || field.type === 'radio'
-  const textual = !['checkbox', 'file', 'signature', 'dropdown', 'radio'].includes(field.type)
+  const hasOptions = OPTION_TYPES.includes(field.type)
+  const isBool = BOOLEAN_TYPES.includes(field.type)
+  // typed answers: placeholder, length, regex
+  const textual = ['text', 'textarea', 'number', 'date', 'email', 'phone', 'time', 'datetime', 'url', 'currency'].includes(
+    field.type,
+  )
+  const numberInput = (label: string, k: 'min' | 'max' | 'step' | 'decimals', extra?: { min?: number }) => (
+    <FormField label={label}>
+      <TextInput type="number" {...extra} value={field[k] ?? ''} onChange={(e) => set({ [k]: num(e.target.value) })} />
+    </FormField>
+  )
   const setPos = (k: 'x' | 'y' | 'width' | 'height', v: string) => {
     const n = num(v)
     if (n != null) set({ position: fitInPage({ ...field.position, [k]: n / 100 }) })
@@ -77,9 +96,9 @@ export default function FieldProperties({
             />
           </FormField>
         )}
-        {field.type !== 'file' && field.type !== 'signature' && (
-          <FormField label={field.type === 'checkbox' ? L.checkedByDefault : L.defaultValue}>
-            {field.type === 'checkbox' ? (
+        {!['file', 'signature', ...MULTI_TYPES].includes(field.type) && (
+          <FormField label={isBool ? L.checkedByDefault : L.defaultValue}>
+            {isBool ? (
               <Checkbox
                 label={L.checkedByDefault}
                 checked={field.defaultValue === 'true'}
@@ -125,6 +144,37 @@ export default function FieldProperties({
               })
             }}
           />
+          {MULTI_TYPES.includes(field.type) && (
+            <div className="grid grid-cols-2 gap-2">
+              {numberInput(L.minChoices, 'min', { min: 0 })}
+              {numberInput(L.maxChoices, 'max', { min: 1 })}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {(field.type === 'slider' || field.type === 'rating') && (
+        <Section title={L.validationSection}>
+          {field.type === 'rating' ? (
+            <FormField label={L.stars}>
+              <TextInput
+                type="number"
+                min={1}
+                max={10}
+                value={rangeOf(field).max}
+                onChange={(e) => {
+                  const n = num(e.target.value)
+                  if (n && n >= 1 && n <= 10) set({ max: Math.round(n) })
+                }}
+              />
+            </FormField>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {numberInput(L.minValue, 'min')}
+              {numberInput(L.maxValue, 'max')}
+              {numberInput(L.stepValue, 'step', { min: 0 })}
+            </div>
+          )}
         </Section>
       )}
 
@@ -147,7 +197,19 @@ export default function FieldProperties({
                 onChange={(e) => set({ maxLength: num(e.target.value) })}
               />
             </FormField>
-            {field.type === 'number' && (
+            {field.type === 'currency' && (
+              <>
+                <FormField label={L.currencySymbol}>
+                  <TextInput
+                    value={field.currency ?? ''}
+                    maxLength={5}
+                    onChange={(e) => set({ currency: e.target.value || undefined })}
+                  />
+                </FormField>
+                {numberInput(L.decimalPlaces, 'decimals', { min: 0 })}
+              </>
+            )}
+            {(field.type === 'number' || field.type === 'currency') && (
               <>
                 <FormField label={L.minValue}>
                   <TextInput

@@ -15,10 +15,14 @@ const SIZE: Partial<Record<FieldType, string>> = {
   signature: 'h-16 w-56',
   file: 'h-9 w-full sm:w-72',
   radio: 'h-9 w-full',
+  checklist: 'h-24 w-full',
+  toggle: 'h-9 w-32',
+  rating: 'h-9 w-48',
+  time: 'h-9 w-40',
 }
 // Parts of an option grid: its rows (the rest of the parts come after it).
 const gridSize = (q: Question) => q.rows?.reduce((a, b) => a + b, 0) ?? 0
-const wide = (t: FieldType) => t === 'textarea' || t === 'radio' || t === 'file'
+const wide = (t: FieldType) => t === 'textarea' || t === 'radio' || t === 'file' || t === 'checklist'
 
 /**
  * The form as questions with search and filters: only the questions that match are shown. Answers are the

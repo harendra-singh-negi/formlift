@@ -11,7 +11,7 @@ import {
   type PDFPage,
   type PDFRef,
 } from 'pdf-lib';
-import { defaultLayout, fieldStates, type Answers, type FieldDef, type Layout, type LayoutElement } from '../core/form-logic';
+import { answerText, defaultLayout, fieldStates, type Answers, type FieldDef, type Layout, type LayoutElement } from '../core/form-logic';
 
 // The document as users see it, as a new PDF: the layout's pages (original pages copied, blank ones added), the
 // admin's text / boxes / lines, then the answers at their fields. The original file stays as it is.
@@ -235,8 +235,8 @@ export async function completedPdf(
     }
     const file = f.type === 'file' ? files[String(v)] : undefined;
     if (file) embedFile(doc, page, { x, top, w, h }, file, embedded);
-    const text = f.type === 'checkbox' ? 'X' : f.type === 'file' ? (file?.fileName ?? '') : String(v);
-    const multiline = f.type === 'textarea';
+    const text = f.type === 'checkbox' ? 'X' : f.type === 'file' ? (file?.fileName ?? '') : answerText(f, v);
+    const multiline = f.type === 'textarea' || f.type === 'checklist';
     const size = Math.max(5, Math.min(11, h * (multiline ? 0.35 : 0.7)));
     page.drawText(printable(font, text), {
       x: x + 2,

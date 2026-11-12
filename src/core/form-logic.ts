@@ -13,6 +13,15 @@ export const FIELD_TYPES = [
   'checkbox',
   'file',
   'signature',
+  'multiselect',
+  'checklist',
+  'time',
+  'datetime',
+  'url',
+  'currency',
+  'rating',
+  'slider',
+  'toggle',
 ] as const;
 export type FieldType = (typeof FIELD_TYPES)[number];
 
@@ -78,16 +87,23 @@ export interface FieldDef {
   requiredMessage?: string;
   /** Names of your own rules (AnswerOptions.rules) this field must pass, checked in order. */
   rules?: string[];
-  /** dropdown / radio choices. */
+  /** dropdown / radio / multiselect / checklist choices. */
   options?: string[];
+  /** currency: the symbol shown before the amount (₹, $, €…). */
+  currency?: string;
+  /** currency: digits after the decimal point. Default 2. */
+  decimals?: number;
+  /** slider: the step between values. Default 1. (min / max: the slider's range, default 0–100; rating: max = stars, default 5.) */
+  step?: number;
   visibleWhen?: Condition;
   requiredWhen?: Condition;
   readOnlyWhen?: Condition;
 }
 
 /**
- * checkbox = boolean, file and signature = stored file id (dffuid; a signature is a PNG file), everything else =
- * string. Signatures saved before they were files are PNG data URLs: still read, turned into files on save.
+ * checkbox and toggle = boolean, file and signature = stored file id (dffuid; a signature is a PNG file),
+ * multiselect and checklist = the chosen options as a JSON array string ('["A","B"]'), everything else = string
+ * (time 'HH:MM', datetime 'YYYY-MM-DDTHH:MM', rating / slider / currency a number as text). Signatures saved before they were files are PNG data URLs: still read, turned into files on save.
  */
 export type AnswerValue = string | boolean | null;
 export type Answers = Record<string, AnswerValue>;
@@ -140,6 +156,10 @@ export interface AnswerMessages {
   phone: string
   option: string
   pattern: string
+  time: string
+  datetime: string
+  url: string
+  decimals: (n: number) => string
 }
 
 export const DEFAULT_ANSWER_MESSAGES: Readonly<AnswerMessages> = Object.freeze({
@@ -157,6 +177,10 @@ export const DEFAULT_ANSWER_MESSAGES: Readonly<AnswerMessages> = Object.freeze({
   phone: 'Must be a phone number',
   option: 'Pick one of the options',
   pattern: 'Has the wrong format',
+  time: 'Must be a time (HH:MM)',
+  datetime: 'Must be a date and time',
+  url: 'Must be a web address (https://…)',
+  decimals: (n: number) => (n ? `At most ${n} digits after the decimal point` : 'Must be a whole number'),
 });
 
 /** One of your own validation rules. Give the same rules to FormEditor (to pick them), FormFiller and your server. */
@@ -191,9 +215,52 @@ const FILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE = /^\+?[0-9 ()-]{6,20}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+const DATETIME = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+
+/** Types whose answer is a boolean. */
+export const BOOLEAN_TYPES: readonly FieldType[] = ['checkbox', 'toggle'];
+/** Types whose answer is several options (a JSON array string). */
+export const MULTI_TYPES: readonly FieldType[] = ['multiselect', 'checklist'];
+/** Types with a list of options. */
+export const OPTION_TYPES: readonly FieldType[] = ['dropdown', 'radio', ...MULTI_TYPES];
+
+/** The chosen options of a multiselect / checklist answer ([] for anything else). */
+export function multiValue(v: AnswerValue | undefined): string[] {
+  if (typeof v !== 'string' || !v.startsWith('[')) return [];
+  try {
+    const a: unknown = JSON.parse(v);
+    return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+/** A multiselect / checklist answer from its chosen options (null when none: an empty answer). */
+export const multiAnswer = (chosen: string[]): AnswerValue => (chosen.length ? JSON.stringify(chosen) : null);
+
+/** A slider's range and step, and a rating's number of stars. */
+export const rangeOf = (f: FieldDef) =>
+  f.type === 'rating'
+    ? { min: 1, max: Math.max(1, Math.round(f.max ?? 5)), step: 1 }
+    : { min: f.min ?? 0, max: f.max ?? 100, step: f.step && f.step > 0 ? f.step : 1 };
+
+/**
+ * An answer as people read it: on the page, in lists and in the completed PDF. Multiple choices joined with ", ",
+ * a currency amount with its symbol, a rating as "4 / 5", booleans as yesText / noText.
+ */
+export function answerText(f: FieldDef, v: AnswerValue | undefined, yesText = 'Yes', noText = 'No'): string {
+  if (v == null || v === '') return '';
+  if (typeof v === 'boolean') return v ? yesText : noText;
+  if (MULTI_TYPES.includes(f.type)) return multiValue(v).join(', ');
+  if (f.type === 'currency' && Number.isFinite(Number(v)))
+    return `${f.currency ?? ''}${Number(v).toFixed(f.decimals ?? 2)}`;
+  if (f.type === 'rating') return `${v} / ${rangeOf(f).max}`;
+  if (f.type === 'datetime') return v.replace('T', ' ');
+  return v;
+}
 
 const isGroup = (r: Rule | Condition): r is Condition => 'rules' in r;
-const isEmpty = (v: AnswerValue | undefined) => v == null || v === '' || v === false;
+const isEmpty = (v: AnswerValue | undefined) => v == null || v === '' || v === false || v === '[]';
 const str = (v: AnswerValue | undefined) => (v == null ? '' : String(v));
 
 function testRule(rule: Rule, answers: Answers): boolean {
@@ -250,7 +317,7 @@ export function defaultAnswers(fields: FieldDef[]): Answers {
   const out: Answers = {};
   for (const f of fields) {
     if (f.defaultValue == null || f.defaultValue === '') continue;
-    out[f.key] = f.type === 'checkbox' ? f.defaultValue === 'true' : f.defaultValue;
+    out[f.key] = BOOLEAN_TYPES.includes(f.type) ? f.defaultValue === 'true' : f.defaultValue;
   }
   return out;
 }
@@ -292,7 +359,7 @@ export function checkAnswer(
 function builtinCheck(f: FieldDef, v: AnswerValue, options?: AnswerOptions): string | null {
   const { maxAnswerLength, maxSignatureChars } = resolveLimits(options);
   const m: AnswerMessages = { ...DEFAULT_ANSWER_MESSAGES, ...options?.messages };
-  if (f.type === 'checkbox') return typeof v === 'boolean' ? null : m.checkbox;
+  if (BOOLEAN_TYPES.includes(f.type)) return typeof v === 'boolean' ? null : m.checkbox;
   if (typeof v !== 'string') return m.invalid;
   if (f.type === 'signature')
     return FILE_ID.test(v) || (v.startsWith('data:image/png;base64,') && v.length <= maxSignatureChars)
@@ -322,6 +389,53 @@ function builtinCheck(f: FieldDef, v: AnswerValue, options?: AnswerOptions): str
     case 'radio':
       if (!(f.options ?? []).includes(v)) return m.option;
       break;
+    case 'multiselect':
+    case 'checklist': {
+      const chosen = multiValue(v);
+      if (!v.startsWith('[') || !chosen.length || chosen.some((o) => !(f.options ?? []).includes(o))) return m.option;
+      if (f.min != null && chosen.length < f.min) return m.min(f.min);
+      if (f.max != null && chosen.length > f.max) return m.max(f.max);
+      return null; // pattern / length rules are for typed text
+    }
+    case 'time':
+      if (!TIME.test(v)) return m.time;
+      break;
+    case 'datetime': {
+      const d = DATETIME.exec(v);
+      if (!d || Number.isNaN(Date.parse(d[1]))) return m.datetime;
+      break;
+    }
+    case 'url': {
+      let ok = false;
+      try {
+        ok = /^https?:$/.test(new URL(v).protocol);
+      } catch {
+        ok = false;
+      }
+      if (!ok) return m.url;
+      break;
+    }
+    case 'currency': {
+      const n = Number(v);
+      if (v.trim() === '' || !Number.isFinite(n)) return m.number;
+      const places = f.decimals ?? 2;
+      if ((v.split('.')[1] ?? '').length > places) return m.decimals(places);
+      if (f.min != null && n < f.min) return m.min(f.min);
+      if (f.max != null && n > f.max) return m.max(f.max);
+      break;
+    }
+    case 'rating':
+    case 'slider': {
+      const n = Number(v);
+      const { min, max, step } = rangeOf(f);
+      if (v.trim() === '' || !Number.isFinite(n)) return m.number;
+      if (n < min) return m.min(min);
+      if (n > max) return m.max(max);
+      // on the step grid (with float slack: 0.1 + 0.2)
+      const k = (n - min) / step;
+      if (Math.abs(k - Math.round(k)) > 1e-9) return m.invalid;
+      break;
+    }
   }
   if (f.pattern && !safeRegex(f.pattern)?.test(v)) return m.pattern;
   return null;
@@ -350,7 +464,7 @@ export function cleanAnswers(fields: FieldDef[], answers: unknown): Answers {
   for (const f of fields) {
     const v = input[f.key];
     if (v == null) continue;
-    if (f.type === 'checkbox') out[f.key] = v === true;
+    if (BOOLEAN_TYPES.includes(f.type)) out[f.key] = v === true;
     else if (typeof v === 'string') out[f.key] = v;
   }
   return out;
@@ -405,7 +519,7 @@ export function validateFields(fields: unknown, pageCount: number, limits?: Part
       p.height <= 0
     )
       errors.push(`${name}: position must lie inside a page of the document`);
-    if ((f.type === 'dropdown' || f.type === 'radio') && !(Array.isArray(f.options) && f.options.length))
+    if (OPTION_TYPES.includes(f.type) && !(Array.isArray(f.options) && f.options.length))
       errors.push(`${name}: needs at least one option`);
     if (f.pattern && !safeRegex(f.pattern)) errors.push(`${name}: regex is not valid`);
     if (f.rules != null && !(Array.isArray(f.rules) && f.rules.every((x) => typeof x === 'string')))

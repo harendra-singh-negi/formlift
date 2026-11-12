@@ -1,4 +1,4 @@
-import type { FieldDef, FieldType } from './form-logic'
+import { OPTION_TYPES, type FieldDef, type FieldType } from './form-logic'
 import { fitInPage } from './coords'
 
 // Default box per type, in page fractions (an A4 page is ~0.6 wide in these units per 1/2 page).
@@ -7,6 +7,14 @@ const SIZES: Partial<Record<FieldType, [number, number]>> = {
   checkbox: [0.025, 0.018],
   radio: [0.35, 0.025],
   signature: [0.25, 0.06],
+  checklist: [0.3, 0.1],
+  multiselect: [0.3, 0.025],
+  time: [0.12, 0.025],
+  datetime: [0.22, 0.025],
+  currency: [0.15, 0.025],
+  rating: [0.15, 0.03],
+  slider: [0.25, 0.03],
+  toggle: [0.06, 0.025],
 }
 
 const newId = () =>
@@ -77,7 +85,7 @@ export function newField(type: FieldType, page: number, x: number, y: number, fi
     label,
     source: 'manual',
     position: fitInPage({ page, x: x - width / 2, y: y - height / 2, width, height }),
-    ...(type === 'dropdown' || type === 'radio' ? { options: ['Option 1', 'Option 2'] } : {}),
+    ...(OPTION_TYPES.includes(type) ? { options: ['Option 1', 'Option 2'] } : {}),
   }
 }
 

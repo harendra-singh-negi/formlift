@@ -1,7 +1,15 @@
 import type { FormliftComponents } from '../ui/slots'
-import { Paperclip, PenLine } from 'lucide-react'
-import { useRef, useState } from 'react'
-import type { AnswerValue, FieldDef, FieldType } from '../../core/form-logic'
+import { Paperclip, PenLine, Star } from 'lucide-react'
+import { useRef, useState, type KeyboardEvent } from 'react'
+import {
+  answerText,
+  multiAnswer,
+  multiValue,
+  rangeOf,
+  type AnswerValue,
+  type FieldDef,
+  type FieldType,
+} from '../../core/form-logic'
 import { useLabels } from '../labels'
 import { Button, inputClass, Modal, ModalBody, ModalFooter, ModalHeader, SignaturePad } from '../ui/slots'
 
@@ -18,8 +26,111 @@ function pngFile(dataUrl: string, name: string) {
 }
 
 // Typed in the full-size box on phones. 16 px text: iOS zooms the page into any smaller input it focuses.
-const SHEET_TYPES: FieldType[] = ['text', 'textarea', 'number', 'date', 'email', 'phone', 'radio']
-const INPUT_TYPE: Partial<Record<FieldType, string>> = { number: 'number', date: 'date', email: 'email', phone: 'tel' }
+const SHEET_TYPES: FieldType[] = [
+  'text',
+  'textarea',
+  'number',
+  'date',
+  'email',
+  'phone',
+  'radio',
+  'time',
+  'datetime',
+  'url',
+  'currency',
+]
+const INPUT_TYPE: Partial<Record<FieldType, string>> = {
+  number: 'number',
+  date: 'date',
+  email: 'email',
+  phone: 'tel',
+  time: 'time',
+  datetime: 'datetime-local',
+  url: 'url',
+}
+
+/** Every option with a checkbox: a checklist, or a multi-select's choices in its dialog. */
+function OptionChecks({
+  field,
+  value,
+  onChange,
+  big,
+  disabled,
+}: {
+  field: FieldDef
+  value: AnswerValue | undefined
+  onChange: (v: AnswerValue) => void
+  /** Finger-sized rows (dialog), else as small as the box on the page. */
+  big?: boolean
+  disabled?: boolean
+}) {
+  const chosen = multiValue(value)
+  const options = field.options ?? []
+  const flip = (o: string) =>
+    // kept in the order of the options, whatever order they were ticked in
+    onChange(multiAnswer(options.filter((x) => (x === o ? !chosen.includes(o) : chosen.includes(x)))))
+  return (
+    <div role="group" aria-label={field.label || field.key} className={big ? 'flex flex-col gap-1' : 'contents'}>
+      {options.map((o) => (
+        <label
+          key={o}
+          className={
+            big
+              ? 'flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-line px-3 text-base'
+              : 'inline-flex cursor-pointer items-center gap-1'
+          }
+        >
+          <input
+            type="checkbox"
+            className={`accent-primary ${big ? 'h-5 w-5' : ''}`}
+            checked={chosen.includes(o)}
+            disabled={disabled}
+            onChange={() => flip(o)}
+          />
+          {o}
+        </label>
+      ))}
+    </div>
+  )
+}
+
+/** A currency amount: its symbol, then the number. */
+function CurrencyInput({
+  field,
+  text,
+  onChange,
+  className,
+  inputClassName,
+  ...rest
+}: {
+  field: FieldDef
+  text: string
+  onChange: (v: AnswerValue) => void
+  className: string
+  inputClassName: string
+  autoFocus?: boolean
+  disabled?: boolean
+  onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void
+  'aria-label'?: string
+  'aria-invalid'?: boolean
+  title?: string
+}) {
+  return (
+    <div className={`flex items-center gap-1 ${className}`}>
+      {field.currency && <span className="flex-none text-muted">{field.currency}</span>}
+      <input
+        {...rest}
+        type="text"
+        inputMode={field.decimals === 0 ? 'numeric' : 'decimal'}
+        className={`min-w-0 flex-1 bg-transparent outline-none ${inputClassName}`}
+        placeholder={field.placeholder}
+        value={text}
+        // digits and one decimal point only; the check on save does the rest
+        onChange={(e) => onChange(e.target.value.replace(/[^\d.-]/g, ''))}
+      />
+    </div>
+  )
+}
 
 function SheetInput({
   field,
@@ -54,6 +165,19 @@ function SheetInput({
           </label>
         ))}
       </div>
+    )
+  if (field.type === 'currency')
+    return (
+      <CurrencyInput
+        autoFocus
+        aria-label={field.label || field.key}
+        field={field}
+        text={text}
+        onChange={onChange}
+        className={`${inputClass} h-11 !text-base`}
+        inputClassName=""
+        onKeyDown={(e) => e.key === 'Enter' && onDone()}
+      />
     )
   if (field.type === 'textarea')
     return (
@@ -141,7 +265,7 @@ export default function FieldControl({
           }`}
         >
           <span className={`min-w-0 ${field.type === 'textarea' ? 'line-clamp-[8] whitespace-pre-wrap' : 'truncate'}`}>
-            {text || <span className="text-faint">{field.placeholder || ''}</span>}
+            {answerText(field, value) || <span className="text-faint">{field.placeholder || ''}</span>}
           </span>
         </button>
         {editing && (
@@ -161,7 +285,135 @@ export default function FieldControl({
     )
   }
 
+  // A multi-select, and a checklist on phones: the choices so far in the box, all options in a dialog.
+  if (field.type === 'multiselect' || (field.type === 'checklist' && compact)) {
+    const name = field.label || field.key
+    const shown = answerText(field, value)
+    return (
+      <>
+        <button
+          type="button"
+          {...common}
+          onClick={() => setEditing(true)}
+          className={`${box} ${border} flex cursor-pointer items-center overflow-hidden text-left leading-tight disabled:cursor-default`}
+        >
+          <span className="min-w-0 truncate">
+            {shown || <span className="text-faint">{field.placeholder || L.chooseOptions}</span>}
+          </span>
+        </button>
+        {editing && (
+          <Modal onClose={() => setEditing(false)} width="w-[480px]">
+            <ModalHeader title={name} onClose={() => setEditing(false)} />
+            <ModalBody>
+              <div className="max-h-[60dvh] overflow-y-auto">
+                <OptionChecks field={field} value={value} onChange={onChange} big />
+              </div>
+              {field.helpText && <p className="mt-2 mb-0 text-[13px] text-muted">{field.helpText}</p>}
+              {error && <p className="mt-2 mb-0 text-[13px] text-danger">{error}</p>}
+            </ModalBody>
+            <ModalFooter>
+              <Button onClick={() => setEditing(false)}>{L.done}</Button>
+            </ModalFooter>
+          </Modal>
+        )}
+      </>
+    )
+  }
+
   switch (field.type) {
+    case 'checklist':
+      return (
+        // the group inside carries the name; this box only the tooltip
+        <div
+          title={common.title}
+          aria-invalid={!!error}
+          className={`flex h-full w-full flex-wrap content-start items-center gap-x-3 overflow-auto rounded-sm border px-1 text-[clamp(8px,18cqh,14px)] ${border} bg-primary-soft/50`}
+        >
+          <OptionChecks field={field} value={value} onChange={onChange} disabled={readOnly} />
+        </div>
+      )
+    case 'currency':
+      return (
+        <CurrencyInput
+          {...common}
+          field={field}
+          text={text}
+          onChange={onChange}
+          className={`${box} ${border}`}
+          inputClassName="h-full"
+        />
+      )
+    case 'rating': {
+      const { max } = rangeOf(field)
+      const n = Number(text) || 0
+      return (
+        <div
+          role="radiogroup"
+          {...common}
+          className={`flex h-full w-full items-center gap-[2%] rounded-sm border px-1 ${border} bg-primary-soft/50`}
+        >
+          {Array.from({ length: max }, (_, i) => i + 1).map((k) => (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={n === k}
+              aria-label={L.ratingStar(k, max)}
+              disabled={readOnly}
+              // a second tap on the chosen star clears it
+              onClick={() => onChange(n === k ? null : String(k))}
+              className="flex h-full min-w-0 flex-1 cursor-pointer items-center justify-center disabled:cursor-default"
+            >
+              <Star
+                className={`h-[min(80cqh,100%)] w-auto ${k <= n ? 'fill-folder text-folder' : 'text-faint'}`}
+              />
+            </button>
+          ))}
+        </div>
+      )
+    }
+    case 'slider': {
+      const { min, max, step } = rangeOf(field)
+      return (
+        <div
+          className={`flex h-full w-full items-center gap-2 rounded-sm border px-1 text-[clamp(8px,55cqh,14px)] ${border} bg-primary-soft/50`}
+        >
+          <input
+            {...common}
+            type="range"
+            className="min-w-0 flex-1 cursor-pointer accent-primary"
+            min={min}
+            max={max}
+            step={step}
+            value={text === '' ? min : Number(text)}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          <span className="min-w-[3ch] flex-none text-right tabular-nums">{text}</span>
+        </div>
+      )
+    }
+    case 'toggle':
+      return (
+        <div className={`flex h-full w-full items-center rounded-sm border px-1 ${border} bg-primary-soft/50`}>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={value === true}
+            {...common}
+            onClick={() => onChange(value !== true)}
+            className={`relative h-[min(70cqh,100%)] aspect-[2/1] flex-none cursor-pointer rounded-full transition-colors disabled:cursor-default ${
+              value === true ? 'bg-primary' : 'bg-line-strong'
+            }`}
+          >
+            <span
+              className={`absolute top-[10%] h-[80%] aspect-square rounded-full bg-white shadow transition-[left] ${
+                value === true ? 'left-[55%]' : 'left-[5%]'
+              }`}
+            />
+          </button>
+          <span className="ml-1 truncate text-[clamp(8px,55cqh,14px)]">{value === true ? L.yes : L.no}</span>
+        </div>
+      )
     case 'textarea':
       return (
         <textarea

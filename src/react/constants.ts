@@ -12,6 +12,15 @@ export const TYPE_LABEL: Record<FieldType, string> = {
   checkbox: 'Checkbox',
   file: 'File upload',
   signature: 'Signature',
+  multiselect: 'Multi-select',
+  checklist: 'Checklist',
+  time: 'Time',
+  datetime: 'Date & time',
+  url: 'Web address (URL)',
+  currency: 'Currency',
+  rating: 'Rating',
+  slider: 'Slider',
+  toggle: 'Yes / No toggle',
 }
 
 /** Default zoom steps; FormEditor / FormFiller take your own as `zoomSteps`. */

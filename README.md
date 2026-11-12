@@ -52,7 +52,7 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 | | |
 | --- | --- |
 | 🔍 **Auto-detect** | Answer lines, checkboxes, typed blanks and table cells come from the PDF's own vector drawing. Sizes are measured relative to the text, so it works at any font size, scale or orientation. |
-| 🧱 **Builder** | 11 field types, drag/resize/snap-to-grid, undo/redo, keyboard shortcuts, fill order, page reorder/insert/delete |
+| 🧱 **Builder** | 20 field types (text, date & time, currency, multi-select, checklist, rating, slider, toggle, signature, file…), drag/resize/snap-to-grid, undo/redo, keyboard shortcuts, fill order, page reorder/insert/delete |
 | ✏️ **Layout editing** | Add text, boxes and lines, or click any line of the original text to replace it, all without touching the file |
 | 🔀 **Conditional logic** | `visibleWhen` / `requiredWhen` / `readOnlyWhen` with nested AND/OR groups and 10 operators. Circular rules are rejected. |
 | ✅ **Validation** | Required, length, min/max, regex, email, phone, date and options. The **same code** runs in the browser and on your server. |
@@ -108,6 +108,7 @@ npm install pdf-lib           # formlift/server (completed PDF)
 (`formlift/react` is marked `"use client"`; `formlift/server` stays server-safe) and TypeScript with any
 `moduleResolution` (`bundler`, `node16`, `nodenext`). Long documents stay light: only the pages near the screen are
 drawn and carry their fields, so a 300-page form with thousands of fields scrolls like a short one.
+
 Angular, Vue, Svelte or plain JS: use `formlift/element`, which needs nothing else.
 
 **Requirements:** React 18 or 19 (only for `formlift/react`) · Node 18+ · browsers with CSS `@scope` support (Chrome/Edge 118+,
@@ -454,8 +455,9 @@ type FormDoc = { fields: FieldDef[]; layout: Layout | null }
 interface FieldDef {
   id: string
   key: string // answer key: starts with a letter; letters, digits and _
-  type: 'text' | 'textarea' | 'number' | 'date' | 'email' | 'phone'
-      | 'dropdown' | 'radio' | 'checkbox' | 'file' | 'signature'
+  type: 'text' | 'textarea' | 'number' | 'date' | 'time' | 'datetime' | 'email' | 'phone' | 'url'
+      | 'currency' | 'dropdown' | 'radio' | 'multiselect' | 'checklist' | 'checkbox' | 'toggle'
+      | 'rating' | 'slider' | 'file' | 'signature'
   label: string
   source: 'manual' | 'ai' // 'ai' = suggested by auto-detect
   confidence?: number
@@ -468,10 +470,13 @@ interface FieldDef {
   hidden?: boolean
   minLength?: number
   maxLength?: number
-  min?: number
-  max?: number
+  min?: number // number / currency / slider; multiselect / checklist: fewest choices
+  max?: number // number / currency / slider; multiselect / checklist: most choices; rating: stars (default 5)
+  step?: number // slider (default 1)
+  currency?: string // currency: symbol before the amount (₹, $, €)
+  decimals?: number // currency: digits after the point (default 2)
   pattern?: string
-  options?: string[] // dropdown, radio
+  options?: string[] // dropdown, radio, multiselect, checklist
   visibleWhen?: Condition
   requiredWhen?: Condition
   readOnlyWhen?: Condition
@@ -491,7 +496,11 @@ interface Rule {
 }
 
 type Answers = Record<string, string | boolean | null>
-// checkbox → boolean · file / signature → your file id · everything else → string
+// checkbox / toggle → boolean · file / signature → your file id
+// multiselect / checklist → the chosen options as a JSON array string: '["Fire","Flood"]'
+//   (read it with multiValue(v), write it with multiAnswer([...]); "contains" conditions match an option)
+// time → 'HH:MM' · datetime → 'YYYY-MM-DDTHH:MM' · rating / slider / currency → the number as text
+// everything else → string. answerText(field, value) gives any answer as people read it ("Fire, Flood", "$12.50").
 ```
 
 Positions are stored as page fractions, so a field never moves when the zoom or screen size changes.
