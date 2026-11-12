@@ -3,6 +3,14 @@
 Written automatically by [release-please](https://github.com/googleapis/release-please) from the
 commit messages. The project uses [Semantic Versioning](https://semver.org/).
 
+## [0.4.1](https://github.com/harendra-singh-negi/formlift/compare/v0.4.0...v0.4.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* **demo:** ship the table-form sample PDF ([b74fa2a](https://github.com/harendra-singh-negi/formlift/commit/b74fa2aed1821b1064ddec2262f1776f64824337))
+* **deps:** upgrade pdf.js to patch CVE-2026-16633 ([#6](https://github.com/harendra-singh-negi/formlift/issues/6)) ([7aff719](https://github.com/harendra-singh-negi/formlift/commit/7aff71998f0ab53a0e7f07000514d9abbe7df6f6))
+
 ## [0.4.0](https://github.com/harendra-singh-negi/formlift/compare/v0.3.0...v0.4.0) (2026-11-12)
 
 
