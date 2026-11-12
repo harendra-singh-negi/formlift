@@ -1,0 +1,16 @@
+# formlift
+
+> Open-source TypeScript library (MIT) that turns any PDF into a fillable web form. It keeps the original PDF and puts real form fields on top of it. No AI and no server-side conversion.
+
+- Auto-detects fields (answer lines, checkboxes, blanks, table cells) from the PDF's vector drawing
+- Drag-and-drop builder, 20 field types, conditional logic, follow-up questions, comments, validation
+- Fill-in UI for desktop and phone; exports a completed PDF with answers, signatures and attachments
+- React components (`formlift/react`), a framework-free custom element for Angular / Vue / plain JS (`formlift/element`), a headless core (`formlift`) and server helpers (`formlift/server`)
+- Install: `npm install formlift`
+
+## Links
+
+- [Live demo](https://harendra-singh-negi.github.io/formlift/)
+- [README and API docs](https://github.com/harendra-singh-negi/formlift#readme)
+- [npm package](https://www.npmjs.com/package/formlift)
+- [Changelog](https://github.com/harendra-singh-negi/formlift/blob/main/CHANGELOG.md)
