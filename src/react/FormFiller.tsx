@@ -136,15 +136,17 @@ export default function FormFiller({
 
   if (loadError) return <p className="fl-root p-6 text-center text-sm text-danger">{loadError}</p>
 
-  // One field's answer control (the same on the document and in the list), with the required star.
-  const control = (f: FieldDef) => (
+  // One field's answer control, with the required star. `sheet`: typed in a full-size dialog (phones, on the
+  // document, whose boxes are too small to type in); the list and dialogs draw full-size boxes, typed in place.
+  const inPlace = (f: FieldDef) => control(f, false)
+  const control = (f: FieldDef, sheet = compact) => (
     <>
       <AnswerControl
         components={components}
         field={f}
         value={answers[f.key]}
         readOnly={readOnly || states[f.key].readOnly || (f.type === 'file' && !ff.canUpload)}
-        compact={compact}
+        compact={sheet}
         error={errors[f.key]}
         onChange={(v) => ff.change(f, v)}
         fileName={ff.fileOf(answers[f.key])?.fileName}
@@ -302,7 +304,7 @@ export default function FormFiller({
               pdf={ff.pdf}
               reading={ff.reading}
               answers={answers}
-              control={control}
+              control={inPlace}
               filters={listFilters}
               search={listSearch}
               hideUnavailable={hideUnavailableFilters}
@@ -348,7 +350,7 @@ export default function FormFiller({
             fields={ff.dialog.keys
               .map((k) => fields.find((x) => x.key === k))
               .filter((x): x is FieldDef => !!x && !!states[x.key]?.visible)}
-            control={control}
+            control={inPlace}
             errors={errors}
             onClose={ff.closeDialog}
           />
