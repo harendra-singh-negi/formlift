@@ -7,3 +7,7 @@ Test PDFs for `detect.fixtures.test.ts`, generated with pdf-lib so each one uses
 - `scaled.pdf`: drawn through a 0.5× transform matrix.
 
 Add a file here (and a case in the test) when a real document shows a layout the detector gets wrong.
+
+`forms.ts` makes synthetic forms with pdf-lib, each with the fields an admin sets up on it: grids of labels, Y / N /
+NA checklists, answers printed in place of boxes, typed answer lines, filled input boxes and bullets, with words,
+sizes and borders picked by a seed. Tests use them to score auto-detect on forms it has never seen.
