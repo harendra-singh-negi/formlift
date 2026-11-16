@@ -1,5 +1,5 @@
 // The form as a list of questions (the List view): fields on one line of the document that belong together —
-// "2.1.1 Were the Master… – Y / N / NA" and the Remarks box beside them — become one question, so it can be
+// "2.1.1 Were the Manager… – Y / N / NA" and the Remarks box beside them — become one question, so it can be
 // searched and filtered as a whole. Grids of boxes and tables are one question each, laid out in the document's
 // rows and columns. Titles are the document's own text when the page text is given.
 import type { AnswerValue, Answers, FieldDef, FieldType } from './form-logic'
@@ -21,7 +21,7 @@ export interface Question {
   section?: string
   /** A column of boxes named by the text block left of it (its options come first). */
   block?: boolean
-  /** "Classification: Core , Risk: H , Assigned to: MASTER" written in its numbered question: filters. */
+  /** "Classification: Core , Risk: H , Assigned to: MANAGER" written in its numbered question: filters. */
   tags?: Record<string, string>
   /** What a run of rows with the same choices asks ("Evaluation of the level of compliance…"), shown over them. */
   intro?: string
@@ -41,7 +41,7 @@ const colOf = (label: string) => (label.includes(SEP) ? label.slice(label.lastIn
 const SERIAL = /^(\d{1,3}|[a-z]|[ivx]{1,5})[.)]?$/i
 const COLUMN = /^(y|n|n ?a|yes|no|remarks?|comments?|observations?|notes?)$/i
 
-// "LAST PSC INSPECTION: Place": a question and the name of its first part.
+// "LAST FIRE INSPECTION: Place": a question and the name of its first part.
 const LEAD = /^(.+?):\s+(\S.*)$/
 
 const byX = (a: FieldDef, b: FieldDef) => a.position.x - b.position.x
@@ -98,8 +98,8 @@ function tableTitle(lines: TextLine[], first: FieldDef[]) {
 
 // A grid of options ("Loading ☐  Discharging ☐ …"): lines of bare checkboxes named only by their own text. Its
 // heading is the line right above the grid with no field on it ("OPERATIONS AT THE TIME OF INSPECTION:"), else
-// the text left of the boxes on their line ("If the ship was detained… ☐ Verified ☐ N/A").
-// A " – " inside a name ("Log-24a (Job Orders – Engine)") is part of the name when no two boxes share the part
+// the text left of the boxes on their line ("If the site was closed… ☐ Verified ☐ N/A").
+// A " – " inside a name ("Log-24a (Job Orders – Wiring)") is part of the name when no two boxes share the part
 // before it: a real "Row – Column" line repeats its row ("2.1.1 … – Y", "2.1.1 … – N").
 const isOptions = (line: FieldDef[]) => {
   const rows = line.map((f) => rowOf(f.label)).filter(Boolean)
@@ -154,7 +154,7 @@ function heading(lines: TextLine[], line: FieldDef[], fields: FieldDef[]) {
 }
 
 // A table's header row: the line of text right above its first row, one name over each column ("Training
-// Topic", "Name/Rank", "Date"). Only when every column has its own name there; a single column's name is centred
+// Topic", "Name/Role", "Date"). Only when every column has its own name there; a single column's name is centred
 // over it (the last line of a paragraph above starts at the margin instead).
 function headerRow(lines: TextLine[], first: FieldDef[]) {
   const y0 = top(first)
@@ -192,7 +192,7 @@ export function toQuestions(
   const sorted = [...fields].sort(
     (a, b) => a.position.page - b.position.page || a.position.y - b.position.y || a.position.x - b.position.x,
   )
-  // Columns of boxes beside a block of text ("A. Vessel is free of: A1… A4…" │ ☐ Yes ☐ No ☐ NA): one question each.
+  // Columns of boxes beside a block of text ("A. Site is free of: A1… A4…" │ ☐ Yes ☐ No ☐ NA): one question each.
   const stacks = findStacks(sorted, textOf)
   const stacked = new Set(stacks.flatMap((s) => s.fields))
   // Lines: fields that overlap the first field of the line vertically by half the smaller height.
@@ -206,9 +206,9 @@ export function toQuestions(
     if (q && q.page === p.page && shared >= 0.5 * Math.min(p.height, q.height)) line.push(f)
     else lines.push([f])
   }
-  // Tables: lines of fields named by their columns ("RANK", "NAME", "SIGNATURE", "DATE"), repeated on the line
+  // Tables: lines of fields named by their columns ("ROLE", "NAME", "SIGNATURE", "DATE"), repeated on the line
   // above or below with the same columns. A row may carry the table's side heading on one field ("INSPECTOR
-  // – RANK"); lines whose fields all share a row name ("2.1.1 … – Y / N") are questions, not table rows.
+  // – ROLE"); lines whose fields all share a row name ("2.1.1 … – Y / N") are questions, not table rows.
   // Numbered rows ("1 – Type of Training Need", or a box named just "1."): the number is the row's name, so
   // lines of them are a table (one column when each line has one field), not questions named "1", "2"…
   const serial = (f: FieldDef) => {
@@ -322,7 +322,7 @@ export function toQuestions(
     }
     const groups = new Map<string, FieldDef[]>()
     const loose: FieldDef[] = []
-    // "LAST PSC INSPECTION: Place ____  Date ____": the fields after a "Question: Part" field on its line are
+    // "LAST FIRE INSPECTION: Place ____  Date ____": the fields after a "Question: Part" field on its line are
     // parts of that question, until another field with its own "…:".
     let lead = ''
     for (const f of [...line].sort(byX)) {
@@ -333,7 +333,7 @@ export function toQuestions(
       if (r) groups.set(r, [...(groups.get(r) ?? []), f])
       else if (lead) groups.set(lead, [...(groups.get(lead) ?? []), f])
       else if (COLUMN.test(f.label.trim())) loose.push(f)
-      else groups.set(`\u0000${f.id}`, [f]) // a question of its own ("Vessel")
+      else groups.set(`\u0000${f.id}`, [f]) // a question of its own ("Site")
     }
     // Loose column fields join the line's first "Row – Column" question, else make one together.
     const host = [...groups.keys()].find((k) => !k.startsWith('\u0000') && !k.startsWith('\u0001'))
@@ -356,7 +356,7 @@ export function toQuestions(
       const generic = !key.startsWith('\u0000') && list.every((f) => !rowOf(f.label))
       let title = key.startsWith('\u0000') ? list[0].label || list[0].key : key
       // The document's own words: in place of names made of columns ("Yes / No"), or where they carry on a label
-      // that was cut short ("Were the Master and senior…" → the whole question). Never a different text.
+      // that was cut short ("Were the Manager and senior…" → the whole question). Never a different text.
       const written = rowText(text, list)
       const stem = norm(title).replace(/^\d+(\.\d+)*[a-z]?\s+/, '') // "2.1.1 Were the…": the number may sit in its own column
       if (written && (generic || (norm(written).startsWith(stem) && norm(written).length > stem.length)))
@@ -550,7 +550,7 @@ function mergeBlocks(out: Question[]) {
 // A category code written as a heading of its own over blocks of questions ("HW" / "PR" / "HF").
 const CODE = /^[A-Z]{2,4}$/
 
-// Codes first on their line, with no other code after them (a header row "RANK NAME DATE" is not), and not a
+// Codes first on their line, with no other code after them (a header row "ROLE NAME DATE" is not), and not a
 // running header or footer (same text at the same height on 3+ pages). The form has categories when at
 // least two codes come back at least twice each; a question takes the last one above it, across page breaks.
 function setCategories(out: Question[], fields: FieldDef[], textOf: PageText, code: RegExp) {
@@ -583,7 +583,7 @@ function lastAbove<T extends { page: number; y: number }>(q: Question, marks: T[
   return marks.filter((m) => m.page < q.page || (m.page === q.page && m.y <= y)).at(-1)
 }
 
-// A numbered heading: "2.1.1 Maintenance of statutory Certificates" (two levels at least: "1. Vessel free…" is an
+// A numbered heading: "2.1.1 Maintenance of statutory Certificates" (two levels at least: "1. Site free…" is an
 // item inside a question; "5.9.2 / 5.10.2" is an index).
 const NUMBERED = /^\d+(\.\d+)+\.?\s+\p{L}/u
 

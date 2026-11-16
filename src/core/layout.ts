@@ -165,7 +165,7 @@ export function toLines(
   const H = y1 - y0
   const glyphs = items
     // Horizontal text only. Whitespace items are dropped: some PDFs fill the gap between columns with one wide
-    // space item, which would join "SHIP:" and "GT:" into one line; the gap rule below adds word spaces back.
+    // space item, which would join "SITE:" and "ID:" into one line; the gap rule below adds word spaces back.
     .filter((i) => i.str.trim().length && Math.abs(i.transform[1]) < 0.01)
     .map((i) => {
       const size = Math.hypot(i.transform[2], i.transform[3]) || 1

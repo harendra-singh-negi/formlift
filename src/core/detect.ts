@@ -591,7 +591,7 @@ export function detectFields(
       }
     const list = run >= 3 || emptyAbove >= 2
     const own = list ? colHead.filter((t) => sameCol(t) && cellText(t)) : []
-    // A wide box right under its own heading bar ("Suggestion / Feedback from Crew" over an empty box).
+    // A wide box right under its own heading bar ("Suggestion / Feedback from Staff" over an empty box).
     const bar = colHead[0]
     const underBar =
       bar && !rowHead.length && sameCol(bar) && Math.abs(bar.y1 - c.y0) < 2.5 && c.x1 - c.x0 > 0.5 * W && cellText(bar)
@@ -783,7 +783,7 @@ export function detectFields(
     if (x0 !== first.x0 && first.x1 - x0 < em * 5) continue
     // Label: text on the same line to the left, or just above-left for a block.
     // Label: text on the same line to the left (with no other answer line in between), plus a column header
-    // right above when the rule sits in a row of rules (RANK / NAME / SIGNATURE / DATE).
+    // right above when the rule sits in a row of rules (ROLE / NAME / SIGNATURE / DATE).
     const left =
       lead ??
       texts
@@ -868,7 +868,7 @@ export function detectFields(
     )
     if (prev && !/:\s*$/.test(prev.text) && !GENERIC.test(cleanLabel(t.text))) continue
     // A line heading a list asks nothing: "A manifold connection is:" over "-Secured with …", "-Not fully bolted";
-    // "A. Senior officer familiar with:" over "A1. Company MOC procedure?" (a numbered question with a note under
+    // "A. Senior manager familiar with:" over "A1. Company MOC procedure?" (a numbered question with a note under
     // it does ask).
     const below: PtText[] = []
     for (let u = t; below.length < 2; ) {
@@ -894,7 +894,7 @@ export function detectFields(
       ...shapes.vlines.filter((v) => v.x0 > t.x1 + 2 && v.y0 < midY && v.y1 > midY).map((v) => v.x0 - 2),
     )
     const top = Math.max(cell.y0 + 1.5, t.y0 - 2)
-    // Down to the next line written under it, the label's own column too ("Comments:" under "1.1.2 IMO number:").
+    // Down to the next line written under it, the label's own column too ("Comments:" under "1.1.2 Permit number:").
     const bottom = Math.min(
       cell.y1 - 1.5,
       ...texts.filter((o) => o.y0 > t.y1 && overlap(o.x0, o.x1, t.x0, right) > 0).map((o) => o.y0 - 1),
@@ -1124,7 +1124,7 @@ export async function detectDocument(
       const shapes = { ...drawn, rects: [...drawn.rects, ...split.boxes] }
       const size = { width: page.view[2] - page.view[0], height: page.view[3] - page.view[1] }
       const all = [...existing, ...found]
-      // Text on both sides of a column line is in two cells: "Tagged Rank | Master" is not one line.
+      // Text on both sides of a column line is in two cells: "Tagged Role | Manager" is not one line.
       const lines = toLines(items, page.view, undefined, drawn.vlines)
       const remembered = learned?.remembered(p.source, i + 1)
       const suggested: Omit<FieldDef, 'id' | 'key'>[] = []

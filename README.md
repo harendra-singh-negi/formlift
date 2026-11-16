@@ -184,7 +184,7 @@ export function FormBuilder({ pdfUrl, saved }: { pdfUrl: string; saved?: FormDoc
       <FormEditor
         pdf={pdfUrl}
         initialValue={saved}
-        title="Crew onboarding"
+        title="Staff onboarding"
         onSave={(doc) =>
           fetch('/api/forms/42', {
             method: 'PUT',
@@ -370,14 +370,14 @@ Runs after the person changes a field (not after your own `setAnswer`), with the
   fields={form.fields}
   onFieldChange={(field, value, api) => {
     // fill another field
-    if (field.key === 'vessel') api.setAnswer('imo', lookupImo(String(value)))
+    if (field.key === 'site') api.setAnswer('permit', lookupPermit(String(value)))
     // ask dialog-only fields your way (they need no follow-up)
     if (field.key === 'incident' && value === true) api.openDialog(['incident_time', 'incident_place'], 'Incident details')
     // tell the person something
     if (field.key === 'expiry' && String(value) < today) api.notify('This certificate has expired')
   }}
   renderFieldExtras={(field, { answers }) =>        // React only: your icon / button next to a field
-    field.key === 'imo' ? <a href={`https://registry.example/${answers.imo}`}>🔗</a> : null}
+    field.key === 'permit' ? <a href={`https://registry.example/${answers.permit}`}>🔗</a> : null}
 />
 ```
 
@@ -767,7 +767,7 @@ You can change every part of it, and the same code runs in the browser and on yo
 | --- | --- |
 | Your wording or language for every built-in message | `messages: { required: (label) => label + ' ज़रूरी है', email: '…' }` (`DEFAULT_ANSWER_MESSAGES` has them all) |
 | A message for one field | In the builder, or in JSON: `requiredMessage`, `errorMessage` on the field |
-| Your own rules, picked per field in the builder | `rules: { imo: { label: 'IMO number', check: (value, field, answers) => ... } }`; the field stores `rules: ['imo']` |
+| Your own rules, picked per field in the builder | `rules: { permit: { label: 'Permit number', check: (value, field, answers) => ... } }`; the field stores `rules: ['permit']` |
 | Rules for some field types only | `types: ['text', 'number']` on a rule |
 | Full control | `validate: (field, value, answers) => 'message' \| null \| undefined`: a message is the error, `null` accepts the answer, `undefined` lets formlift check as usual |
 
@@ -776,7 +776,7 @@ import { validateAnswers, type AnswerOptions } from 'formlift'
 
 const validation: AnswerOptions = {
   rules: {
-    imo: { label: 'IMO number', types: ['text'], check: (v) => (/^\d{7}$/.test(String(v)) ? null : 'IMO must be 7 digits') },
+    permit: { label: 'Permit number', types: ['text'], check: (v) => (/^\d{7}$/.test(String(v)) ? null : 'Permit number must be 7 digits') },
     afterStart: { label: 'After start date', types: ['date'], check: (v, f, a) => (v > a.startDate ? null : 'Must be after the start date') },
   },
 }
@@ -1119,7 +1119,7 @@ const hasCategories = form.kind === 'inspection' // your rule, not formlift's
     'answered',                                                  // a built-in, by id
     partFilter({ id: 'finding', title: 'Finding', match: /finding|observation/i }),
     ...(hasCategories ? [categoryFilter({ title: 'Chapter' })] : []),
-    customFilter('deck', 'Deck', (q) => [q.page <= 2 ? 'Upper' : 'Lower']),
+    customFilter('floor', 'Floor', (q) => [q.page <= 2 ? 'Upper' : 'Lower']),
   ]}
   listSearch={true}
   hideUnavailableFilters={false} // show listed filters even when this form has nothing for them

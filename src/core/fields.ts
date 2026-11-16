@@ -28,7 +28,7 @@ export function uniqueKey(base: string, fields: FieldDef[]) {
   return `${base}_${i}`
 }
 
-/** A field key from a label: "IMO NUMBER" → imo_number_1 (unique among `fields`). */
+/** A field key from a label: "PERMIT NUMBER" → permit_number_1 (unique among `fields`). */
 export function keyFor(label: string, type: FieldType, fields: { key: string }[]) {
   const slug = label
     .toLowerCase()

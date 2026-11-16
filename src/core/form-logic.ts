@@ -250,7 +250,7 @@ export interface AnswerRule {
 export type AnswerOptions = Partial<Limits> & {
   /** Your own wording for formlift's answer errors (any language). */
   messages?: Partial<AnswerMessages>;
-  /** Named rules that fields list in `rules`, e.g. { imo: { label: 'IMO number', check: (v) => ... } }. */
+  /** Named rules that fields list in `rules`, e.g. { permit: { label: 'Permit number', check: (v) => ... } }. */
   rules?: Record<string, AnswerRule>;
   /**
    * Runs first, for every visible field. Return a message (error), null (valid: skip formlift's checks) or

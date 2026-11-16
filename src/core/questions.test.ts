@@ -35,19 +35,19 @@ const f = (label: string, type: FieldType, x: number, y: number, height = 0.015)
 })
 
 // Like AUD 06: a row "2.1.1 …" with Y / N / NA checkboxes and a Remarks box named only "Remarks"; a second row;
-// "Vessel" and "Date" side by side on one line (two questions); a Comments box under an item.
+// "Site" and "Date" side by side on one line (two questions); a Comments box under an item.
 const q1 = [
-  f('2.1.1 Were the Master familiar… – Y', 'checkbox', 0.7, 0.2),
-  f('2.1.1 Were the Master familiar… – N', 'checkbox', 0.75, 0.2),
-  f('2.1.1 Were the Master familiar… – N A', 'checkbox', 0.8, 0.2),
+  f('2.1.1 Were the Manager familiar… – Y', 'checkbox', 0.7, 0.2),
+  f('2.1.1 Were the Manager familiar… – N', 'checkbox', 0.75, 0.2),
+  f('2.1.1 Were the Manager familiar… – N A', 'checkbox', 0.8, 0.2),
   f('Remarks', 'textarea', 0.85, 0.195, 0.03),
 ]
 const q2 = [
   f('2.1.2 Were all certificates on board? – Y', 'checkbox', 0.7, 0.25),
   f('Remarks', 'textarea', 0.85, 0.245, 0.03),
 ]
-const line = [f('Vessel', 'text', 0.2, 0.1), f('Date', 'date', 0.6, 0.1)]
-const comment = [f('1.1.8 Date the vessel was delivered – Comments', 'text', 0.2, 0.4)]
+const line = [f('Site', 'text', 0.2, 0.1), f('Date', 'date', 0.6, 0.1)]
+const comment = [f('1.1.8 Date the site was handed over – Comments', 'text', 0.2, 0.4)]
 const all = [...q2, ...comment, ...line, ...q1] // any order: document order comes from the positions
 
 describe('form as questions', () => {
@@ -55,11 +55,11 @@ describe('form as questions', () => {
 
   it('groups the fields of one line by question; a bare Remarks box joins the question on its line', () => {
     expect(qs.map((q) => [q.title, q.parts.map((p) => p.name)])).toEqual([
-      ['Vessel', ['']],
+      ['Site', ['']],
       ['Date', ['']],
-      ['2.1.1 Were the Master familiar…', ['Y', 'N', 'N A', 'Remarks']],
+      ['2.1.1 Were the Manager familiar…', ['Y', 'N', 'N A', 'Remarks']],
       ['2.1.2 Were all certificates on board?', ['Y', 'Remarks']],
-      ['1.1.8 Date the vessel was delivered', ['Comments']],
+      ['1.1.8 Date the site was handed over', ['Comments']],
     ])
   })
 
@@ -70,16 +70,16 @@ describe('form as questions', () => {
       qs.filter((q) => matches(q, answers, { ...NO_FILTER, ...patch })).map((q) => q.title)
     expect(titles({ remarks: 'filled' })).toEqual([first.title])
     expect(titles({ remarks: 'empty' })).toEqual([second.title]) // questions without a Remarks box are left out
-    expect(titles({ comments: 'empty' })).toEqual(['1.1.8 Date the vessel was delivered'])
+    expect(titles({ comments: 'empty' })).toEqual(['1.1.8 Date the site was handed over'])
     expect(titles({ answered: 'empty' })).toEqual([
-      'Vessel',
+      'Site',
       'Date',
       second.title,
-      '1.1.8 Date the vessel was delivered',
+      '1.1.8 Date the site was handed over',
     ])
     expect(titles({ type: 'date' })).toEqual(['Date'])
     expect(titles({ search: 'CERTIFICATES' })).toEqual([second.title])
-    expect(titles({ answered: 'filled', remarks: 'filled', search: 'master' })).toEqual([first.title])
+    expect(titles({ answered: 'filled', remarks: 'filled', search: 'manager' })).toEqual([first.title])
   })
 
   it('titles from the page text: a table is one question under its title, a cut label gets the whole question', () => {
@@ -95,7 +95,7 @@ describe('form as questions', () => {
       t('Inspector’s Inspection Results – List of Observations', 0.25, 0.5, 0.55),
       t('(A copy of this page, including the complete list of observations, shall be handed over', 0.1, 0.516, 0.8),
       t('No.', 0.1, 0.55, 0.03),
-      t('Were the Master familiar with the company procedure for certificates?', 0.3, 0.2, 0.38),
+      t('Were the Manager familiar with the company procedure for certificates?', 0.3, 0.2, 0.38),
       t('Sailing Visit:', 0.05, 0.3, 0.1),
       t('Yes', 0.25, 0.3, 0.03),
     ]
@@ -103,7 +103,7 @@ describe('form as questions', () => {
     const sailing = [f('Yes', 'checkbox', 0.29, 0.3), f('No', 'checkbox', 0.4, 0.3)]
     const qs = toQuestions([q1[0], ...sailing, ...row(0.6), ...row(0.63)], () => text)
     expect(qs.map((q) => q.title)).toEqual([
-      'Were the Master familiar with the company procedure for certificates?',
+      'Were the Manager familiar with the company procedure for certificates?',
       'Sailing Visit:',
       'Inspector’s Inspection Results – List of Observations',
     ])
@@ -140,11 +140,11 @@ describe('option grids', () => {
 })
 
 describe('question with parts on one line', () => {
-  it('"LAST PSC INSPECTION: Place ___ Date ___" is one question; "SHIP ___ GT ___" stays two', () => {
+  it('"LAST FIRE INSPECTION: Place ___ Date ___" is one question; "SITE ___ ID ___" stays two', () => {
     const fs = [
-      f('SHIP', 'text', 0.2, 0.1),
-      f('GT', 'text', 0.6, 0.1),
-      f('LAST PSC INSPECTION: Place', 'text', 0.3, 0.2),
+      f('SITE', 'text', 0.2, 0.1),
+      f('ID', 'text', 0.6, 0.1),
+      f('LAST FIRE INSPECTION: Place', 'text', 0.3, 0.2),
       f('Date', 'date', 0.6, 0.2),
       f('DATE OF INSPECTION: From', 'date', 0.3, 0.3),
       f('To', 'date', 0.6, 0.3),
@@ -152,9 +152,9 @@ describe('question with parts on one line', () => {
       f('Flag: Code', 'text', 0.8, 0.4),
     ]
     expect(toQuestions(fs).map((q) => [q.title, q.parts.map((p) => p.name)])).toEqual([
-      ['SHIP', ['']],
-      ['GT', ['']],
-      ['LAST PSC INSPECTION', ['Place', 'Date']],
+      ['SITE', ['']],
+      ['ID', ['']],
+      ['LAST FIRE INSPECTION', ['Place', 'Date']],
       ['DATE OF INSPECTION', ['From', 'To']],
       ['Port', ['Name']],
       ['Flag', ['Code']],
@@ -207,7 +207,7 @@ describe('option grids in other layouts', () => {
     const text = [
       t('Practical Guidelines', 0.45, 0.144),
       t('Human', 0.13, 0.161),
-      t('The Inspector is expected to interview the Master…', 0.23, 0.161),
+      t('The Inspector is expected to interview the Manager…', 0.23, 0.161),
     ]
     expect(shape([box('Human', 0.2, 0.161)], text)).toEqual([['Human', [''], undefined]])
   })
@@ -215,27 +215,27 @@ describe('option grids in other layouts', () => {
   it('a " – " inside option names is not a Row – Column label when every box has its own', () => {
     const text = [
       t('Supporting Documents', 0.1, 0.1),
-      t('Log-24a (Job Orders – Engine)', 0.05, 0.12),
-      t('Log-24b (Job Orders – Deck)', 0.4, 0.12),
+      t('Log-24a (Job Orders – Wiring)', 0.05, 0.12),
+      t('Log-24b (Job Orders – Doors)', 0.4, 0.12),
     ]
-    const fs = [box('Log-24a (Job Orders – Engine)', 0.3, 0.12), box('Log-24b (Job Orders – Deck)', 0.65, 0.12)]
+    const fs = [box('Log-24a (Job Orders – Wiring)', 0.3, 0.12), box('Log-24b (Job Orders – Doors)', 0.65, 0.12)]
     expect(shape(fs, text)).toEqual([
-      ['Supporting Documents', ['Log-24a (Job Orders – Engine)', 'Log-24b (Job Orders – Deck)'], [2]],
+      ['Supporting Documents', ['Log-24a (Job Orders – Wiring)', 'Log-24b (Job Orders – Doors)'], [2]],
     ])
   })
 })
 
 describe('tables as on the document', () => {
-  it('a side heading on the first row ("INSPECTOR – RANK") names the table; the rows stay one table', () => {
-    const row = (y: number, first = 'RANK') => [
+  it('a side heading on the first row ("INSPECTOR – ROLE") names the table; the rows stay one table', () => {
+    const row = (y: number, first = 'ROLE') => [
       f(first, 'text', 0.25, y),
       f('NAME', 'text', 0.45, y),
       f('SIGNATURE', 'signature', 0.65, y),
       f('DATE', 'date', 0.85, y),
     ]
-    const qs = toQuestions([...row(0.8, 'INSPECTOR – RANK'), ...row(0.83), ...row(0.86)])
+    const qs = toQuestions([...row(0.8, 'INSPECTOR – ROLE'), ...row(0.83), ...row(0.86)])
     expect(qs.map((q) => [q.title, q.columns, q.rows, q.rowNames])).toEqual([
-      ['INSPECTOR', ['RANK', 'NAME', 'SIGNATURE', 'DATE'], [4, 4, 4], undefined],
+      ['INSPECTOR', ['ROLE', 'NAME', 'SIGNATURE', 'DATE'], [4, 4, 4], undefined],
     ])
   })
 
@@ -247,7 +247,7 @@ describe('tables as on the document', () => {
       t('Boots', 0.05, 0.33),
     ])
     expect(qs.map((q) => [q.title, q.rowNames])).toEqual([
-      ['2.1.1 Were the Master familiar…', undefined],
+      ['2.1.1 Were the Manager familiar…', undefined],
       ['2.1.2 Were all certificates on board?', undefined],
       ['Quantity / Remarks', ['Gloves', 'Boots']],
     ])
@@ -258,7 +258,7 @@ describe('numbered rows', () => {
   it('"1 – Type of Training Need …" rows and a list of inputs named "1", "2" are tables with numbered rows', () => {
     const row = (n: number, y: number) => [
       f(`${n} – Type of Training Need`, 'text', 0.14, y),
-      f(`${n} – Name/Rank`, 'text', 0.5, y),
+      f(`${n} – Name/Role`, 'text', 0.5, y),
       f(`${n} – Close Out Date`, 'date', 0.8, y),
     ]
     const list = [1, 2, 3].map((n) => f(String(n), 'text', 0.14, 0.4 + n * 0.02))
@@ -266,8 +266,8 @@ describe('numbered rows', () => {
     const qs = toQuestions([...row(1, 0.1), ...row(2, 0.12), ...list, ...yn])
     expect(qs.map((q) => [q.title, q.columns, q.rowNames])).toEqual([
       [
-        'Type of Training Need / Name/Rank / Close Out Date',
-        ['Type of Training Need', 'Name/Rank', 'Close Out Date'],
+        'Type of Training Need / Name/Role / Close Out Date',
+        ['Type of Training Need', 'Name/Role', 'Close Out Date'],
         ['1', '2'],
       ],
       ['List', [''], ['1', '2', '3']],
@@ -306,7 +306,7 @@ describe('table header row from the page', () => {
     const text = [
       t('No.', 0.11, 0.02),
       t('Training Topic', 0.26, 0.12),
-      t('Name/Rank', 0.6, 0.09),
+      t('Name/Role', 0.6, 0.09),
       t('Date', 0.86, 0.03),
     ]
     const row = (n: number, y: number) => [
@@ -316,7 +316,7 @@ describe('table header row from the page', () => {
     ]
     const [q] = toQuestions([...row(1, 0.226), ...row(2, 0.248)], () => text)
     expect([q.columns, q.rowNames]).toEqual([
-      ['Training Topic', 'Name/Rank', 'Date'],
+      ['Training Topic', 'Name/Role', 'Date'],
       ['1', '2'],
     ])
   })
@@ -355,7 +355,7 @@ describe('categories', () => {
     t('HF', 0.39, 0.5),
     t('HW', 0.39, 0.7),
     t('PR', 0.39, 0.8),
-    t('RANK', 0.1, 0.9), // a header row of codes is not a category
+    t('ROLE', 0.1, 0.9), // a header row of codes is not a category
     t('NAME', 0.3, 0.9),
   ]
   const fs = [
@@ -424,7 +424,7 @@ describe('a column of boxes beside a block of text', () => {
   const page = [
     t('2.1.1 Maintenance of statutory Certificates', 0.06, 0.08),
     t('HW', 0.39, 0.113, 0.02),
-    t('A. Vessel is free of:', 0.06, 0.125),
+    t('A. Site is free of:', 0.06, 0.125),
     t('A1. Any visual defect (but not yet', 0.06, 0.139),
     t('assessed by class)?', 0.08, 0.151),
     t('A2. Condition of Class?', 0.06, 0.164),
@@ -448,7 +448,7 @@ describe('a column of boxes beside a block of text', () => {
     const [q, ...rest] = toQuestions(fs, () => page)
     expect(rest).toEqual([])
     expect(q.title).toBe(
-      'A. Vessel is free of:\nA1. Any visual defect (but not yet assessed by class)?\nA2. Condition of Class?',
+      'A. Site is free of:\nA1. Any visual defect (but not yet assessed by class)?\nA2. Condition of Class?',
     )
     expect(q.parts.map((p) => p.name)).toEqual(['Yes', 'No', 'NA', 'Finding'])
     expect(q.rows).toEqual([3])
@@ -465,9 +465,9 @@ describe('tags', () => {
   const t = (text: string, y: number): TextLine => ({ text, x: 0.06, y, width: 0.4, height: 0.01, fontSize: 9 })
   const page = [
     t('2.1.1 Maintenance of statutory Certificates', 0.05),
-    t('Classification: Core , Risk: H , Assigned to: MASTER', 0.3), // under the questions: still all of 2.1.1
+    t('Classification: Core , Risk: H , Assigned to: MANAGER', 0.3), // under the questions: still all of 2.1.1
     t('2.2.1 Inspector inspection', 0.4),
-    t('Classification: Rotational 2 , Risk: M , Assigned to: Chief Officer', 0.6),
+    t('Classification: Rotational 2 , Risk: M , Assigned to: Supervisor', 0.6),
     t('Name: John , Date: today', 0.7), // keys seen in one numbered question only: not filters
   ]
   const fs = [
@@ -479,9 +479,9 @@ describe('tags', () => {
 
   it('apply to every question of their numbered question, and filter on them', () => {
     expect(qs.map((q) => q.tags)).toEqual([
-      { Classification: 'Core', Risk: 'H', 'Assigned to': 'MASTER' },
-      { Classification: 'Core', Risk: 'H', 'Assigned to': 'MASTER' },
-      { Classification: 'Rotational 2', Risk: 'M', 'Assigned to': 'Chief Officer' },
+      { Classification: 'Core', Risk: 'H', 'Assigned to': 'MANAGER' },
+      { Classification: 'Core', Risk: 'H', 'Assigned to': 'MANAGER' },
+      { Classification: 'Rotational 2', Risk: 'M', 'Assigned to': 'Supervisor' },
     ])
     const risk = (v: string) => qs.filter((q) => matches(q, {}, { ...NO_FILTER, tags: { Risk: v } })).length
     expect([risk('H'), risk('M'), risk('L')]).toEqual([2, 1, 0])
@@ -538,8 +538,8 @@ describe('a numbered question cut by a picture', () => {
     fontSize: 9,
   })
   const page = [
-    t('11.1.10 Was photograph No.10, forward main deck, representative of the condition', 0.106, 0.601, 0.847),
-    t('as seen onboard and, if so, was it free of', 0.106, 0.617, 0.848),
+    t('11.1.10 Was photograph No.10, front main hall, representative of the condition', 0.106, 0.601, 0.847),
+    t('as seen on site and, if so, was it free of', 0.106, 0.617, 0.848),
     t('Sampl', 0.126, 0.635, 0.083, 0.023), // the photo's watermark: another text size
     t('any areas for concern?', 0.106, 0.821, 0.19), // the question carries on under the photo
     t('Comments:', 0.106, 0.838, 0.096),
@@ -550,7 +550,7 @@ describe('a numbered question cut by a picture', () => {
   it('the heading is the whole question; the card is named by its box', () => {
     const [q] = toQuestions(fs, () => page)
     expect(q.section).toBe(
-      '11.1.10 Was photograph No.10, forward main deck, representative of the condition as seen onboard and, if so, was it free of any areas for concern?',
+      '11.1.10 Was photograph No.10, front main hall, representative of the condition as seen on site and, if so, was it free of any areas for concern?',
     )
     expect([q.title, q.parts.map((p) => p.name)]).toEqual(['Comments', ['']])
   })
@@ -589,7 +589,7 @@ describe('rows on one scale', () => {
     t('Ν/S', 0.915, 0.349, 0.03), // typed with a Greek Ν
     t('(in accordance with scoring system provided below)', 0.106, 0.357),
     t('Chapter 02. Certification', 0.106, 0.376, 0.3),
-    t('Chapter 03. Crew Management', 0.106, 0.393, 0.3),
+    t('Chapter 03. Staff Management', 0.106, 0.393, 0.3),
     t(' 2 “fair” means that the standards are not satisfactory', 0.109, 0.6, 0.8), // a symbol-font bullet
     t(' 1 “unsatisfactory” means that the level is poor.', 0.109, 0.62, 0.8),
     t(' N/S “not seen” means that it was not possible to see it', 0.109, 0.64, 0.8),
@@ -597,7 +597,7 @@ describe('rows on one scale', () => {
   const row = (name: string, y: number) =>
     ['1', '2', 'Ν/S'].map((c, k) => f(`${name} – ${c}`, 'checkbox', 0.7 + 0.05 * k, y, 0.013))
   const qs = toQuestions(
-    [...row('Chapter 02. Certification', 0.377), ...row('Chapter 03. Crew Management', 0.394)],
+    [...row('Chapter 02. Certification', 0.377), ...row('Chapter 03. Staff Management', 0.394)],
     () => page,
   )
 

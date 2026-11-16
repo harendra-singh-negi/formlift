@@ -41,15 +41,15 @@ describe('field helpers', () => {
     const a = newField('text', 1, 0.5, 0.1, [])
     const b = newField('text', 1, 0.5, 0.2, [a])
     b.visibleWhen = { logic: 'and', rules: [{ fieldKey: a.key, op: 'isNotEmpty' }] }
-    let f = withField([a, b], { ...a, label: 'Vessel Name' })
-    expect(f[0].key).toBe('vessel_name_1')
-    expect(f[1].visibleWhen?.rules[0]).toMatchObject({ fieldKey: 'vessel_name_1' })
+    let f = withField([a, b], { ...a, label: 'Site Name' })
+    expect(f[0].key).toBe('site_name_1')
+    expect(f[1].visibleWhen?.rules[0]).toMatchObject({ fieldKey: 'site_name_1' })
     // The same label on another field still gets its own key.
-    f = withField(f, { ...f[1], label: 'Vessel Name' })
-    expect(f.map((x) => x.key)).toEqual(['vessel_name_1', 'vessel_name_2'])
+    f = withField(f, { ...f[1], label: 'Site Name' })
+    expect(f.map((x) => x.key)).toEqual(['site_name_1', 'site_name_2'])
     // A typed key is ignored when it would clash; moving the box keeps the key.
-    expect(withField(f, { ...f[1], key: 'vessel_name_1' })[1].key).toBe('vessel_name_2')
-    expect(withField(f, { ...f[1], position: { ...f[1].position, x: 0.1 } })[1].key).toBe('vessel_name_2')
+    expect(withField(f, { ...f[1], key: 'site_name_1' })[1].key).toBe('site_name_2')
+    expect(withField(f, { ...f[1], position: { ...f[1].position, x: 0.1 } })[1].key).toBe('site_name_2')
     expect(validateFields(f, 1)).toEqual([])
   })
 })

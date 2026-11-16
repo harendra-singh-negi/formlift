@@ -58,10 +58,10 @@ describe('toLines', () => {
 
   it('joins words of a line, splits columns and lines', () => {
     const lines = toLines(
-      [item('SHIP:', 50, 30), item('Name', 82, 30), item('GT:', 350, 20), item('Second line', 50, 60, 780)],
+      [item('SITE:', 50, 30), item('Name', 82, 30), item('ID:', 350, 20), item('Second line', 50, 60, 780)],
       box,
     )
-    expect(lines.map((l) => l.text)).toEqual(['SHIP: Name', 'GT:', 'Second line'])
+    expect(lines.map((l) => l.text)).toEqual(['SITE: Name', 'ID:', 'Second line'])
     expect(lines[0].x).toBeCloseTo(50 / 595)
     expect(lines[0].width).toBeCloseTo(62 / 595)
     expect(lines[0].y).toBeCloseTo((42 - 12 * 0.92) / 842)
@@ -69,15 +69,15 @@ describe('toLines', () => {
   })
 
   it('a wide whitespace item between columns does not join them', () => {
-    const lines = toLines([item('SHIP:', 50, 30), item(' ', 80, 270), item('GT:', 350, 20)], box)
-    expect(lines.map((l) => l.text)).toEqual(['SHIP:', 'GT:'])
+    const lines = toLines([item('SITE:', 50, 30), item(' ', 80, 270), item('ID:', 350, 20)], box)
+    expect(lines.map((l) => l.text)).toEqual(['SITE:', 'ID:'])
   })
 
   it('text either side of a column line is in two cells, however close', () => {
-    const items = [item('Tagged Rank', 70, 59), item('Master', 139, 36)]
-    expect(toLines(items, box).map((l) => l.text)).toEqual(['Tagged Rank Master'])
+    const items = [item('Tagged Role', 70, 59), item('Manager', 139, 36)]
+    expect(toLines(items, box).map((l) => l.text)).toEqual(['Tagged Role Manager'])
     const wall = { x0: 135, y0: 30, y1: 46 }
-    expect(toLines(items, box, undefined, [wall]).map((l) => l.text)).toEqual(['Tagged Rank', 'Master'])
+    expect(toLines(items, box, undefined, [wall]).map((l) => l.text)).toEqual(['Tagged Role', 'Manager'])
   })
 
   it('a line replaced in the editor becomes a valid white text item', () => {
@@ -99,12 +99,12 @@ describe('text items', () => {
   const box = [0, 0, 595, 842]
   it('bold / italic come from the font name', () => {
     const items = [
-      { str: 'SHIP:', transform: [9, 0, 0, 9, 50, 700], width: 25, fontName: 'f1' },
+      { str: 'SITE:', transform: [9, 0, 0, 9, 50, 700], width: 25, fontName: 'f1' },
       { str: 'note', transform: [9, 0, 0, 9, 50, 680], width: 20, fontName: 'f2' },
     ]
     const names: Record<string, string> = { f1: 'ABCDEF+Arial-BoldMT', f2: 'XYZ+Calibri-Italic' }
     const [a, b] = toLines(items, box, (id) => names[id])
-    expect(a).toMatchObject({ text: 'SHIP:', bold: true })
+    expect(a).toMatchObject({ text: 'SITE:', bold: true })
     expect(a.italic).toBeUndefined()
     expect(b).toMatchObject({ italic: true })
     expect(replaceLine(a, 1)).toMatchObject({ bold: true })

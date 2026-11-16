@@ -70,7 +70,7 @@ export interface FlowBlock {
   cells?: FlowCell[]
   /**
    * …or with `line`, a line of the page without rules: its text and fields side by side, each at its place
-   * ("SHIP: ___   GT: ___", a row of answer lines under column names); on a narrow screen they wrap like words…
+   * ("SITE: ___   ID: ___", a row of answer lines under column names); on a narrow screen they wrap like words…
    */
   line?: boolean
   /** …or free text: paragraphs one under another. */

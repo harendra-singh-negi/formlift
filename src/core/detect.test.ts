@@ -42,11 +42,11 @@ describe('detectFields', () => {
     expect(pt(f)).toEqual({ x: 99, y: 199, w: 11, h: 11 })
   })
 
-  it('a dotted line after "SHIP:" becomes a text input above the line; "Date:" a date', () => {
+  it('a dotted line after "SITE:" becomes a text input above the line; "Date:" a date', () => {
     const shapes = { ...none, hlines: [h(100, 300, 180, true), h(380, 500, 180, true)] }
-    const found = detectFields(shapes, [text('SHIP:', 57, 170, 80), text('Date:', 340, 170, 370)], size, 1)
+    const found = detectFields(shapes, [text('SITE:', 57, 170, 80), text('Date:', 340, 170, 370)], size, 1)
     expect(found.map((f) => [f.type, f.label])).toEqual([
-      ['text', 'SHIP'],
+      ['text', 'SITE'],
       ['date', 'Date'],
     ])
     // One text line high: the page's text is 10 pt tall here, so 11 pt.
@@ -96,8 +96,8 @@ describe('detectFields', () => {
     const ys = [100, 120, 140, 160]
     const walls = [50, 150, 300].flatMap((x) => [v(x, 100, 120.8), v(x, 122.9, 140.8), v(x, 142.9, 160.8)])
     const shapes = { ...none, hlines: ys.flatMap((y) => [h(50, 300, y), h(50, 300, y + 1.1)]), vlines: walls }
-    const lines = [text('Rank', 55, 105, 80), text('Name', 155, 105, 185), text('Master', 55, 125, 90)]
-    expect(detectFields(shapes, lines, size, 1).map((f) => f.label)).toContain('Master – Name')
+    const lines = [text('Role', 55, 105, 80), text('Name', 155, 105, 185), text('Manager', 55, 125, 90)]
+    expect(detectFields(shapes, lines, size, 1).map((f) => f.label)).toContain('Manager – Name')
   })
 
   it('a table drawn with shading only: label cells name the empty space beside them, split by column headers', () => {
@@ -110,14 +110,14 @@ describe('detectFields', () => {
     const lines = [
       text('Signature:', 155, 104, 200),
       text('Date:', 325, 104, 350),
-      text('Master', 35, 122, 70),
-      text('Chief Engineer', 35, 140, 95),
+      text('Manager', 35, 122, 70),
+      text('Site Engineer', 35, 140, 95),
     ]
     expect(detectFields(shapes, lines, size, 1).map((f) => [f.type, f.label])).toEqual([
-      ['signature', 'Master – Signature'],
-      ['date', 'Master – Date'],
-      ['signature', 'Chief Engineer – Signature'],
-      ['date', 'Chief Engineer – Date'],
+      ['signature', 'Manager – Signature'],
+      ['date', 'Manager – Date'],
+      ['signature', 'Site Engineer – Signature'],
+      ['date', 'Site Engineer – Date'],
     ])
     // A lone shaded title is not a label cell.
     expect(
@@ -221,13 +221,13 @@ describe('detectFields', () => {
       vlines: [v(50, 300, 320), v(550, 300, 320)],
     }
     const lines = [
-      text('1.1.8 Date the vessel was delivered', 52, 285, 250),
+      text('1.1.8 Date the site was handed over', 52, 285, 250),
       text('Comments:', 55, 305, 105),
       text('Name of person to contact:', 55, 350, 200),
     ]
     expect(detectFields(shapes, lines, size, 1).map((f) => [f.type, f.label])).toEqual([
       ['text', 'Name of person to contact'],
-      ['text', '1.1.8 Date the vessel was delivered – Comments'],
+      ['text', '1.1.8 Date the site was handed over – Comments'],
     ])
   })
 
@@ -237,10 +237,10 @@ describe('detectFields', () => {
       hlines: [h(50, 550, 300), h(50, 550, 330), h(52, 548, 318, true)],
       vlines: [v(50, 300, 330), v(550, 300, 330)],
     }
-    const lines = [text('2.3.1 Was the PSC report on board?', 52, 270, 250), text('Comments:', 55, 306, 105, 316)]
+    const lines = [text('2.3.1 Was the fire report on site?', 52, 270, 250), text('Comments:', 55, 306, 105, 316)]
     const found = detectFields(shapes, lines, size, 1)
     expect(found).toHaveLength(1)
-    expect(found[0]).toMatchObject({ type: 'text', label: '2.3.1 Was the PSC report on board? – Comments' })
+    expect(found[0]).toMatchObject({ type: 'text', label: '2.3.1 Was the fire report on site? – Comments' })
     expect(pt(found[0]).x).toBe(109)
     expect(pt(found[0]).x + pt(found[0]).w).toBe(548)
   })
@@ -259,7 +259,7 @@ describe('detectFields', () => {
       hlines: [h(50, 550, 100), h(50, 550, 120), h(50, 550, 140)],
       vlines: [v(50, 100, 140), v(550, 100, 140), v(150, 100, 120)],
     }
-    const lines = [text('Tagged Rank', 55, 105, 120), text('Master', 155, 105, 190)]
+    const lines = [text('Tagged Role', 55, 105, 120), text('Manager', 155, 105, 190)]
     const bar = { x: 50, y: 120, w: 500, h: 20, stroked: false, filled: true, fill: '#f2f2f2' }
     expect(detectFields(shapes, lines, size, 1)).toHaveLength(1)
     expect(detectFields({ ...shapes, rects: [bar] }, lines, size, 1)).toEqual([])
@@ -273,8 +273,8 @@ describe('detectFields', () => {
       text('-Not fully bolted', 55, 129, 140),
     ]
     expect(detectFields(shapes, list, size, 1)).toEqual([])
-    const question = [text('1.1.1 Name of the vessel:', 55, 105, 180), text('As on the registry.', 55, 117, 200)]
-    expect(detectFields(shapes, question, size, 1).map((f) => f.label)).toEqual(['1.1.1 Name of the vessel'])
+    const question = [text('1.1.1 Name of the site:', 55, 105, 180), text('As on the registry.', 55, 117, 200)]
+    expect(detectFields(shapes, question, size, 1).map((f) => f.label)).toEqual(['1.1.1 Name of the site'])
   })
 
   it('skips places already covered by a field', () => {
@@ -397,8 +397,8 @@ describe('extractShapes', () => {
 })
 
 it('keys come from labels and stay unique; detected fields are a valid mapping', () => {
-  expect(keyFor('IMO NUMBER', 'text', [])).toBe('imo_number_1')
-  expect(keyFor('IMO NUMBER', 'text', [{ key: 'imo_number_1' }])).toBe('imo_number_2')
+  expect(keyFor('PERMIT NUMBER', 'text', [])).toBe('permit_number_1')
+  expect(keyFor('PERMIT NUMBER', 'text', [{ key: 'permit_number_1' }])).toBe('permit_number_2')
   expect(keyFor('2.1.1a Certificate – Comments', 'text', [])).toBe('text_2_1_1a_certificate_comments_1')
   expect(keyFor('', 'checkbox', [])).toBe('checkbox_1')
   const shapes = { ...none, rects: [{ x: 100, y: 200, w: 9, h: 9, stroked: true, filled: false }] }
