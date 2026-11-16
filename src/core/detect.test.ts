@@ -253,6 +253,30 @@ describe('detectFields', () => {
     expect(pt(f)).toMatchObject({ y: 300, h: 16 })
   })
 
+  it('a grey cell with nothing in it is a bar, not an answer box', () => {
+    const shapes = {
+      ...none,
+      hlines: [h(50, 550, 100), h(50, 550, 120), h(50, 550, 140)],
+      vlines: [v(50, 100, 140), v(550, 100, 140), v(150, 100, 120)],
+    }
+    const lines = [text('Tagged Rank', 55, 105, 120), text('Master', 155, 105, 190)]
+    const bar = { x: 50, y: 120, w: 500, h: 20, stroked: false, filled: true, fill: '#f2f2f2' }
+    expect(detectFields(shapes, lines, size, 1)).toHaveLength(1)
+    expect(detectFields({ ...shapes, rects: [bar] }, lines, size, 1)).toEqual([])
+  })
+
+  it('a line heading a list asks nothing; a numbered question with a note under it does', () => {
+    const shapes = { ...none, hlines: [h(50, 550, 100), h(50, 550, 160)], vlines: [v(50, 100, 160), v(550, 100, 160)] }
+    const list = [
+      text('A manifold connection is:', 55, 105, 180),
+      text('-Secured with damaged bolts', 55, 117, 200),
+      text('-Not fully bolted', 55, 129, 140),
+    ]
+    expect(detectFields(shapes, list, size, 1)).toEqual([])
+    const question = [text('1.1.1 Name of the vessel:', 55, 105, 180), text('As on the registry.', 55, 117, 200)]
+    expect(detectFields(shapes, question, size, 1).map((f) => f.label)).toEqual(['1.1.1 Name of the vessel'])
+  })
+
   it('skips places already covered by a field', () => {
     const shapes = { ...none, rects: [{ x: 100, y: 200, w: 9, h: 9, stroked: true, filled: false }] }
     const existing = [
