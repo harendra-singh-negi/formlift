@@ -56,7 +56,8 @@ All three must pass, and CI runs them again on your PR.
 - **Do not change the JSON shape** of `FieldDef`, `Layout` or `Answers` in a breaking way without an issue
   first, because stored forms depend on it.
 - Keep pull requests focused: one fix or feature per PR.
-- Update `README.md` and `CHANGELOG.md` (under "Unreleased") when behaviour or API changes.
+- Update `README.md` when behaviour or API changes, and add a row to its "Upgrading" table when users must do
+  something. Don't edit `CHANGELOG.md`: release-please writes it from the commit messages.
 
 ## Commit messages
 
@@ -73,8 +74,9 @@ are generated from them, so the prefix matters:
 | `feat!: ...` or a `BREAKING CHANGE:` footer | breaking change | minor while below 1.0, then major |
 
 Examples: `feat: detect checkboxes drawn as curves`, `fix: autosave after a failed save`,
-`docs: add a Next.js recipe`. Pull requests are squash-merged, so the **PR title** is the commit message and
-must follow the same format.
+`docs: add a Next.js recipe`. A one-change pull request is squash-merged, so the **PR title** is the commit message
+and must follow the same format. A branch with several commits, each its own changelog entry, is merged with
+"Rebase and merge" instead: a squash would turn them into one entry.
 
 ## Releasing (maintainer)
 
