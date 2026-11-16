@@ -8,6 +8,8 @@ export interface Seg {
   x1: number
   y1: number
   dashed: boolean
+  /** Filled thinner than half a point: a table's wall (Word draws them so), never an answer line. */
+  hair?: boolean
 }
 export interface Rect {
   x: number
@@ -196,6 +198,13 @@ export function extractShapes(fnArray: number[], argsArray: unknown[][], OPS: Op
         const axisAligned = s.every(
           (p, j) => j === 0 || Math.abs(p[0] - s[j - 1][0]) < 0.5 || Math.abs(p[1] - s[j - 1][1]) < 0.5,
         )
+        // A rule filled as a rectangle thinner than half a point (Word's 0.48 pt table borders): a fill paints every
+        // pixel it touches, so it prints as a hairline. (A path with no area at all is left out.)
+        if (filled && !stroked && axisAligned && s.length >= 4 && Math.min(w, h) > 0 && Math.min(w, h) <= 0.5 && Math.max(w, h) > 10) {
+          if (w > h) out.hlines.push({ x0: x, y0: y + h / 2, x1: x + w, y1: y + h / 2, dashed: false, hair: true })
+          else out.vlines.push({ x0: x + w / 2, y0: y, x1: x + w / 2, y1: y + h, dashed: false, hair: true })
+          continue
+        }
         if (s.length >= 4 && axisAligned && w > 0.5 && h > 0.5) {
           // A thin filled rectangle is how some tools draw a rule.
           if (filled && !stroked && h < 2 && w > 10)

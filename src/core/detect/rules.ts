@@ -11,7 +11,7 @@
 import type { FieldDef, FieldType } from '../form-logic'
 import { clashes, fitInPage, overlap } from '../coords'
 import type { TextLine } from '../layout'
-import { cleanLabel, GENERIC, LIST_ITEM, typeFor } from './labels'
+import { cleanLabel, GENERIC, LIST_ITEM, PRINTED_CHOICES, typeFor } from './labels'
 import type { Rect, Seg, Shapes } from './shapes'
 import { tableCells } from './tables'
 
@@ -95,12 +95,11 @@ export function detectFields(
   )
   type Cell = (typeof cells)[number]
   const textCells = cells.filter((c) => textIn(c.x0, c.y0, c.x1, c.y1).length)
-  const cellText = (c: Cell) =>
-    cleanLabel(
-      textIn(c.x0, c.y0, c.x1, c.y1)
-        .map((t) => t.text)
-        .join(' '),
-    )
+  const rawText = (c: Cell) =>
+    textIn(c.x0, c.y0, c.x1, c.y1)
+      .map((t) => t.text)
+      .join(' ')
+  const cellText = (c: Cell) => cleanLabel(rawText(c))
   // "Row – Column": the nearest text cell on the left in the same row, and the table's header row (the topmost
   // text cell in the unbroken run of cells straight above, so another table above never names the column).
   // A header exactly as wide as the column wins over wider cells above it (the form's own header block, e.g.
@@ -148,13 +147,18 @@ export function detectFields(
       bar && !rowHead.length && sameCol(bar) && Math.abs(bar.y1 - c.y0) < 2.5 && c.x1 - c.x0 > 0.5 * W && cellText(bar)
     const top = underBar ? bar : (own[0] ?? colHead[colHead.length - 1])
     const col = top ? cellText(top) : ''
-    const rowRaw = rowHead.length
-      ? textIn(rowHead[0].x0, rowHead[0].y0, rowHead[0].x1, rowHead[0].y1)
-          .map((t) => t.text)
-          .join(' ')
-      : ''
+    const rowRaw = rowHead.length ? rawText(rowHead[0]) : ''
     const row = cleanLabel(rowRaw) || (longRow && rowRaw ? rowRaw.slice(0, 57).trimEnd() + '…' : '')
-    return [row, col].filter(Boolean).join(' – ')
+    // In a grid of labels and answers ("Port or Yard:" and the cell after it) the cell found above is another
+    // answer ("Yes ☐") or label ("Date:" with its own blank cell after it), not the column's header. A header row's
+    // "Signature:" has the next header after it.
+    const after = top && cells.find((t) => Math.abs(t.y0 - top.y0) < 2 && Math.abs(t.x0 - top.x1) < 2.5)
+    const answer =
+      !!top &&
+      (boxes.some((b) => b.x > top.x0 && b.x < top.x1 && b.y > top.y0 && b.y < top.y1) ||
+        PRINTED_CHOICES.test(rawText(top)) ||
+        (/:\s*$/.test(rawText(top)) && /:\s*$/.test(rowRaw) && !!after && !textCells.includes(after)))
+    return [row, answer ? '' : col].filter(Boolean).join(' – ')
   }
   const cellAt = (x: number, y: number) => cells.find((c) => x > c.x0 && x < c.x1 && y > c.y0 && y < c.y1)
   const proseRight = (c: Cell) =>
@@ -264,8 +268,13 @@ export function detectFields(
     const besideProse = textCells.some(
       (t) => t.x0 >= c.x1 - 2 && overlap(t.y0, t.y1, c.y0, c.y1) > 0.6 * (c.y1 - c.y0) && cellText(t).length === 0,
     )
+    // A narrow blank cell that starts a row of text is its number's place (a heading row has none), not an answer.
+    const gutter =
+      c.x1 - c.x0 < em * 4 &&
+      !cells.some((t) => t.x1 <= c.x0 + 2 && overlap(t.y0, t.y1, c.y0, c.y1) > 0) &&
+      textCells.some((t) => Math.abs(t.x0 - c.x1) < 2.5 && overlap(t.y0, t.y1, c.y0, c.y1) > 0)
     // A cell with no row or column name is spacing in the layout (beside headings, instructions), not an answer box.
-    if (!label || besideProse || proseRight(c)) continue
+    if (!label || besideProse || gutter || proseRight(c)) continue
     fieldCells.push(c)
     const tall = c.y1 - c.y0 > lineH * 2.2
     const pad = 1.5
@@ -286,7 +295,8 @@ export function detectFields(
     fieldCells.some((c) => x > c.x0 + 1 && x < c.x1 - 1 && y > c.y0 + 1 && y < c.y1 - 1)
   const isWall = (l: Seg) =>
     cells.some((c) => (Math.abs(l.y0 - c.y0) < 2 || Math.abs(l.y0 - c.y1) < 2) && l.x0 < c.x1 && l.x1 > c.x0)
-  let rules = [...shapes.hlines, ...underscores]
+  // (A hairline is a table's wall, never an answer line.)
+  let rules = [...shapes.hlines.filter((l) => !l.hair), ...underscores]
     .filter((l) => l.x1 - l.x0 >= 25 && !isWall(l) && !inAnyCell((l.x0 + l.x1) / 2, l.y0))
     // Underlined words: text sits right on top of a solid rule (dotted rules are always answer lines).
     .filter(
