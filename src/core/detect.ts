@@ -7,10 +7,10 @@
 // Suggestions get source 'ai' + a confidence, so the editor shows them as dashed boxes for the admin to check.
 
 import type { FieldDef, FieldType, Position } from './form-logic'
-import { fitInPage } from './coords'
+import { clashes, fitInPage, overlap } from './coords'
 import { keyFor } from './fields'
 import { toLines, type TextLine } from './layout'
-import { learnedFor, type Lesson } from './learn'
+import { learnedFor, lessonFor as learnFrom, type EditSession, type Forget, type Lesson, type Suggestion as Made } from './learn'
 
 export interface Seg {
   x0: number
@@ -349,14 +349,6 @@ const cluster = (values: number[], tol: number) => {
   for (const v of sorted) if (!out.length || v - out[out.length - 1] > tol) out.push(v)
   return out
 }
-const overlap = (a0: number, a1: number, b0: number, b1: number) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0))
-// Covers more than 30 % of a box already placed (or of itself, the smaller one): the same place.
-const clashes = (taken: Position[], p: Position) =>
-  taken.some(
-    (t) =>
-      overlap(t.x, t.x + t.width, p.x, p.x + p.width) * overlap(t.y, t.y + t.height, p.y, p.y + p.height) >
-      0.3 * Math.min(t.width * t.height, p.width * p.height),
-  )
 const overlapArea = (r: Rect, c: { x0: number; y0: number; x1: number; y1: number }) =>
   overlap(r.x, r.x + r.w, c.x0, c.x1) * overlap(r.y, r.y + r.h, c.y0, c.y1)
 // Grey, from light grey to black (not white): the shading of headings and bars, never of a place to write.
@@ -1078,13 +1070,74 @@ export function splitUnderscores<T extends { str: string; transform: number[]; w
 
 export { keyFor }
 
+interface PdfPage {
+  view: number[]
+  getOperatorList(o?: { intent?: string }): Promise<{ fnArray: number[]; argsArray: unknown[] }>
+  getTextContent(): Promise<{ items: unknown[] }>
+}
 /** What detection needs from a pdf.js document (PDFDocumentProxy). */
 interface PdfDoc {
-  getPage(n: number): Promise<{
-    view: number[]
-    getOperatorList(o?: { intent?: string }): Promise<{ fnArray: number[]; argsArray: unknown[] }>
-    getTextContent(): Promise<{ items: unknown[] }>
-  }>
+  getPage(n: number): Promise<PdfPage>
+}
+type Item = { str: string; transform: number[]; width: number }
+
+/** A page as detection reads it: what it draws (with typed boxes and "____" runs) and its text without them. */
+async function readDrawing(page: PdfPage, OPS: Ops) {
+  // 'print' intent: its operator list is not the one the canvas renderer caches and rewrites.
+  const ops = await page.getOperatorList({ intent: 'print' })
+  const text = await page.getTextContent()
+  const split = splitBoxChars(text.items as Item[], page.view)
+  const typed = splitUnderscores(split.items, page.view)
+  const drawn = extractShapes(ops.fnArray, ops.argsArray as unknown[][], OPS, page.view)
+  const size = { width: page.view[2] - page.view[0], height: page.view[3] - page.view[1] }
+  return { drawn, shapes: { ...drawn, rects: [...drawn.rects, ...split.boxes] }, typed, size }
+}
+
+/**
+ * Whether a box (page fractions) sits on a page's drawing: an edge of it on a line, on a box's edge or on a table
+ * wall. `typed`: the page's "____" runs.
+ */
+function onDrawing(shapes: Shapes, typed: Seg[], size: { width: number; height: number }) {
+  // Lines as [where, from, to]; a box's edges are lines too.
+  const h = [
+    ...[...shapes.hlines, ...typed].map((l) => [l.y0, l.x0, l.x1]),
+    ...shapes.rects.flatMap((r) => [r.y, r.y + r.h].map((y) => [y, r.x, r.x + r.w])),
+  ]
+  const v = [
+    ...shapes.vlines.map((l) => [l.x0, l.y0, l.y1]),
+    ...shapes.rects.flatMap((r) => [r.x, r.x + r.w].map((x) => [x, r.y, r.y + r.h])),
+  ]
+  const near = (a: number, b: number) => Math.abs(a - b) < 4
+  return (p: Position) => {
+    const [x0, y0] = [p.x * size.width, p.y * size.height]
+    const [x1, y1] = [x0 + p.width * size.width, y0 + p.height * size.height]
+    return (
+      h.some(([y, a, b]) => (near(y, y0) || near(y, y1)) && overlap(a, b, x0, x1) > 0.5 * (x1 - x0)) ||
+      v.some(([x, a, b]) => (near(x, x0) || near(x, x1)) && overlap(a, b, y0, y1) > 0.5 * (y1 - y0))
+    )
+  }
+}
+
+/**
+ * What a save taught auto-detect (see learn.ts), or null when it taught nothing. `pdf`: the pdf.js document;
+ * `pages`: the layout's pages (`source` = the page of the PDF, null = a blank page). `OPS`: pdf.js OPS, so a page
+ * remembers which of its fields sit on its boxes and lines (a page whose boxes changed is then not taken for it).
+ * `forgotten`: what the admin told auto-detect to forget in this session (left out). useFormEditor calls it after
+ * each save (`onLesson`).
+ */
+export function lessonFor(
+  pdf: PdfDoc,
+  pages: { source: number | null }[],
+  session: EditSession,
+  { OPS, ...options }: { at?: number; OPS?: Ops; forgotten?: Forget } = {},
+) {
+  const drawing =
+    OPS &&
+    (async (source: number) => {
+      const { shapes, typed, size } = await readDrawing(await pdf.getPage(source), OPS)
+      return onDrawing(shapes, typed.rules, size)
+    })
+  return learnFrom(pdf, pages, session, { ...options, drawing })
 }
 
 /**
@@ -1092,7 +1145,9 @@ interface PdfDoc {
  * Runs page by page so the page stays responsive; `onProgress(done, total)`; stop early with `signal`.
  * New fields get ids and keys; existing fields are never duplicated.
  * `lessons`: what earlier saves taught (see learn.ts). A page set up before gets its fields back as they were
- * (confidence REMEMBERED); other suggestions get the admin's changes for their label, or are left out.
+ * (confidence REMEMBERED), with their conditions and follow-ups; other suggestions get the admin's changes for their
+ * label, or are left out, and fields the admin drew by hand next to a line in other forms are drawn there
+ * (confidence LEARNT).
  */
 export async function detectDocument(
   pdf: PdfDoc,
@@ -1104,6 +1159,8 @@ export async function detectDocument(
   lessons?: Lesson[],
 ): Promise<FieldDef[]> {
   const found: FieldDef[] = []
+  // The suggestions that learning made, for the fields made of them.
+  const from = new Map<FieldDef, Made>()
   const learned = lessons?.length
     ? await learnedFor(lessons, pdf, pages.flatMap((p) => (p.source ? [p.source] : [])), pages.length)
     : null
@@ -1114,33 +1171,31 @@ export async function detectDocument(
     if (!p.source) prevText = ''
     else {
       const page = await pdf.getPage(p.source)
-      // 'print' intent: its operator list is not the one the canvas renderer caches and rewrites.
-      const ops = await page.getOperatorList({ intent: 'print' })
-      const text = await page.getTextContent()
-      const split = splitBoxChars(text.items as { str: string; transform: number[]; width: number }[], page.view)
-      const typed = splitUnderscores(split.items, page.view)
-      const items = typed.items
-      const drawn = extractShapes(ops.fnArray, ops.argsArray as unknown[][], OPS, page.view)
-      const shapes = { ...drawn, rects: [...drawn.rects, ...split.boxes] }
-      const size = { width: page.view[2] - page.view[0], height: page.view[3] - page.view[1] }
+      const { drawn, shapes, typed, size } = await readDrawing(page, OPS)
       const all = [...existing, ...found]
       // Text on both sides of a column line is in two cells: "Tagged Role | Manager" is not one line.
-      const lines = toLines(items, page.view, undefined, drawn.vlines)
-      const remembered = learned?.remembered(p.source, i + 1)
-      const suggested: Omit<FieldDef, 'id' | 'key'>[] = []
-      if (remembered) {
+      const lines = toLines(typed.items, page.view, undefined, drawn.vlines)
+      const remembered = learned?.remembered(p.source, i + 1, onDrawing(shapes, typed.rules, size))
+      const taken = all.filter((f) => f.position.page === i + 1).map((f) => f.position)
+      const suggested: Made[] = []
+      if (remembered)
         // A page set up before: its fields as they were (overlaps among them too), where nothing is placed yet.
-        const taken = all.filter((f) => f.position.page === i + 1).map((f) => f.position)
-        suggested.push(...remembered.filter((s) => !clashes(taken, s.position)))
-      } else
+        suggested.push(...remembered.filter((s) => s.dialogOnly || !clashes(taken, s.position)))
+      else {
         for (const s of detectFields(shapes, lines, size, i + 1, all, typed.rules, prevText)) {
           const t = learned ? learned.adjust(s) : s
           if (t) suggested.push(t)
         }
+        if (learned) suggested.push(...learned.drawn(p.source, i + 1, [...taken, ...suggested.map((s) => s.position)]))
+      }
       for (const s of suggested) {
+        const { ref, why, ...field } = s
         const id =
           typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `d${Date.now()}${Math.random()}`
-        found.push({ ...s, id, key: keyFor(s.label, s.type, [...existing, ...found]), label: s.label || s.type })
+        const key = keyFor(field.label, field.type, [...existing, ...found])
+        const f = { ...field, id, key, label: field.label || field.type }
+        found.push(f)
+        if (ref || why) from.set(f, s)
       }
       // The page's last lines, bottom up: a heading under a note ("PART 1 – SUMMARY" / "(concise overview…)").
       const bottom = [...lines].sort((a, b) => b.y - a.y).slice(0, 2)
@@ -1148,5 +1203,5 @@ export async function detectDocument(
     }
     onProgress?.(i + 1, pages.length)
   }
-  return found
+  return learned ? learned.link(found, from) : found
 }
