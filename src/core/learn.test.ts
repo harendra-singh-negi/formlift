@@ -264,6 +264,50 @@ describe('fields drawn by hand', () => {
     expect((await learnedFor(lessons, fakePdf(elsewhere()), [1], 1))!.drawn(1, 1, taken)).toEqual([])
   })
 
+  it('are drawn in every form once drawn twice in one form (two pages with the same line)', async () => {
+    const twice = { ...name, id: 'm2', key: 'm2', position: { ...name.position, page: 2 } }
+    const one = (await lessonFor(fakePdf(FORM, FORM), [{ source: 1 }, { source: 2 }], session([], [name, twice])))!
+    expect(one.drawn?.map((d) => d.times)).toEqual([2])
+    expect((await learnedFor([one], fakePdf(elsewhere()), [1], 1))!.drawn(1, 1, [])).toHaveLength(1)
+    expect(learnt([one]).drawn.map((d) => [d.settings.label, d.times])).toEqual([['Inspector name', 2]])
+  })
+
+  it('take the nearer line for their label: the one right above, not one far along the row', async () => {
+    // A box under "Notes" in the right column; the left column's code is on the box's row, far away.
+    const page: Line[] = [['Notes', 320, 300], ['FL-0001-06', 50, 320]]
+    const box = { ...name, label: 'Notes', position: { page: 1, x: 320 / 600, y: 306 / 800, width: 240 / 600, height: 40 / 800 } }
+    const lesson = (await lessonFor(fakePdf(page), [{ source: 1 }], session([], [box])))!
+    expect(lesson.drawn?.[0].side).toBe('below')
+  })
+
+  it('take the line right before them on their row, then a line over them that starts where they start', async () => {
+    const sideOf = async (page: Line[], x: number, width = 150) => {
+      const box = { ...name, label: 'Answer', position: { page: 1, x: x / 600, y: 290.8 / 800, width: width / 600, height: 12 / 800 } }
+      return (await lessonFor(fakePdf(page), [{ source: 1 }], session([], [box])))!.drawn?.map((d) => d.side)
+    }
+    // "To:" right before the field wins over a column header right above it.
+    expect(await sideOf([['Date', 70, 284], ['To:', 50, 300]], 70)).toEqual(['right'])
+    // An answer at the far end of a question's row, with another column's header above it but not over its start:
+    // the question names it.
+    expect(await sideOf([['Remarks', 450, 284], ['1.2 Is the alarm working', 50, 300]], 400)).toEqual(['right'])
+    // A header over its start, with only a far line on its row: the header names it.
+    expect(await sideOf([['Remarks', 400, 284], ['1.2 Is the alarm working', 50, 300]], 400)).toEqual(['below'])
+  })
+
+  it('may cover as much text as where they were drawn (a code printed in their box)', async () => {
+    const page = (n: number): Line[] => [['Remarks', 50, 300], [`FL-000${n}-12`, 52, 350]]
+    const box = { ...name, label: 'Remarks', position: { page: 1, x: 50 / 600, y: 312 / 800, width: 300 / 600, height: 50 / 800 } }
+    const two = [
+      (await lessonFor(fakePdf(page(1)), [{ source: 1 }], session([], [box], [], 'a'), { at: 1 }))!,
+      (await lessonFor(fakePdf(page(2)), [{ source: 1 }], session([], [box], [], 'b'), { at: 2 }))!,
+    ]
+    expect(two[0].drawn?.[0].covers).toBe(1)
+    expect((await learnedFor(two, fakePdf(page(3)), [1], 1))!.drawn(1, 1, [])).toHaveLength(1)
+    // More text there than that: something else is written in that place.
+    const more: Line[] = [...page(3), ['Defects found on the site', 60, 330]]
+    expect((await learnedFor(two, fakePdf(more), [1], 1))!.drawn(1, 1, [])).toEqual([])
+  })
+
   it('are named after their line when the admin did not name them', async () => {
     const plain = { ...name, label: 'Text' }
     const lessons = [await teach('a', 1, plain), await teach('b', 2, plain)]
@@ -317,6 +361,18 @@ describe('label lessons', () => {
     const b = field('b', 'Remarks', 'textarea', 0.1, 0.6)
     const lesson = await lessonOf(session([a, b], [{ ...a, type: 'textarea' }, b]))
     expect(lesson.labels[0].change).toEqual({ type: 'textarea' })
+  })
+
+  it('learns from the pages the admin changed: a page left as it was may not have been looked at', async () => {
+    // A long form: the admin renamed "Remarks" on page 1, and has not got to page 2 yet.
+    const one = field('a', 'Remarks', 'text', 0.1, 0.5)
+    const two = { ...field('b', 'Remarks', 'text', 0.1, 0.5), position: { ...one.position, page: 2 } }
+    const lesson = await lessonOf(session([one, two], [{ ...one, label: 'Comments' }, two]))
+    expect(lesson.labels[0].change).toEqual({ label: 'Comments' })
+    // Page 2 changed too, with "Remarks" kept there: the admin set it up in two ways, so nothing is learnt.
+    const other = { ...field('c', 'Other', 'text', 0.1, 0.7), position: { ...one.position, page: 2, y: 0.7 } }
+    const both = await lessonOf(session([one, two, other], [{ ...one, label: 'Comments' }, two]))
+    expect(both.labels.find((n) => n.label === 'Remarks')?.change).toBeUndefined()
   })
 
   it('learns nothing from a label the admin set up in two ways', async () => {

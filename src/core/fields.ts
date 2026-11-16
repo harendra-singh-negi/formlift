@@ -43,6 +43,8 @@ export function keyFor(label: string, type: FieldType, fields: { key: string }[]
 }
 
 type Cond = FieldDef['visibleWhen']
+const uses = (c: Cond, key: string): boolean =>
+  !!c && c.rules.some((r) => ('rules' in r ? uses(r, key) : r.fieldKey === key))
 const renameIn = (c: Cond, from: string, to: string): Cond =>
   c && {
     ...c,
@@ -65,10 +67,14 @@ export function withField(fields: FieldDef[], f: FieldDef): FieldDef[] {
       : keyFor(f.label, f.type, others)
   const next = { ...f, key }
   if (key === old.key) return fields.map((x) => (x.id === f.id ? next : x))
+  const conds = ['visibleWhen', 'requiredWhen', 'readOnlyWhen'] as const
   return fields.map((x) => {
+    // A field that does not use the old key stays the same object (a long form's thousands of fields do not change).
+    const usesOld =
+      conds.some((k) => uses(x[k], old.key)) || uses(x.followUp?.when, old.key) || x.followUp?.fields.includes(old.key)
+    if (x.id !== f.id && !usesOld) return x
     const y = { ...(x.id === f.id ? next : x) }
-    for (const k of ['visibleWhen', 'requiredWhen', 'readOnlyWhen'] as const)
-      if (y[k]) y[k] = renameIn(y[k], old.key, key)
+    for (const k of conds) if (y[k]) y[k] = renameIn(y[k], old.key, key)
     if (y.followUp)
       y.followUp = {
         ...y.followUp,
@@ -144,4 +150,25 @@ export function reorder(fields: FieldDef[], id: string, step: -1 | 1) {
   const out = [...fields]
   ;[out[i], out[j]] = [out[j], out[i]]
   return out
+}
+
+/**
+ * A new detection in place of `untouched` suggestions (the admin has not changed them): `fresh`, the suggestions
+ * to add, and `gone`, the untouched ones to remove. One made again as it was (its confidence aside) stays as it is,
+ * id and key too. An untouched one on a page detection did not reach (`reached`: pages done) stays.
+ */
+export function refreshed(untouched: FieldDef[], found: FieldDef[], reached: number) {
+  // Its settings and box (to 0.0001 of the page: a page set up before keeps boxes so).
+  const r4 = (n: number) => Math.round(n * 1e4) / 1e4
+  const asIs = ({ position: p, ...f }: FieldDef) =>
+    JSON.stringify({ ...f, id: '', key: '', confidence: 0, at: [p.page, r4(p.x), r4(p.y), r4(p.width), r4(p.height)] })
+  const twins = new Map<string, FieldDef[]>()
+  for (const f of untouched) twins.set(asIs(f), [...(twins.get(asIs(f)) ?? []), f])
+  const fresh: FieldDef[] = []
+  for (const f of found) {
+    const twin = twins.get(asIs(f))?.pop() // taken off the list: it stays
+    if (!twin) fresh.push(f)
+  }
+  const gone = new Set([...twins.values()].flat().filter((f) => f.position.page <= reached))
+  return { fresh, gone }
 }

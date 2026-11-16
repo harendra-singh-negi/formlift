@@ -8,7 +8,7 @@
 //     is known by where its ink is; a page whose boxes and lines changed is not taken for the one set up before;
 //   - applies what the admin changed about a suggestion (type, label, options, required…) to every suggestion with
 //     the same label, in any form, and leaves out a suggestion the admin deleted in the last two forms that had it;
-//   - draws a field next to a line of text where the admin drew one by hand in two forms.
+//   - draws a field next to a line of text where the admin drew one by hand twice (in one form or in two).
 // The editor shows what was learnt, and the admin can forget any of it: a lesson that says what to forget.
 // Pages are known again by the lines only they have in their document, kept as hashes: a lesson holds no page text.
 
@@ -75,7 +75,7 @@ export interface LabelNote {
   change?: SettingsChange
 }
 
-/** A field the admin drew by hand next to a line of text. Drawn in two forms, it is suggested in every form. */
+/** A field the admin drew by hand next to a line of text. Drawn twice, it is suggested in every form. */
 export interface DrawnNote {
   /** The line: a hash of its text. */
   line: string
@@ -84,6 +84,10 @@ export interface DrawnNote {
   /** Points: from the line's end (right) or from its start and bottom (below); then the field's width and height. */
   box: [dx: number, dy: number, width: number, height: number]
   settings: FieldSettings
+  /** How many times the session drew it there (once when left out). */
+  times?: number
+  /** Lines of text the field covered (a code printed in its box): as many may be inside it in other forms. */
+  covers?: number
 }
 
 /** A field of a page set up before. */
@@ -165,8 +169,9 @@ const MIN_OWN = 3
 const SAME_PAGE = 0.8
 const SAMPLE = 24
 const MAX_MARKS = 5000
-// A field drawn by hand next to the same line in this many forms is drawn there in every form.
-const DRAWN_FORMS = 2
+// A field drawn by hand next to the same line this many times (on pages of one form or in several) is drawn there
+// in every form.
+const DRAWN_TIMES = 2
 // A page's picture: GRID × GRID cells, at least INK_MIN of them inked. Pictures this alike (Dice) are one page: a
 // copy of the same scan is 1, another screen of the same app 0.93.
 const GRID = 32
@@ -362,8 +367,12 @@ function overlapShare(a: Position, b: Position) {
   return inter / (area(a) + area(b) - inter)
 }
 
-/** What the admin did with the suggestions of each label; and the fields drawn in place of a deleted suggestion. */
-function notesOf({ before, suggested, saved }: EditSession) {
+/**
+ * What the admin did with the suggestions of each label; and the fields drawn in place of a deleted suggestion.
+ * Settings are learnt from the pages the admin changed (`touched`): a page left as it was may not have been looked
+ * at yet (a long form set up page by page), so its suggestions do not count against a change.
+ */
+function notesOf({ before, suggested, saved }: EditSession, touched: Set<number>) {
   const byId = new Map(saved.map((f) => [f.id, f]))
   const used = new Set<FieldDef>()
   // Every suggestion deleted, and many of them: the admin started again, which says nothing about each one.
@@ -395,11 +404,13 @@ function notesOf({ before, suggested, saved }: EditSession) {
   const notes: LabelNote[] = []
   const kept: string[] = []
   for (const [key, l] of labels) {
-    // A setting is learnt when the admin left every kept one with the same value and some had another before.
+    // A setting is learnt when the admin left every kept one on the pages they changed with the same value, and
+    // some had another before.
     const change: Record<string, unknown> = {}
+    const reviewed = l.kept.filter(([s]) => touched.has(s.position.page))
     for (const k of SETTINGS) {
-      const to = l.kept.map(([, f]) => f[k] ?? null)
-      if (to.every((v) => same(v, to[0])) && l.kept.some(([s]) => !same(s[k], to[0]))) change[k] = to[0]
+      const to = reviewed.map(([, f]) => f[k] ?? null)
+      if (to.length && to.every((v) => same(v, to[0])) && reviewed.some(([s]) => !same(s[k], to[0]))) change[k] = to[0]
     }
     const n = l.kept.length + l.byHand
     // Kept as suggested: only a vote, kept as the label's hash.
@@ -431,6 +442,13 @@ function renamed(c: Condition, to: (key: string) => string | undefined): Conditi
     rules.push(x)
   }
   return { ...c, rules }
+}
+
+/** The pages (of the layout) whose fields the admin changed in a session. */
+function touchedPages({ before, suggested, saved }: EditSession) {
+  const given = [...before, ...suggested]
+  const pages = new Set([...given, ...saved].map((f) => f.position.page))
+  return new Set([...pages].filter((p) => pageState(given, p) !== pageState(saved, p)))
 }
 
 // A page's fields as the admin sees them (not ids: those change by themselves).
@@ -559,27 +577,43 @@ async function drawnOf(
           b[2] <= x0 + 2 && x0 - b[2] <= W / 2 && overlap(b[1], b[3], y0, y1) >= 0.5 * Math.min(b[3] - b[1], y1 - y0),
       )
       .sort((a, b) => b.b[2] - a.b[2])[0]
+    // A label over a field starts where the field starts.
     const above = boxes
-      .filter(({ b }) => b[3] <= y0 + 2 && y0 - b[3] <= 3 * (b[3] - b[1]) && overlap(b[0], b[2], x0, x1) > 0)
+      .filter(({ b }) => b[3] <= y0 + 2 && y0 - b[3] <= 3 * (b[3] - b[1]) && Math.abs(b[0] - x0) <= 15)
       .sort((a, b) => b.b[3] - a.b[3])[0]
-    const at = row ?? above
-    if (!at || at.l.text.trim().length > 80 || !/\p{L}/u.test(at.l.text) || out.has(at.l.h)) continue
+    // Its label: the line right before it on its row, else the one over it, else a line further along its row (a
+    // question with its answer at the far end; but not another column's line when the field has one over it).
+    const close = row && x0 - row.b[2] <= 3 * (row.b[3] - row.b[1])
+    const at = close ? row : (above ?? row)
+    if (!at || at.l.text.trim().length > 80 || !/\p{L}/u.test(at.l.text)) continue
+    const side = at === row ? 'right' : 'below'
     const [lx0, ly0, lx1, ly1] = at.b
     // Another field between the line and this one: the line names that one.
     const between = s.saved
       .filter((f) => f !== d && f.position.page === d.position.page && !f.dialogOnly)
       .map((f) => pts(f.position))
       .some((o) =>
-        row
+        side === 'right'
           ? o[0] >= lx1 - 2 && o[2] <= x0 + 2 && overlap(o[1], o[3], y0, y1) > 0
           : o[1] >= ly1 - 2 && o[3] <= y0 + 2 && overlap(o[0], o[2], x0, x1) > 0,
       )
     if (between) continue
+    // Drawn next to this line before in this session (another page of the form): once more.
+    const again = out.get(at.l.h)
+    if (again) {
+      again.times = (again.times ?? 1) + 1
+      continue
+    }
+    const covers = boxes.filter(({ l, b }) => {
+      const [cx, cy] = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]
+      return l !== at.l && cx > x0 && cx < x1 && cy > y0 && cy < y1
+    }).length
     out.set(at.l.h, {
       line: at.l.h,
-      side: row ? 'right' : 'below',
-      box: [r1(row ? x0 - lx1 : x0 - lx0), r1(row ? y0 - ly0 : y0 - ly1), r1(x1 - x0), r1(y1 - y0)],
+      side,
+      box: [r1(side === 'right' ? x0 - lx1 : x0 - lx0), r1(side === 'right' ? y0 - ly0 : y0 - ly1), r1(x1 - x0), r1(y1 - y0)],
       settings: settingsOf(d),
+      ...(covers > 0 && { covers }),
     })
   }
   return [...out.values()]
@@ -597,7 +631,7 @@ export async function lessonFor(
   session: EditSession,
   { at = Date.now(), drawing, forgotten }: { at?: number; drawing?: Drawing; forgotten?: Forget } = {},
 ): Promise<Lesson | null> {
-  const { notes, kept, used } = notesOf(session)
+  const { notes, kept, used } = notesOf(session, touchedPages(session))
   const memory = await memoryOf(pdf, pages, session, drawing)
   const forgot = new Set([...(forgotten?.labels ?? []), ...(forgotten?.drawn ?? [])])
   const labels = notes.filter((n) => !forgot.has(labelHash(n.label)))
@@ -711,6 +745,8 @@ export function validateLesson(lesson: unknown, limits?: Partial<Limits>): strin
           !d ||
           !isHash(d.line) ||
           (d.side !== 'right' && d.side !== 'below') ||
+          (d.times != null && !(Number.isInteger(d.times) && d.times >= 1 && d.times <= 100_000)) ||
+          (d.covers != null && !(Number.isInteger(d.covers) && d.covers >= 0 && d.covers <= 1000)) ||
           !box4(d.box, 10_000) ||
           !okSettings(d.settings, false) ||
           validateFields([asField(d.settings, 'x')], 1, limits).length
@@ -812,6 +848,9 @@ export function validateLesson(lesson: unknown, limits?: Partial<Limits>): strin
   return errors
 }
 
+/** How many times the admin drew a field next to a line, over its notes. */
+const timesOf = (notes: { note: DrawnNote }[]) => notes.reduce((n, { note }) => n + (note.times ?? 1), 0)
+
 /** Adds `v` to the list of `k`. */
 function add<K, V>(map: Map<K, V[]>, k: K, v: V) {
   const list = map.get(k)
@@ -909,7 +948,7 @@ export async function learnedFor(lessons: Lesson[] | undefined, pdf: TextPdf, so
   const valid = (lessons ?? []).filter((l) => !validateLesson(l, unlimited).length)
   if (!valid.length) return null
   const { votes, drawn: drawnNotes, memories } = knowledge(valid)
-  const drawnHere = new Map([...drawnNotes].filter(([, n]) => n.length >= DRAWN_FORMS))
+  const drawnHere = new Map([...drawnNotes].filter(([, n]) => timesOf(n) >= DRAWN_TIMES))
   const index = new Map<string, number[]>()
   for (const [i, x] of memories.entries()) for (const [h] of x.m.text) add(index, h, i)
   const texts = memories.length || drawnHere.size ? await textOf(pdf, sources) : new Map<number, PageText>()
@@ -1023,26 +1062,27 @@ export async function learnedFor(lessons: Lesson[] | undefined, pdf: TextPdf, so
       for (const l of lines) {
         const notes = drawnHere.get(l.h)
         if (!notes) continue
-        const { side, box, settings } = notes[notes.length - 1].note
+        const { side, box, settings, covers = 0 } = notes[notes.length - 1].note
         const [dx, dy, w, h] = box
         const x = side === 'right' ? (l.x + l.w) * W + dx : l.x * W + dx
         const y = side === 'right' ? l.y * H + dy : (l.y + l.ht) * H + dy
-        // As wide as there is room for: up to the next text on its row, or the page's edge.
+        // As wide as there is room for: up to the next text on its row, or the page's edge. (Text at its start, like
+        // a code printed in its box, is counted below instead.)
         const room =
           Math.min(
             W,
             ...lines
-              .filter((o) => o !== l && o.x * W > x - 2 && overlap(o.y * H, (o.y + o.ht) * H, y, y + h) > 0)
+              .filter((o) => o !== l && o.x * W > x + 0.4 * w && overlap(o.y * H, (o.y + o.ht) * H, y, y + h) > 0)
               .map((o) => o.x * W - 3),
           ) - x
         const width = Math.min(w, room)
         if (width < Math.max(10, 0.4 * w) || x < 0 || y < 0 || y + h > H) continue
-        // Text inside it: this form uses that place for something else.
+        // More text inside it than where it was drawn: this form uses that place for something else.
         const inside = (o: Line) => {
           const [cx, cy] = [(o.x + o.w / 2) * W, (o.y + o.ht / 2) * H]
           return cx > x && cx < x + width && cy > y && cy < y + h
         }
-        if (lines.some((o) => o !== l && inside(o))) continue
+        if (lines.filter((o) => o !== l && inside(o)).length > covers) continue
         const position = fitInPage({ page, x: x / W, y: y / H, width: width / W, height: h / H })
         if (clashes(taken, position)) continue
         // Named by the admin, or after its line.
@@ -1097,8 +1137,8 @@ export async function learnedFor(lessons: Lesson[] | undefined, pdf: TextPdf, so
 export interface Learnt {
   /** Labels auto-detect changes or leaves out, newest first. `hash`: what `forget.labels` takes. */
   labels: { label: string; hash: string; drop: boolean; change: SettingsChange; at: number }[]
-  /** Fields it draws next to a line (drawn there by hand in `forms` forms), newest first. */
-  drawn: { line: string; settings: FieldSettings; forms: number; at: number }[]
+  /** Fields it draws next to a line (drawn there by hand `times` times), newest first. */
+  drawn: { line: string; settings: FieldSettings; times: number; at: number }[]
   /** Pages it puts back as they were set up (a page saved in several sessions counts once). */
   pages: number
 }
@@ -1119,8 +1159,8 @@ export function learnt(lessons: Lesson[] | undefined): Learnt {
     .sort((a, b) => b.at - a.at)
   const fields = [...drawn]
     .flatMap(([line, ns]) =>
-      ns.length >= DRAWN_FORMS
-        ? [{ line, settings: ns[ns.length - 1].note.settings, forms: ns.length, at: ns[ns.length - 1].at }]
+      timesOf(ns) >= DRAWN_TIMES
+        ? [{ line, settings: ns[ns.length - 1].note.settings, times: timesOf(ns), at: ns[ns.length - 1].at }]
         : [],
     )
     .sort((a, b) => b.at - a.at)
