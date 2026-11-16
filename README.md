@@ -83,7 +83,7 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 
 | | |
 | --- | --- |
-| 🔍 **Auto-detect** | Answer lines, checkboxes, typed blanks and table cells come from the PDF's own vector drawing. Sizes are measured relative to the text, so it works at any font size, scale or orientation. |
+| 🔍 **Auto-detect** | A fillable PDF (made in Acrobat, Word…) gives its own fields as they are: place, type, options, required, max length, named by the text beside them. On other pages, answer lines, checkboxes, typed blanks and table cells come from the PDF's own vector drawing. Sizes are measured relative to the text, so it works at any font size, scale or orientation. |
 | 🧠 **Learns from your corrections** | Each save teaches auto-detect. A page you set up comes back the way you saved it, conditions included (in the next revision of the form, in any form that has the same page, even a scanned one). What you change about a label applies to that label in every form, and a field you draw by hand next to the same text twice is drawn there in every form. The editor shows what it learnt, and anything can be forgotten. No AI service: the lessons are plain JSON that you store. [How it works](#auto-detect-that-learns) |
 | 🧱 **Builder** | 20 field types (text, date & time, currency, multi-select, checklist, rating, slider, toggle, signature, file…), drag/resize/snap-to-grid, undo/redo, keyboard shortcuts, fill order, page reorder/insert/delete |
 | ✏️ **Layout editing** | Add text, boxes and lines, or click any line of the original text to replace it, all without touching the file |
@@ -91,7 +91,7 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 | ☑️ **Groups, follow-ups, comments** | Boxes that allow exactly one or several ticks, follow-up dialogs ("No" → ask why), 💬 comments per field, and an `onFieldChange` hook for your own logic. [Guide](#guide-groups-follow-ups-comments-and-your-own-logic) |
 | ✅ **Validation** | Required, length, min/max, regex, email, phone, date and options. The **same code** runs in the browser and on your server. |
 | 📱 **Filler** | Fields stay pinned to the page at every zoom. The list view is the whole PDF reflowed for any screen (its text with bold, colours and highlights, its tables, its pictures) with the answers in place, plus search and filters. Includes autosave, signatures and file uploads. |
-| 📄 **Completed PDF** | Answers, signature images and embedded attachments in a new PDF. Runs in Node, Bun, Deno, workers or the browser. |
+| 📄 **Completed PDF** | Answers, signature images and embedded attachments in a new PDF. A fillable original's own fields are printed as they look and removed, so no empty field covers an answer. Runs in Node, Bun, Deno, workers or the browser. |
 | 🎨 **Isolated styling** | All CSS is scoped to `.fl-root` with no global reset, so it never clashes with your app (Tailwind included). Theme it with CSS variables. |
 | 🧩 **Headless core** | Zero-dependency core you can use with any framework, or with none |
 | 🟦 **TypeScript** | Written in TypeScript. Ships ESM, CommonJS and full type definitions. |
@@ -1003,6 +1003,8 @@ Nothing breaks. Check these:
 
 | What | Who | What to do |
 | --- | --- | --- |
+| Fillable PDFs | – | Auto-detect now takes a page's own fillable fields as they are (radio buttons become a group of boxes where one can be ticked), and does not guess from the drawing on that page. Pages without fillable fields are detected as before. |
+| Completed PDF of a fillable original | – | The original's own fields are now printed as they look and removed from the completed PDF (before, they stayed in it empty, on top of the answers). The completed PDF is no longer fillable in Acrobat. |
 | Auto-detect learns from corrections | – | New, opt-in: store what `onLesson` gives you and pass it all back as `lessons`. See [Auto-detect that learns](#auto-detect-that-learns). Without `lessons`, detection suggests exactly what it did before. |
 | Learnt tab | apps that set `onLesson` | A new tab in the editor's panel shows what auto-detect learnt and forgets it. `hide={['learntTab']}` leaves it out. |
 | Auto-detect again | – | It now also remakes the suggestions of the same editing session that the admin has not touched, with what auto-detect learnt meanwhile (before, it only added fields where nothing was placed). Fields the admin changed, and fields of a saved form, stay as they are. |
