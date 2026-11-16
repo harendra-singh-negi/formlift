@@ -136,8 +136,8 @@ export const DEFAULT_LABELS = {
 
   // Editor messages (notify)
   saved: 'Saved',
-  fieldsSuggested: (n: number, stoppedEarly: boolean) =>
-    `${n} fields suggested${stoppedEarly ? ' (stopped early)' : ''}. Check the dashed ones, then Save.`,
+  fieldsSuggested: (n: number, stoppedEarly: boolean, remembered = 0) =>
+    `${n} fields suggested${remembered ? ` (${remembered} from pages set up before)` : ''}${stoppedEarly ? ' (stopped early)' : ''}. Check the dashed ones, then Save.`,
   noFieldsFoundAuto: 'No fields found automatically. Drag them in from the left.',
   noNewFieldsFound: 'No new fields found',
 
@@ -155,6 +155,7 @@ export const DEFAULT_LABELS = {
   fieldSection: 'Field',
   suggestedAutomatically: (sure: number | null) =>
     `Suggested automatically${sure != null ? ` (${sure}% sure)` : ''}. Check it.`,
+  rememberedField: 'Set up like this on the same page before. Check it.',
   fieldId: (id: string) => `ID ${id}`,
   label: 'Label',
   keyAutomatic: 'Key (automatic, from the label)',

@@ -17,7 +17,7 @@ const SIZES: Partial<Record<FieldType, [number, number]>> = {
   toggle: [0.06, 0.025],
 }
 
-const newId = () =>
+export const newId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `f${Date.now()}${Math.random()}`
 
 /** A key not used yet: text_1, text_2… */

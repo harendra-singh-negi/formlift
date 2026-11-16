@@ -6,10 +6,11 @@
 // Everything here works in PDF points with the origin at the page's top left; results are page fractions.
 // Suggestions get source 'ai' + a confidence, so the editor shows them as dashed boxes for the admin to check.
 
-import type { FieldDef, FieldType } from './form-logic'
+import type { FieldDef, FieldType, Position } from './form-logic'
 import { fitInPage } from './coords'
 import { keyFor } from './fields'
 import { toLines, type TextLine } from './layout'
+import { learnedFor, type Lesson } from './learn'
 
 export interface Seg {
   x0: number
@@ -349,6 +350,13 @@ const cluster = (values: number[], tol: number) => {
   return out
 }
 const overlap = (a0: number, a1: number, b0: number, b1: number) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0))
+// Covers more than 30 % of a box already placed (or of itself, the smaller one): the same place.
+const clashes = (taken: Position[], p: Position) =>
+  taken.some(
+    (t) =>
+      overlap(t.x, t.x + t.width, p.x, p.x + p.width) * overlap(t.y, t.y + t.height, p.y, p.y + p.height) >
+      0.3 * Math.min(t.width * t.height, p.width * p.height),
+  )
 const overlapArea = (r: Rect, c: { x0: number; y0: number; x1: number; y1: number }) =>
   overlap(r.x, r.x + r.w, c.x0, c.x1) * overlap(r.y, r.y + r.h, c.y0, c.y1)
 // Grey, from light grey to black (not white): the shading of headings and bars, never of a place to write.
@@ -1017,13 +1025,7 @@ export function detectFields(
   for (const s of out) {
     if (s.w < 4 || s.h < 4) continue
     const position = fitInPage({ page, x: s.x / W, y: s.y / H, width: s.w / W, height: s.h / H })
-    const clash = taken.some((p) => {
-      const inter =
-        overlap(p.x, p.x + p.width, position.x, position.x + position.width) *
-        overlap(p.y, p.y + p.height, position.y, position.y + position.height)
-      return inter > 0.3 * Math.min(p.width * p.height, position.width * position.height)
-    })
-    if (clash) continue
+    if (clashes(taken, position)) continue
     taken.push(position)
     result.push({ type: s.type, label: s.label, source: 'ai', confidence: s.confidence, position })
   }
@@ -1089,6 +1091,8 @@ interface PdfDoc {
  * Suggested fields for every page of a layout (original pages only; blank pages have nothing to detect).
  * Runs page by page so the page stays responsive; `onProgress(done, total)`; stop early with `signal`.
  * New fields get ids and keys; existing fields are never duplicated.
+ * `lessons`: what earlier saves taught (see learn.ts). A page set up before gets its fields back as they were
+ * (confidence REMEMBERED); other suggestions get the admin's changes for their label, or are left out.
  */
 export async function detectDocument(
   pdf: PdfDoc,
@@ -1097,8 +1101,12 @@ export async function detectDocument(
   existing: FieldDef[],
   onProgress?: (done: number, total: number) => void,
   signal?: AbortSignal,
+  lessons?: Lesson[],
 ): Promise<FieldDef[]> {
   const found: FieldDef[] = []
+  const learned = lessons?.length
+    ? await learnedFor(lessons, pdf, pages.flatMap((p) => (p.source ? [p.source] : [])), pages.length)
+    : null
   let prevText = ''
   for (let i = 0; i < pages.length; i++) {
     if (signal?.aborted) break
@@ -1118,7 +1126,18 @@ export async function detectDocument(
       const all = [...existing, ...found]
       // Text on both sides of a column line is in two cells: "Tagged Rank | Master" is not one line.
       const lines = toLines(items, page.view, undefined, drawn.vlines)
-      for (const s of detectFields(shapes, lines, size, i + 1, all, typed.rules, prevText)) {
+      const remembered = learned?.remembered(p.source, i + 1)
+      const suggested: Omit<FieldDef, 'id' | 'key'>[] = []
+      if (remembered) {
+        // A page set up before: its fields as they were (overlaps among them too), where nothing is placed yet.
+        const taken = all.filter((f) => f.position.page === i + 1).map((f) => f.position)
+        suggested.push(...remembered.filter((s) => !clashes(taken, s.position)))
+      } else
+        for (const s of detectFields(shapes, lines, size, i + 1, all, typed.rules, prevText)) {
+          const t = learned ? learned.adjust(s) : s
+          if (t) suggested.push(t)
+        }
+      for (const s of suggested) {
         const id =
           typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `d${Date.now()}${Math.random()}`
         found.push({ ...s, id, key: keyFor(s.label, s.type, [...existing, ...found]), label: s.label || s.type })

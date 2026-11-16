@@ -37,7 +37,8 @@ reports. Rebuilding each one in a form tool takes days and loses the original la
 
 1. **Upload** a PDF. formlift reads the page drawing and **suggests fields** for dotted lines, underlines,
    checkboxes, `____` blanks and empty table cells.
-2. **Adjust** them in the builder: rename, retype, move, add rules and conditions.
+2. **Adjust** them in the builder: rename, retype, move, add rules and conditions. formlift
+   [learns from what you save](#auto-detect-that-learns), so the next form needs fewer changes.
 3. **Publish.** People fill the form on the original page, on desktop or phone.
 4. **Export** a completed PDF with the answers, signatures and attachments.
 
@@ -82,6 +83,7 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 | | |
 | --- | --- |
 | 🔍 **Auto-detect** | Answer lines, checkboxes, typed blanks and table cells come from the PDF's own vector drawing. Sizes are measured relative to the text, so it works at any font size, scale or orientation. |
+| 🧠 **Learns from your corrections** | Each save teaches auto-detect. A page you set up comes back the way you saved it (in the next revision of the form, or in any form that has the same page), and what you change about a label applies to that label in every form. No AI service: the lessons are plain JSON that you store. [How it works](#auto-detect-that-learns) |
 | 🧱 **Builder** | 20 field types (text, date & time, currency, multi-select, checklist, rating, slider, toggle, signature, file…), drag/resize/snap-to-grid, undo/redo, keyboard shortcuts, fill order, page reorder/insert/delete |
 | ✏️ **Layout editing** | Add text, boxes and lines, or click any line of the original text to replace it, all without touching the file |
 | 🔀 **Conditional logic** | `visibleWhen` / `requiredWhen` / `readOnlyWhen` with nested AND/OR groups and 10 operators. Circular rules are rejected. |
@@ -385,6 +387,178 @@ always counted, so give them `visibleWhen` if they apply only sometimes.
 **Angular / Vue / plain JS:** `onFieldChange`, comments and everything above work the same through
 `mountFiller(el, { ... })`. `renderFieldExtras` is React-only.
 
+## Auto-detect that learns
+
+Auto-detect finds fields in the PDF's drawing. Every time an admin saves, formlift also writes down what they
+changed: a **lesson**. Pass the lessons back to the editor and the next detection starts from what your admins
+already did, so every form needs fewer corrections than the one before. Use it as much as you can. It gets better
+with every form you save.
+
+There is no AI service, and nothing is sent anywhere. A lesson is plain JSON that **your app** stores, the same
+way it stores the forms. Keep one set of lessons for the whole organisation, and every admin's work helps all the
+others.
+
+### What it learns
+
+| When the admin… | the next detection… |
+| --- | --- |
+| sets up a page: deletes, adds, moves, renames or retypes fields, groups boxes | **puts that page back the way it was saved.** This happens in the next revision of the form, and in any other form that has the same page (a cover page, say). Each field moves with the line of text next to it, so it still fits when the text has moved. |
+| changes the settings of a suggestion: type, label, options, required, placeholder, help text, rules… | **gives every suggestion with that label the same settings, in every form.** An "IMO number" changed to a Number once comes as a Number from then on. |
+| deletes a suggestion in two forms in a row | **stops suggesting that label**, until an admin keeps it in a form again or adds a field with that label by hand. |
+
+A field put back from a page set up before says so in its properties. After auto-detect, the editor also says how
+many fields came from pages set up before.
+
+- **How a page is recognised:** by the lines of text that appear only on that page of its document. Mostly the
+  same text must be in the same place. A text that moved as a block still counts, a different layout does not.
+  Pages with hardly any text of their own (scans, photo pages) are not remembered, and neither are pages saved
+  without fields: they keep getting suggestions.
+- **Not learnt:** conditions and follow-up questions, because they point at other fields of one form. A setting
+  that the admin set differently on suggestions with the same label in one form is not learnt either. A field
+  that the admin adds by hand comes back on the same page only. On a new form, finding it is up to the detection
+  rules.
+- **What a lesson stores:** hashes of the page's lines, the labels of the suggestions, and the fields as the admin
+  saved them. It stores no answers and no other text from the page.
+
+### Turn it on
+
+Two props. `onLesson` receives a lesson after each save that taught something. `lessons` is all the lessons you
+have stored:
+
+```tsx
+<FormEditor
+  pdf={pdfUrl}
+  onSave={saveForm}
+  lessons={lessons}                              // every lesson you stored: all forms, all admins
+  onLesson={(lesson) => api.saveLesson(lesson)}  // store it, replacing the one with the same id
+/>
+```
+
+- **Store each lesson by its `id`.** Each editing session has one id. When the same session saves again, it sends
+  a lesson with the same id that covers everything the session did, and that lesson replaces the old one.
+  `addLesson(lessons, lesson)` does this for an array.
+- **Load the lessons before the editor opens.** Auto-detect runs as soon as the PDF is open.
+- **Angular / Vue / plain JS:** the same two options, in `mountEditor(el, { lessons, onLesson })`. A custom editor
+  on `useFormEditor` takes the same two options. Without the editor, `lessonFor(pdf, pages, session)` makes a
+  lesson and `detectDocument(…, lessons)` uses lessons.
+
+### Where to keep lessons
+
+The more forms feed into the same lessons, the better detection gets. So keep **one shared set on your server**.
+
+**1. Your API and database (recommended).** One row per lesson:
+
+```sql
+CREATE TABLE formlift_lessons (
+  id         VARCHAR(100) PRIMARY KEY,
+  lesson     JSON NOT NULL,                       -- JSONB in PostgreSQL
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+```ts
+import express from 'express'
+import { validateLesson } from 'formlift'
+
+const app = express().use(express.json({ limit: '5mb' })) // a lesson for a 300-page form is under 1 MB
+
+// Every lesson, for the editor
+app.get('/api/formlift/lessons', async (req, res) => {
+  const { rows } = await db.query('SELECT lesson FROM formlift_lessons ORDER BY updated_at')
+  res.json(rows.map((r) => r.lesson))
+})
+
+// One lesson from onLesson: check it, then add it or replace the one with its id
+app.put('/api/formlift/lessons/:id', requireAdmin, async (req, res) => {
+  const problems = validateLesson(req.body)
+  if (problems.length || req.body.id !== req.params.id) return res.status(400).json({ problems })
+  await db.query(
+    `INSERT INTO formlift_lessons (id, lesson) VALUES ($1, $2)
+     ON CONFLICT (id) DO UPDATE SET lesson = $2, updated_at = CURRENT_TIMESTAMP`,
+    [req.params.id, req.body],
+  )
+  res.sendStatus(204)
+})
+```
+
+```tsx
+import { addLesson, type Lesson } from 'formlift'
+
+const [lessons, setLessons] = useState<Lesson[] | null>(null)
+useEffect(() => void api.get('/api/formlift/lessons').then(setLessons), [])
+
+// the editor opens once the lessons are in
+{lessons && (
+  <FormEditor
+    pdf={pdfUrl}
+    onSave={saveForm}
+    lessons={lessons}
+    onLesson={async (lesson) => {
+      await api.put(`/api/formlift/lessons/${lesson.id}`, lesson)
+      setLessons((all) => addLesson(all ?? [], lesson))
+    }}
+  />
+)}
+```
+
+**2. A JSON file on your server (no database).** One file holds every lesson. The browser code stays the same as
+above. On the server, write one lesson at a time, so that two admins who save together don't overwrite each
+other's lessons. Write to a temporary file first, so that a crash never leaves half a file:
+
+```ts
+import fs from 'node:fs/promises'
+import { addLesson, validateLesson, type Lesson } from 'formlift'
+
+const FILE = '/var/lib/your-app/formlift-lessons.json' // outside the web root, included in your backups
+const readAll = async (): Promise<Lesson[]> => JSON.parse(await fs.readFile(FILE, 'utf8').catch(() => '[]'))
+let writing = Promise.resolve()
+
+app.get('/api/formlift/lessons', async (req, res) => res.json(await readAll()))
+
+app.put('/api/formlift/lessons/:id', requireAdmin, (req, res) => {
+  const problems = validateLesson(req.body)
+  if (problems.length || req.body.id !== req.params.id) return res.status(400).json({ problems })
+  const done = writing.then(async () => {
+    const all = addLesson(await readAll(), req.body) // replaces the one with this id; keeps the newest 1000
+    await fs.writeFile(FILE + '.tmp', JSON.stringify(all))
+    await fs.rename(FILE + '.tmp', FILE)
+  })
+  writing = done.catch(() => {}) // the next write waits for this one, even if it failed
+  done.then(() => res.sendStatus(204), (e) => res.status(500).json({ error: String(e) }))
+})
+```
+
+This works for one server process. If your app runs on several processes or servers, use a database.
+
+**3. Only in the browser (to try it out).** Every browser then learns on its own, and `localStorage` holds
+only a few MB. Use it to see learning work, and keep lessons on the server for real use:
+
+```tsx
+const KEY = 'formlift-lessons'
+const [lessons, setLessons] = useState<Lesson[]>(() => JSON.parse(localStorage.getItem(KEY) ?? '[]'))
+
+<FormEditor
+  pdf={pdfUrl}
+  onSave={saveForm}
+  lessons={lessons}
+  onLesson={(lesson) => {
+    const all = addLesson(lessons, lesson, 50)
+    setLessons(all)
+    localStorage.setItem(KEY, JSON.stringify(all))
+  }}
+/>
+```
+
+### Good to know
+
+- **Check lessons on the server.** A lesson comes from the browser, so run `validateLesson` before you store it.
+  Detection also skips lessons that fail the check. Accept lessons only from people who may edit forms, because a
+  lesson changes what auto-detect suggests to every admin.
+- **Size.** Most lessons are a few KB. A 300-page checklist set up page by page makes a lesson of about 0.7 MB.
+  `addLesson` keeps the newest 1000 lessons.
+- **Undo a lesson.** A newer lesson always wins, so set the page up again the right way and save. To start from
+  scratch, delete the stored lessons. Detection then uses only its rules again.
+
 ## Server side
 
 **Never trust the browser.** Run the same checks on your server with the core package:
@@ -458,6 +632,8 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 | `keyboard` | `boolean` | `true` | Keyboard shortcuts |
 | `warnUnsaved` | `boolean` | `true` | Browser warning when leaving with unsaved changes |
 | `onDetected` | `(found: FieldDef[]) => void` | – | Called with the fields auto-detect suggested |
+| `lessons` | `Lesson[]` | – | What earlier saves taught auto-detect, from all your forms and admins ([Auto-detect that learns](#auto-detect-that-learns)) |
+| `onLesson` | `(lesson: Lesson) => unknown` | – | Called after a save that taught auto-detect something. Store the lesson, replacing the one with the same `id`. |
 | `limits` | `Partial<Limits>` | `DEFAULT_LIMITS` | Size limits checked before saving, such as `{ maxFields: 20000 }` ([Limits](#limits)) |
 | `snapStep` | `number` | `0.005` | Snap-to-grid step as a fraction of the page |
 | `undoLimit` | `number` | `100` | Undo steps kept |
@@ -537,7 +713,10 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 | `answerText(field, value)` | `string` | An answer as people read it ("Fire, Flood", "$12.50", "Yes") |
 | `withoutField(fields, id)` / `newFollowUpField(type, trigger, fields)` | `FieldDef[]` | Remove a field (with its follow-up questions) / add a follow-up question |
 | `defaultLayout(pageSizes)` | `Layout` | The layout of an untouched document |
-| `detectDocument(pdf, OPS, pages, existing, onProgress?, signal?)` | `Promise<FieldDef[]>` | Suggests fields for a whole document |
+| `detectDocument(pdf, OPS, pages, existing, onProgress?, signal?, lessons?)` | `Promise<FieldDef[]>` | Suggests fields for a whole document, using what the lessons taught |
+| `lessonFor(pdf, pages, session)` | `Promise<Lesson \| null>` | What a save taught auto-detect (`null` = nothing). The editor does this for you ([Auto-detect that learns](#auto-detect-that-learns)) |
+| `addLesson(lessons, lesson, max?)` | `Lesson[]` | The lessons with `lesson` replacing the one with its `id`, keeping the newest `max` (default 1000) |
+| `validateLesson(lesson, limits?)` | `string[]` | Problems in a lesson from the browser (`[]` = fine). Run it before you store one, with the same `limits` as your forms |
 | `toQuestions(fields, textOf?, { categoryCode? })` | `Question[]` | Fields grouped as questions, used by the list view |
 | `filterQuestions(questions, answers, filters, values, search?)` | `Question[]` | The questions passing a search and picked filter values (see [Filters](#4-filters-you-choose-formlift-computes)) |
 
@@ -768,6 +947,16 @@ const fields = await detectDocument(pdf, OPS as unknown as Ops, pages, [])
 
 What changed for your code, per release. The full list of changes is in the
 [CHANGELOG](./CHANGELOG.md).
+
+### 0.5 → next
+
+Nothing breaks. Check these:
+
+| What | Who | What to do |
+| --- | --- | --- |
+| Auto-detect learns from corrections | – | New, opt-in: store what `onLesson` gives you and pass it all back as `lessons`. See [Auto-detect that learns](#auto-detect-that-learns). Without `lessons`, detection suggests exactly what it did before. |
+| `fieldsSuggested` label | apps with their own `labels` | It now gets a third argument: how many of the fields came from pages set up before. Your function can ignore it. |
+| `rememberedField` label | apps with their own `labels` | New text, shown in the properties of a field put back from a page set up before. English default: `'Set up like this on the same page before. Check it.'` |
 
 ### 0.4 → 0.5
 
@@ -1029,6 +1218,7 @@ full list.
 
 - Run `validateFields` / `validateLayout` when a form is saved, and `cleanAnswers` + `validateAnswers` when
   answers are submitted. Browser-side checks are for user experience only.
+- Run `validateLesson` before storing a lesson, and accept lessons only from people who may edit forms.
 - pdf.js runs with `isEvalSupported: false`, so code embedded in a document is never compiled.
 - Patterns in fields (`pattern`) are compiled safely. An invalid regex is rejected, never thrown.
 - formlift never uploads anything on its own. All network traffic goes through your callbacks.
@@ -1044,8 +1234,9 @@ full list.
 ## FAQ
 
 **Does it use AI or send my documents anywhere?**
-No. Detection is geometric and runs locally in the browser (or in Node). Nothing leaves your app unless your
-own callbacks send it.
+No. Detection is geometric and runs locally in the browser (or in Node). It learns from your admins' corrections
+without any AI service: the [lessons](#auto-detect-that-learns) are JSON that your app stores. Nothing leaves your
+app unless your own callbacks send it.
 
 **Can I use it without React?**
 Yes. `formlift` and `formlift/server` have no UI. The React package is one way to render the form, and
