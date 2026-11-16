@@ -44,6 +44,7 @@ export default function QuestionList({
   hideUnavailable = true,
   toolbar = true,
   renderToolbar,
+  renderReading,
   pageSize = PAGE,
   loadMore = 'button',
   paperClassName = '',
@@ -63,6 +64,8 @@ export default function QuestionList({
   hideUnavailable?: boolean
   toolbar?: boolean
   renderToolbar?: (fs: QuestionFilterState) => ReactNode
+  /** Your own loader while the PDF is read. Default: the `readingDocument` text. */
+  renderReading?: (reading: { done: number; total: number }) => ReactNode
   /** Questions shown at first and added by "Show more". Default 100. */
   pageSize?: number
   /** How more questions come: a "Show more" button (default), or by themselves as the end scrolls into view. */
@@ -179,7 +182,11 @@ export default function QuestionList({
           )}
 
       {reading ? (
-        <EmptyText>{L.readingDocument(reading.done, reading.total)}</EmptyText>
+        renderReading ? (
+          renderReading(reading)
+        ) : (
+          <EmptyText>{L.readingDocument(reading.done, reading.total)}</EmptyText>
+        )
       ) : (
         fs.active && page.length === 0 && <EmptyText>{L.noQuestionMatches}</EmptyText>
       )}

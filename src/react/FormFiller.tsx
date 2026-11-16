@@ -50,6 +50,8 @@ export interface FormFillerProps extends UseFormFillerOptions {
   hideUnavailableFilters?: boolean
   /** Your own search / filter bar over the list instead of the built-in one; `fs` has every filter as data. */
   renderFilters?: (fs: QuestionFilterState) => ReactNode
+  /** Your own loader in the list view while the PDF is read (`done` of `total` pages). Default: the `readingDocument` text. */
+  renderListReading?: (reading: { done: number; total: number }) => ReactNode
   /** Ask "Submit this form?" first. Default true. */
   confirmSubmit?: boolean
   /** Extra classes on the root. It fills its container's height (`h-full`) by default: give the container a height. */
@@ -102,6 +104,7 @@ export default function FormFiller({
   listSearch,
   hideUnavailableFilters,
   renderFilters,
+  renderListReading,
   confirmSubmit: askFirst = true,
   className = 'h-full',
   zoomSteps,
@@ -304,6 +307,7 @@ export default function FormFiller({
               search={listSearch}
               hideUnavailable={hideUnavailableFilters}
               renderToolbar={renderFilters}
+              renderReading={renderListReading}
               pageSize={listPageSize}
               loadMore={listLoadMore}
               paperClassName={listPaperClassName}

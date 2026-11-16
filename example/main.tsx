@@ -282,6 +282,13 @@ function Demo() {
             // Advanced: your own logic next to the editor's settings
             onFieldChange={tourKind === 'logic' ? tourOnFieldChange : undefined}
             notify={setToast}
+            // Your own loader in the list view while the PDF is read (default: a line of text)
+            renderListReading={({ done, total }) => (
+              <div className="reading" role="status">
+                <span>Reading page {done} of {total}</span>
+                <progress value={done} max={total} />
+              </div>
+            )}
             onSave={(a, info) => {
               setAnswers(a)
               setComments(info.comments)

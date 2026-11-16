@@ -467,6 +467,7 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 | `listSearch` | `boolean` | `true` | Search box over the list |
 | `hideUnavailableFilters` | `boolean` | `true` | Leave out filters this form has nothing for |
 | `renderFilters` | `(fs: QuestionFilterState) => ReactNode` | – | Your own search / filter bar instead of the built-in one |
+| `renderListReading` | `({ done, total }) => ReactNode` | – | List view: your own loader while the PDF is read. Default: the `readingDocument` text |
 | `toQuestions` | `(fields, textOf) => Question[]` | `toQuestions` | How fields become list questions |
 | `components` | `FormliftComponents` | – | Replacement UI components and answer controls |
 | `labels` | `Partial<Labels>` | English | Your own text for every button, heading and message (any language) ([Labels](#labels-text-and-language)) |
@@ -754,6 +755,7 @@ cards. There is no switch back. Check these:
 | `<QuestionList>` needs `segments` | apps that draw `QuestionList` themselves | Pass `segments={f.segments}` and `pdf={f.pdf}` from `useFormFiller` (and `reading={f.reading}` for the loading message). `FormFiller` does this for you. |
 | The list fills the width | everyone | It used to be at most 64rem wide. To get that back, pass `listPaperClassName` with a class of yours (`max-width: 64rem; margin: 0 auto`). |
 | Infinite scroll | – | New, opt-in: `listLoadMore="scroll"`. The default is still the "Show more" button. |
+| Your own loader | – | New, opt-in: `renderListReading` draws your loader while the PDF is read. See [List view](#4b-list-view-paging-loader-width). |
 
 ### 0.3 → 0.4
 
@@ -797,6 +799,7 @@ formlift's logic is separate from its look. Pick how much you replace:
 | 2. Parts and features | what shows, which field types / views exist | `hide`, `views`, `fieldTypes`, `listFilters`… |
 | 3. Components | any button, input, modal, chip…, the answer control, or one field type | `components` prop / `<FormliftProvider>` |
 | 4. Filters | which filters exist, your own filters, your own filter UI | `listFilters`, filter objects, `renderFilters` / `useQuestionFilter` |
+| 4b. List view | how many questions at a time, button or scroll, its text, your loader, width | `listPageSize`, `listLoadMore`, `labels`, `renderListReading`, `listPaperClassName` |
 | 5. Headless | the whole screen | `useFormEditor` / `useFormFiller` + your own markup |
 
 ### 2. Choose what shows
@@ -922,6 +925,35 @@ Headless: `useQuestionFilter(f.questions, f.answers, { filters, search, initial,
 same object; render `fs.list` yourself or pass it to
 `<QuestionList questions={f.questions} segments={f.segments} pdf={f.pdf} filter={fs} toolbar={false} … />`.
 On the server (no React): `filterQuestions(questions, answers, resolveFilters(filters, questions), values, search)`.
+
+### 4b. List view: paging, loader, width
+
+The list view shows the PDF reflowed, a page of questions at a time. Everything about that is yours to set:
+
+```tsx
+<FormFiller
+  pdf={url}
+  fields={fields}
+  views={['list', 'document']}                 // open on the list
+  listPageSize={50}                            // questions at first and per step (default 100)
+  listLoadMore="button"                        // 'button' (default) or 'scroll' (infinite scroll, no button)
+  labels={{
+    showMore: (left) => `Load more (${left})`, // the button's text
+    readingDocument: (done, total) => `Preparing ${done}/${total}…`, // the default loader's text
+  }}
+  renderListReading={({ done, total }) => (    // or your own loader instead of that text
+    <div className="my-loader">
+      <MySpinner />
+      <progress value={done} max={total} />
+    </div>
+  )}
+  listPaperClassName="my-paper"                // e.g. .my-paper { max-width: 64rem; margin: 0 auto }
+/>
+```
+
+- No `renderListReading`: formlift shows the `readingDocument` text ("Reading the document… page 3 of 12").
+- `renderListReading` is called again on every page read, so `done` / `total` stay live.
+- Drawing `<QuestionList>` yourself: the same props are `pageSize`, `loadMore`, `renderReading`, `paperClassName`.
 
 ### 5. Headless: hooks only
 
