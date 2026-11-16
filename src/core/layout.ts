@@ -150,13 +150,15 @@ export interface PdfTextItem {
 
 /**
  * Groups pdf.js text items into lines. Items on the same baseline join when the gap between them is small (a
- * space); a wide gap (another column, a table cell) starts a new line. `viewBox` = [x0, y0, x1, y1] of the page.
+ * space); a wide gap (another column, a table cell) or a vertical rule between them (`walls`, in points from the
+ * top left as extractShapes gives them: a table's column line) starts a new line. `viewBox` = [x0, y0, x1, y1].
  */
 export function toLines(
   items: PdfTextItem[],
   viewBox: number[],
   /** The real font name of a pdf.js font id ('ABCDEF+Arial-BoldMT'), to tell bold / italic text. */
   fontOf: (id: string) => string | undefined = () => undefined,
+  walls: { x0: number; y0: number; y1: number }[] = [],
 ): TextLine[] {
   const [x0, y0, x1, y1] = viewBox
   const W = x1 - x0
@@ -186,7 +188,9 @@ export function toLines(
     const last = lines[lines.length - 1]
     const sameLine = last && Math.abs(g.base - last.base) < Math.max(g.size, last.size) * 0.4
     const gap = last ? g.x - last.end : Infinity
-    if (sameLine && gap < Math.max(g.size, last.size) * 1.5 && gap > -last.size) {
+    const mid = g.base - g.size / 3
+    const wall = !!last && walls.some((w) => w.x0 > last.end - 1 && w.x0 < g.x + 1 && w.y0 < mid && w.y1 > mid)
+    if (sameLine && gap < Math.max(g.size, last.size) * 1.5 && gap > -last.size && !wall) {
       last.text += gap > g.size * 0.15 && !last.text.endsWith(' ') && !g.str.startsWith(' ') ? ' ' + g.str : g.str
       last.end = Math.max(last.end, g.x + g.w)
       last.size = Math.max(last.size, g.size)

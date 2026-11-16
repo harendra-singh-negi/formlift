@@ -756,6 +756,7 @@ cards. There is no switch back. Check these:
 | The list fills the width | everyone | It used to be at most 64rem wide. To get that back, pass `listPaperClassName` with a class of yours (`max-width: 64rem; margin: 0 auto`). |
 | Infinite scroll | – | New, opt-in: `listLoadMore="scroll"`. The default is still the "Show more" button. |
 | Your own loader | – | New, opt-in: `renderListReading` draws your loader while the PDF is read. See [List view](#4b-list-view-paging-loader-width). |
+| Auto-detect suggests different fields | forms you detect again | "Comments" / "Remarks" boxes are text (not dates), sit after their label and are named after their question; empty grey bars, list headings and cells that hold text no longer get fields. Saved forms keep their fields; only a new detection changes. |
 
 ### 0.3 → 0.4
 

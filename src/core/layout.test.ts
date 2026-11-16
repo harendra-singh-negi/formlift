@@ -73,6 +73,13 @@ describe('toLines', () => {
     expect(lines.map((l) => l.text)).toEqual(['SHIP:', 'GT:'])
   })
 
+  it('text either side of a column line is in two cells, however close', () => {
+    const items = [item('Tagged Rank', 70, 59), item('Master', 139, 36)]
+    expect(toLines(items, box).map((l) => l.text)).toEqual(['Tagged Rank Master'])
+    const wall = { x0: 135, y0: 30, y1: 46 }
+    expect(toLines(items, box, undefined, [wall]).map((l) => l.text)).toEqual(['Tagged Rank', 'Master'])
+  })
+
   it('a line replaced in the editor becomes a valid white text item', () => {
     const [line] = toLines([item('Comments:', 50, 60)], box)
     const e = replaceLine(line, 4)

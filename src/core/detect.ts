@@ -1116,7 +1116,8 @@ export async function detectDocument(
       const shapes = { ...drawn, rects: [...drawn.rects, ...split.boxes] }
       const size = { width: page.view[2] - page.view[0], height: page.view[3] - page.view[1] }
       const all = [...existing, ...found]
-      const lines = toLines(items, page.view)
+      // Text on both sides of a column line is in two cells: "Tagged Rank | Master" is not one line.
+      const lines = toLines(items, page.view, undefined, drawn.vlines)
       for (const s of detectFields(shapes, lines, size, i + 1, all, typed.rules, prevText)) {
         const id =
           typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `d${Date.now()}${Math.random()}`
