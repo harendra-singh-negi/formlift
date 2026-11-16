@@ -362,9 +362,14 @@ const cleanLabel = (s: string) => {
   return /:\s*$/.test(s) ? t.slice(0, 57).trimEnd() + '…' : ''
 }
 
+// The type a field's name suggests. Names are often "Row – Column" or "1.1.8 Date … – Comments": a "Comments"
+// box takes text whatever its item asks; "From" / "To" mean dates only as a name of their own (a column), not as
+// a word in a sentence ("Name of person to contact").
 function typeFor(label: string): FieldType {
+  const parts = label.split(' – ').map(cleanLabel)
+  if (parts.some((p) => GENERIC.test(p))) return 'text'
   if (/\bsign(ature)?\b/i.test(label)) return 'signature'
-  if (/\bdate\b|\bfrom\b|\bto\b|\bdob\b/i.test(label)) return 'date'
+  if (/\bdates?\b|\bdob\b/i.test(label) || parts.some((p) => /^(from|to)$/i.test(p))) return 'date'
   if (/e-?mail/i.test(label)) return 'email'
   if (/phone|mobile|\btel\b|contact no/i.test(label)) return 'phone'
   return 'text'
