@@ -403,7 +403,7 @@ others.
 
 | When the admin… | the next detection… |
 | --- | --- |
-| sets up a page: deletes, adds, moves, renames or retypes fields, groups boxes, adds conditions and follow-up questions | **puts that page back the way it was saved**, conditions and follow-ups included. This happens in the next revision of the form, and in any other form that has the same page (a cover page, say). Each field moves with the line of text next to it, so it still fits when the text has moved. |
+| sets up a page: deletes, adds, moves, renames or retypes fields, groups boxes, adds conditions and follow-up questions | **puts that page back the way it was saved**, conditions and follow-ups included. This happens in the next revision of the form, and in any other form that has the same page (a cover page, say). Each field moves with the line of text next to it, so it still fits when the text has moved. What auto-detect finds on the page now and did not find then (a newer formlift, say) is still suggested; what the admin removed there is not. |
 | changes the settings of a suggestion: type, label, options, required, placeholder, help text, rules… | **gives every suggestion with that label the same settings, in every form.** A "Date of joining" changed to a Date once comes as a Date from then on. |
 | deletes a suggestion in two forms in a row | **stops suggesting that label**, until an admin keeps it in a form again or adds a field with that label by hand. |
 | draws a field by hand next to the same line of text twice (on two pages of a long form, or in two forms), where auto-detect found nothing (after "Remarks:", say) | **draws that field next to that line in every form**, where there is room for it. |
@@ -428,6 +428,10 @@ many fields came from pages set up before, and how many follow what you taught i
   When the page's boxes and lines changed (the same text in another form), it is not taken for the page set up
   before either. A page with hardly any text of its own (a scan) is recognised by its picture: the same scan, in
   this file or in any other. A page saved without fields is not remembered: it keeps getting suggestions.
+- **A page set up before still gets new suggestions:** the fields the admin kept, changed or added come back as
+  saved, the places where they removed or moved a field get nothing, and what auto-detect finds anywhere else on the
+  page comes as a dashed suggestion, as on a new page. Fields drawn by hand in other forms are not added to it: the
+  admin drew on this page what they wanted.
 - **Long forms:** only the pages an admin changed teach auto-detect, because a page left as it was may not have
   been looked at yet. Set up the first page or two of a long form (a 1001-page form repeats the same page, say),
   save, and **Auto-detect** again: the other pages follow what you did. (Auto-detect again remakes only the
@@ -437,8 +441,8 @@ many fields came from pages set up before, and how many follow what you taught i
   point at fields of that form. A field drawn by hand once comes back on its own page only; drawn next to the same
   line twice, it is drawn in every form.
 - **What a lesson stores:** hashes of some lines of each page it remembers (a small picture for a scan), the labels
-  that the admin changed or deleted (kept labels only as hashes), and the fields as the admin saved them. It
-  stores no answers and no other text from the page.
+  that the admin changed or deleted (kept labels only as hashes), the fields as the admin saved them, and the boxes
+  of fields they removed. It stores no answers and no other text from the page.
 
 ### See and forget what it learnt
 
