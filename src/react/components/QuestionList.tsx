@@ -45,6 +45,7 @@ export default function QuestionList({
   toolbar = true,
   renderToolbar,
   pageSize = PAGE,
+  loadMore = 'button',
 }: {
   questions: Question[]
   /** The document's flow, cut where questions end (useFormFiller's `segments`). */
@@ -63,6 +64,8 @@ export default function QuestionList({
   renderToolbar?: (fs: QuestionFilterState) => ReactNode
   /** Questions shown at first and added by "Show more". Default 100. */
   pageSize?: number
+  /** How more questions come: a "Show more" button (default), or by themselves as the end scrolls into view. */
+  loadMore?: 'button' | 'scroll'
 }) {
   const L = useLabels()
   const own = useQuestionFilter(questions, answers, { filters, search })
@@ -202,7 +205,10 @@ export default function QuestionList({
           ))}
         </ul>
       )}
-      {!reading && list.length > count && (
+      {!reading && list.length > count && loadMore === 'scroll' && (
+        <More onSeen={() => setShown((n) => n + pageSize)} />
+      )}
+      {!reading && list.length > count && loadMore === 'button' && (
         <div className="mt-3 text-center">
           <Button variant="secondary" size="sm" onClick={() => setShown((n) => n + pageSize)}>
             {L.showMore(list.length - count)}
@@ -211,6 +217,21 @@ export default function QuestionList({
       )}
     </div>
   )
+}
+
+/** The end of the list: shows more questions when it scrolls into view (infinite scroll). */
+function More({ onSeen }: { onSeen: () => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const seen = useRef(onSeen)
+  seen.current = onSeen
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && seen.current())
+    io.observe(el)
+    return () => io.disconnect()
+  })
+  return <div ref={ref} aria-hidden className="h-px" />
 }
 
 type FieldPart = { field: FieldDef; w: number; h: number; caption?: boolean }

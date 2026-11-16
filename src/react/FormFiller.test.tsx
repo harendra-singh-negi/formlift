@@ -171,6 +171,37 @@ it('lets you draw the list filters yourself', () => {
   expect(inList('Name')).toBeNull()
 })
 
+it('the list shows more with a button, or by itself as its end scrolls into view', () => {
+  const seen: (() => void)[] = []
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      constructor(private cb: (e: { isIntersecting: boolean }[]) => void) {}
+      observe = () => seen.push(() => this.cb([{ isIntersecting: true }]))
+      disconnect = () => {}
+    },
+  )
+  const draw = (loadMore: 'button' | 'scroll') =>
+    act(() =>
+      root.render(
+        <FormFiller pdf="x.pdf" fields={fields} views={['list']} listPageSize={1} listLoadMore={loadMore} />,
+      ),
+    )
+  const shown = () => el.querySelectorAll('ul [aria-label="Name"], ul [aria-label="Status"]').length
+  draw('button')
+  expect(shown()).toBe(1)
+  act(() => button('Show more (1 left)').click())
+  expect(shown()).toBe(2)
+  act(() => root.unmount())
+  root = createRoot(el)
+  draw('scroll')
+  expect(shown()).toBe(1)
+  expect(button('Show more (1 left)')).toBeUndefined()
+  act(() => seen.at(-1)!())
+  expect(shown()).toBe(2)
+  vi.unstubAllGlobals()
+})
+
 it('offers only the filters you list, and you decide on the ones this form has nothing for', () => {
   let groups: { id: string; available: boolean }[] = []
   act(() =>
