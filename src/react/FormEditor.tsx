@@ -28,7 +28,7 @@ import { useFormEditor, type FormDoc, type UseFormEditorOptions } from './hooks/
 import { toolName, typeName, useLabels } from './labels'
 import { boxStyle } from '../core/coords'
 import { applyAnswer, type FieldType } from '../core/form-logic'
-import { whyLearnt } from '../core/learn'
+import { taughtBy, whyLearnt } from '../core/learn'
 import type { ElementTool } from '../core/layout'
 import {
   Button,
@@ -187,6 +187,7 @@ export default function FormEditor({
   const { previewStates, previewAnswers, counts, pageHeight } = ed
   // How learning made the selected field, when it did (this session's suggestions): what Forget this forgets.
   const why = selectedField && ed.learnt ? whyLearnt(selectedField) : undefined
+  const taught = selectedField && ed.learnt ? taughtBy(selectedField) : undefined
 
   // Drag onto a page, or tap it and then tap the page (touch screens have no drag and drop).
   const toolItem = (key: string, label: string) => (
@@ -620,6 +621,7 @@ export default function FormEditor({
                         onSelect={(id) => ed.setSelection({ kind: 'field', id })}
                         rules={options.rules}
                         onForget={why && (() => ed.forget(why))}
+                        taught={taught}
                       />
                     ) : selectedElement ? (
                       <ElementProperties

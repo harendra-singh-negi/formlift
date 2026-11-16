@@ -40,6 +40,7 @@ export default function FieldProperties({
   onSelect,
   rules = {},
   onForget,
+  taught,
 }: {
   field: FieldDef
   fields: FieldDef[]
@@ -53,6 +54,8 @@ export default function FieldProperties({
   rules?: Record<string, AnswerRule>
   /** For a field auto-detect made from what it learnt: forget that (it will not do it again). */
   onForget?: () => void
+  /** For a field pattern learning suggested (or typed, or grouped): the cues of the boxes admins kept like it. */
+  taught?: string[]
 }) {
   const L = useLabels()
   const set = (patch: Partial<FieldDef>) => onChange({ ...field, ...patch })
@@ -88,7 +91,14 @@ export default function FieldProperties({
               ? L.rememberedField
               : field.confidence === LEARNT
                 ? L.learntField
-                : L.suggestedAutomatically(field.confidence != null ? Math.round(field.confidence * 100) : null)}
+                : taught
+                  ? L.patternField(field.confidence != null ? Math.round(field.confidence * 100) : null)
+                  : L.suggestedAutomatically(field.confidence != null ? Math.round(field.confidence * 100) : null)}
+            {taught && (
+              <span className="mt-1 block text-muted">
+                {[...new Set(taught.map(L.learntCue).filter(Boolean))].slice(0, 4).join(' · ')}
+              </span>
+            )}
             {onForget && (
               <>
                 {' '}

@@ -84,7 +84,7 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 | | |
 | --- | --- |
 | 🔍 **Auto-detect** | A fillable PDF (made in Acrobat, Word…) gives its own fields as they are: place, type, options, required, max length, named by the text beside them. On other pages, answer lines, checkboxes, typed blanks, table cells and boxes named above or beside them come from the PDF's own vector drawing. Sizes are measured relative to the text, so it works at any font size, scale or orientation. |
-| 🧠 **Learns from your corrections** | Each save teaches auto-detect. A page you set up comes back the way you saved it, conditions included (in the next revision of the form, in any form that has the same page, even a scanned one). What you change about a label applies to that label in every form, and a field you draw by hand next to the same text twice is drawn there in every form. The editor shows what it learnt, and anything can be forgotten. No AI service: the lessons are plain JSON that you store. [How it works](#auto-detect-that-learns) |
+| 🧠 **Learns from your corrections** | Each save teaches auto-detect. A page you set up comes back the way you saved it, conditions included (in the next revision of the form, in any form that has the same page, even a scanned one). What you change about a label applies to that label in every form, and a field you draw by hand next to the same text twice is drawn there in every form. It also learns patterns that carry over to forms it has never seen: boxes like the ones you kept are suggested (answers printed as "Yes/No/NA" included), boxes like the ones you deleted are not, typed and grouped as you did. The editor shows what it learnt, and anything can be forgotten. No AI service: the lessons are plain JSON that you store. [How it works](#auto-detect-that-learns) |
 | 🧱 **Builder** | 20 field types (text, date & time, currency, multi-select, checklist, rating, slider, toggle, signature, file…), drag/resize/snap-to-grid, undo/redo, keyboard shortcuts, fill order, page reorder/insert/delete |
 | ✏️ **Layout editing** | Add text, boxes and lines, or click any line of the original text to replace it, all without touching the file |
 | 🔀 **Conditional logic** | `visibleWhen` / `requiredWhen` / `readOnlyWhen` with nested AND/OR groups and 10 operators. Circular rules are rejected. |
@@ -395,6 +395,12 @@ changed: a **lesson**. Pass the lessons back to the editor and the next detectio
 already did, so every form needs fewer corrections than the one before. Use it as much as you can. It gets better
 with every form you save.
 
+It learns in two ways. It **remembers**: a page set up before comes back as it was saved, and a label changed once
+is changed in every form. And it **learns patterns that carry over to forms it has never seen**: it knows a box by
+what is around it (a blank cell under a "Comments" header, answers printed in place of boxes, a label ending in
+":" before it), so what admins did with boxes in one form applies to boxes like them in any other form, whatever
+their words. See [Forms it has never seen](#forms-it-has-never-seen).
+
 There is no AI service, and nothing is sent anywhere. A lesson is plain JSON that **your app** stores, the same
 way it stores the forms. Keep one set of lessons for the whole organisation, and every admin's work helps all the
 others.
@@ -407,6 +413,7 @@ others.
 | changes the settings of a suggestion: type, label, options, required, placeholder, help text, rules… | **gives every suggestion with that label the same settings, in every form.** A "Date of joining" changed to a Date once comes as a Date from then on. |
 | deletes a suggestion in two forms in a row | **stops suggesting that label**, until an admin keeps it in a form again or adds a field with that label by hand. |
 | draws a field by hand next to the same line of text twice (on two pages of a long form, or in two forms), where auto-detect found nothing (after "Remarks:", say) | **draws that field next to that line in every form**, where there is room for it. |
+| keeps, deletes or draws boxes on a page, changes their type or required, or groups a row of Y / N / NA boxes | **does the same with boxes like those, in any form**, also in a form auto-detect has never seen. Answers printed in place of boxes ("Yes/No/NA"), light filled input boxes, blank cells and the space after a label are suggested once admins kept boxes like them; small squares used as bullets are left out once admins deleted them. |
 
 **An example.** Your forms all ask for a **Date of joining**.
 
@@ -441,13 +448,45 @@ many fields came from pages set up before, and how many follow what you taught i
   point at fields of that form. A field drawn by hand once comes back on its own page only; drawn next to the same
   line twice, it is drawn in every form.
 - **What a lesson stores:** hashes of some lines of each page it remembers (a small picture for a scan), the labels
-  that the admin changed or deleted (kept labels only as hashes), the fields as the admin saved them, and the boxes
-  of fields they removed. It stores no answers and no other text from the page.
+  that the admin changed or deleted (kept labels only as hashes), the fields as the admin saved them, the boxes
+  of fields they removed, and the cues of the boxes on the pages they changed (structure as it is, `k=cell`,
+  `h1`; words only as hashes) with what they did with each. It stores no answers and no other text from the page.
+
+### Forms it has never seen
+
+Remembering helps with the forms you already set up. Patterns help with the next, different one.
+
+- **How it sees a box.** Every box auto-detect proposes on a page (what its rules suggest, and boxes it suggests
+  only once taught: answers printed in a cell, light filled boxes, blank cells, the space after a short label) gets
+  its cues: what proposed it, its size in letters and lines of that page's own text, whether it is in a table cell
+  or on an answer line or framed or filled, what is printed in it, the label before it, over it or after it, its
+  column's header, and how many boxes like it share its row. A field the admin draws gets the same cues.
+- **What a save teaches.** On the pages the admin changed: each box they kept or drew is a field, each they deleted
+  or left empty is not, and each field's type, required and grouping is what they gave it.
+- **What detection does with it.** It trains a small model from all lessons, in the browser, in a few milliseconds
+  (logistic regression for "is this a field", starting from how sure the rules are; counts per cue for the type,
+  required and grouping). Then it suggests boxes like those admins kept, leaves out boxes like those they deleted,
+  and gives a box the type admins gave boxes with the same words around them, measured against the type auto-detect
+  gave it: a "Mobile number" stays a phone even where "Permit number" boxes were kept as text. A row of boxes is
+  grouped (one answer) where admins grouped rows like it. The field's properties say why ("column “comments”",
+  "answers printed in it").
+- **It needs evidence.** A box the rules do not suggest, or one they are sure of, changes only after admins did
+  the same with several boxes like it (one save with many alike, or a few saves). What it was not shown, it leaves
+  as it was.
+- **Measured.** `npm run eval` sets up 8 synthetic forms one after another, then scores 6 forms that share no
+  label, question or item with them: 96 corrections without lessons, 0 with them, and nothing that was right made
+  wrong. On a real bank checklist whose answers are printed "Yes/No" in a column, an admin who set up one page got a
+  dropdown in every Yes/No cell of the other pages.
+- **Not learnt:** what admins never did. It learns from your admins, not from the world: "DOB" becomes a date once
+  an admin made a "DOB" box a date, and a box no rule or finder proposes (letters in separate little boxes, say) is
+  learnt only by the line next to it (the drawn-by-hand row above). Conditions and follow-ups come back with their
+  page, not in other forms.
 
 ### See and forget what it learnt
 
 The editor's **Learnt** tab lists what auto-detect learnt: the labels it changes or leaves out, the fields it draws
-by hand, and how many pages it puts back. Each has **Forget**, and **Forget everything** starts from scratch. A
+by hand, how many pages it puts back, and how many boxes taught it patterns. Each has **Forget**, and **Forget
+everything** starts from scratch. A
 field that auto-detect made from a lesson has **Forget this** in its properties: forget the page it came from, or
 what was learnt about its label.
 
@@ -601,9 +640,9 @@ const [lessons, setLessons] = useState<Lesson[]>(() => JSON.parse(localStorage.g
 - **Check lessons on the server.** A lesson comes from the browser, so run `validateLesson` before you store it.
   Detection also skips lessons that fail the check. Accept lessons only from people who may edit forms, because a
   lesson changes what auto-detect suggests to every admin.
-- **Size.** A lesson holds only the pages the admin changed, so most are a few KB. A 300-page checklist with every
-  page changed makes about 0.5 MB, about 0.1 MB gzipped; a 1001-page form with 12 000 fields, all changed, about
-  2 MB (0.2 MB gzipped). `addLesson` keeps the newest 1000 lessons.
+- **Size.** A lesson holds only the pages the admin changed, so most are a few KB. A 309-page checklist with every
+  page changed makes about 1.1 MB, about 0.2 MB gzipped (half of it what boxes taught); a 1001-page form with
+  12 000 fields, all changed, about 2.3 MB (0.2 MB gzipped). `addLesson` keeps the newest 1000 lessons.
 - **Forms over 5000 fields or 1000 pages** need higher `limits`: in the editor, in `validateFields` on your server,
   and in `validateLesson` (the same values everywhere).
 - **Undo a lesson.** Forget it in the Learnt tab, or set the page up again the right way and save: a newer lesson
@@ -766,9 +805,10 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 | `detectDocument(pdf, OPS, pages, existing, onProgress?, signal?, lessons?)` | `Promise<FieldDef[]>` | Suggests fields for a whole document, using what the lessons taught |
 | `lessonFor(pdf, pages, session, { OPS })` | `Promise<Lesson \| null>` | What a save taught auto-detect (`null` = nothing). The editor does this for you ([Auto-detect that learns](#auto-detect-that-learns)) |
 | `addLesson(lessons, lesson, max?)` | `Lesson[]` | The lessons with `lesson` replacing the one with its `id`, keeping the newest `max` (default 1000) |
-| `learnt(lessons)` | `Learnt` | What the lessons taught, after what was forgotten: labels it changes or leaves out, fields it draws, pages it puts back |
-| `forgetting(what)` | `Lesson` | A lesson that forgets `what` (`{ all: true }`, or labels, drawn fields, pages from `learnt` / `whyLearnt`). Store it like any other |
+| `learnt(lessons)` | `Learnt` | What the lessons taught, after what was forgotten: labels it changes or leaves out, fields it draws, pages it puts back, how many boxes taught it patterns |
+| `forgetting(what)` | `Lesson` | A lesson that forgets `what` (`{ all: true }`, `{ patterns: true }`, or labels, drawn fields, pages from `learnt` / `whyLearnt`). Store it like any other |
 | `whyLearnt(field)` | `Forget \| undefined` | For a field auto-detect suggested in this session: what to forget so it does not do that again |
+| `taughtBy(field)` | `string[] \| undefined` | For a field pattern learning suggested, typed or grouped in this session: the cues of the boxes admins kept like it (`"c:comments"`, `"k=choice"`…), to say why |
 | `validateLesson(lesson, limits?)` | `string[]` | Problems in a lesson from the browser (`[]` = fine). Run it before you store one, with the same `limits` as your forms |
 | `toQuestions(fields, textOf?, { categoryCode? })` | `Question[]` | Fields grouped as questions, used by the list view |
 | `filterQuestions(questions, answers, filters, values, search?)` | `Question[]` | The questions passing a search and picked filter values (see [Filters](#4-filters-you-choose-formlift-computes)) |
@@ -1013,9 +1053,10 @@ Nothing breaks. Check these:
 | Auto-detect learns from corrections | – | New, opt-in: store what `onLesson` gives you and pass it all back as `lessons`. See [Auto-detect that learns](#auto-detect-that-learns). Without `lessons`, detection suggests exactly what it did before. |
 | Learnt tab | apps that set `onLesson` | A new tab in the editor's panel shows what auto-detect learnt and forgets it. `hide={['learntTab']}` leaves it out. |
 | Auto-detect again | – | It now also remakes the suggestions of the same editing session that the admin has not touched, with what auto-detect learnt meanwhile (before, it only added fields where nothing was placed). Fields the admin changed, and fields of a saved form, stay as they are. |
-| `fieldsSuggested` label | apps with their own `labels` | It now gets a third and a fourth argument: how many of the fields came from pages set up before, and how many follow what the admin taught it. Your function can ignore them. |
+| `fieldsSuggested` label | apps with their own `labels` | It now gets a third and a fourth argument: how many of the fields came from pages set up before, and how many follow what the admin taught it (patterns included). Your function can ignore them. |
+| Patterns that carry over | – | Lessons now also hold `cues` and `examples` (what boxes taught), so detection suggests, leaves out, types and groups boxes as admins did with boxes like them in any form. Nothing to do: store lessons as before. They are bigger for long forms (a 309-page form with every page changed: about 1.1 MB, 0.2 MB gzipped). `forgetting({ patterns: true })` forgets it; `learnt()` gives `patterns: { boxes, saves }`; `taughtBy(field)` the cues behind a suggestion. |
 | Word tables with hairline borders | – | Auto-detect now reads tables whose borders are drawn as very thin filled bars (as Word draws them, 0.48 pt): forms like that got no suggestions before. In a grid of labels and answers, a cell is named by its label alone (not "Last inspection – Yes"), and a blank cell in a table's number column is no longer suggested. |
-| New labels | apps with their own `labels` | `rememberedField`, `learntField`, `forgetThis`, `forgetThisHint`, `forgotten`, and the Learnt tab's `learntTab`, `learntHeading`, `learntNothing`, `learntLeftOut`, `learntRenamed`, `learntDrawn`, `learntPages`, `forget`, `forgetEverything`, `confirmForgetEverything`. Anything you leave out stays English. |
+| New labels | apps with their own `labels` | `rememberedField`, `learntField`, `patternField`, `learntCue`, `forgetThis`, `forgetThisHint`, `forgotten`, and the Learnt tab's `learntTab`, `learntHeading`, `learntNothing`, `learntLeftOut`, `learntRenamed`, `learntDrawn`, `learntPages`, `learntPatterns`, `forget`, `forgetEverything`, `confirmForgetEverything`. Anything you leave out stays English. |
 
 ### 0.4 → 0.5
 

@@ -458,7 +458,7 @@ describe('forgetting', () => {
     expect((await adjust(noRemarks, remarks))?.type).toBe('text')
     expect(await adjust(noRemarks, desc)).toBeNull()
     const nothing = [...lessons, forgetting({ all: true }, 3)]
-    expect(learnt(nothing)).toEqual({ labels: [], drawn: [], pages: 0 })
+    expect(learnt(nothing)).toEqual({ labels: [], drawn: [], pages: 0, patterns: { boxes: 0, saves: 0 } })
     expect(await adjust(nothing, desc)).not.toBeNull()
     // What is learnt after it counts again.
     const later = await lessonOf({ ...session([remarks], [{ ...remarks, type: 'textarea' }]), id: 'later' }, 4)

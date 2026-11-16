@@ -22,7 +22,7 @@ const describe = (L: Labels, c: SettingsChange) =>
 export default function LearntPanel({ learnt, onForget }: { learnt: Learnt; onForget: (what: Forget) => void }) {
   const L = useLabels()
   const [confirm, setConfirm] = useState(false)
-  const nothing = !learnt.labels.length && !learnt.drawn.length && !learnt.pages
+  const nothing = !learnt.labels.length && !learnt.drawn.length && !learnt.pages && !learnt.patterns.boxes
   const forget = (what: Forget) => (
     <button type="button" className="flex-none cursor-pointer text-primary hover:underline" onClick={() => onForget(what)}>
       {L.forget}
@@ -54,6 +54,12 @@ export default function LearntPanel({ learnt, onForget }: { learnt: Learnt; onFo
           </li>
         ))}
       </ul>
+      {learnt.patterns.boxes > 0 && (
+        <div className={row}>
+          <span className="min-w-0 flex-1 text-muted">{L.learntPatterns(learnt.patterns.boxes, learnt.patterns.saves)}</span>
+          {forget({ patterns: true })}
+        </div>
+      )}
       {learnt.pages > 0 && <p className="m-0 px-3 py-2 text-muted">{L.learntPages(learnt.pages)}</p>}
       {!nothing && (
         <div className="px-3 py-2">

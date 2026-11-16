@@ -11,6 +11,7 @@
 import type { FieldDef, FieldType } from '../form-logic'
 import { clashes, fitInPage, overlap } from '../coords'
 import type { TextLine } from '../layout'
+import type { Candidate } from '../learn'
 import { cleanLabel, GENERIC, LIST_ITEM, PRINTED_CHOICES, typeFor } from './labels'
 import type { Rect, Seg, Shapes } from './shapes'
 import { tableCells } from './tables'
@@ -31,6 +32,8 @@ interface Suggestion {
   w: number
   h: number
   confidence: number
+  /** The rule that made it (see the top of this file). */
+  kind: 'checkbox' | 'cell' | 'line' | 'colon' | 'shade'
 }
 
 const overlapArea = (r: Rect, c: { x0: number; y0: number; x1: number; y1: number }) =>
@@ -55,6 +58,19 @@ export function detectFields(
   underscores: Seg[] = [],
   prevText = '',
 ): Omit<FieldDef, 'id' | 'key'>[] {
+  return proposals(shapes, lines, size, page, existing, underscores, prevText).found.map((c) => c.field)
+}
+
+/** detectFields with the rule that made each suggestion (its kind) and the table cells of the page. */
+export function proposals(
+  shapes: Shapes,
+  lines: TextLine[],
+  size: { width: number; height: number },
+  page: number,
+  existing: FieldDef[] = [],
+  underscores: Seg[] = [],
+  prevText = '',
+): { found: Candidate[]; cells: { x0: number; y0: number; x1: number; y1: number }[] } {
   const W = size.width
   const H = size.height
   const texts: PtText[] = lines.map((l) => ({
@@ -200,6 +216,7 @@ export function detectFields(
       w: b.w + 2,
       h: b.h + 2,
       confidence: 0.9,
+      kind: 'checkbox',
     })
   }
 
@@ -286,6 +303,7 @@ export function detectFields(
       w: c.x1 - c.x0 - 2 * pad,
       h: c.y1 - c.y0 - 2 * pad,
       confidence: 0.75,
+      kind: 'cell',
     })
   }
 
@@ -410,6 +428,7 @@ export function detectFields(
       w: first.x1 - x0,
       h: lastRule.y0 - top,
       confidence: label ? 0.8 : 0.5,
+      kind: 'line',
     })
   }
 
@@ -504,6 +523,7 @@ export function detectFields(
       w: right - x,
       h: bottom - top,
       confidence: 0.65,
+      kind: 'colon',
     })
   }
 
@@ -586,19 +606,24 @@ export function detectFields(
         w: p.b - p.a - 3,
         h: y1 - y0 - 2,
         confidence: 0.6,
+        kind: 'shade',
       })
     }
   }
 
   // Page fractions; skip what overlaps an existing field or an earlier suggestion.
   const taken = existing.filter((f) => f.position.page === page).map((f) => f.position)
-  const result: Omit<FieldDef, 'id' | 'key'>[] = []
+  const found: Candidate[] = []
   for (const s of out) {
     if (s.w < 4 || s.h < 4) continue
     const position = fitInPage({ page, x: s.x / W, y: s.y / H, width: s.w / W, height: s.h / H })
     if (clashes(taken, position)) continue
     taken.push(position)
-    result.push({ type: s.type, label: s.label, source: 'ai', confidence: s.confidence, position })
+    found.push({
+      field: { type: s.type, label: s.label, source: 'ai', confidence: s.confidence, position },
+      kind: s.kind,
+      prior: s.confidence,
+    })
   }
-  return result
+  return { found, cells }
 }
