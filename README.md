@@ -757,6 +757,7 @@ cards. There is no switch back. Check these:
 | Infinite scroll | – | New, opt-in: `listLoadMore="scroll"`. The default is still the "Show more" button. |
 | Your own loader | – | New, opt-in: `renderListReading` draws your loader while the PDF is read. See [List view](#4b-list-view-paging-loader-width). |
 | Auto-detect suggests different fields | forms you detect again | "Comments" / "Remarks" boxes are text (not dates), sit after their label and are named after their question; empty grey bars, list headings and cells that hold text no longer get fields. Saved forms keep their fields; only a new detection changes. |
+| `signed` label | apps with their own `labels` | New text for a signature whose picture can't be shown. English default `'Signed'`. |
 
 ### 0.3 → 0.4
 
