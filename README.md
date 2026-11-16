@@ -84,7 +84,7 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 | | |
 | --- | --- |
 | 🔍 **Auto-detect** | Answer lines, checkboxes, typed blanks and table cells come from the PDF's own vector drawing. Sizes are measured relative to the text, so it works at any font size, scale or orientation. |
-| 🧠 **Learns from your corrections** | Each save teaches auto-detect. A page you set up comes back the way you saved it (in the next revision of the form, or in any form that has the same page), and what you change about a label applies to that label in every form. No AI service: the lessons are plain JSON that you store. [How it works](#auto-detect-that-learns) |
+| 🧠 **Learns from your corrections** | Each save teaches auto-detect. A page you set up comes back the way you saved it, conditions included (in the next revision of the form, in any form that has the same page, even a scanned one). What you change about a label applies to that label in every form, and a field you draw by hand next to the same text in two forms is drawn there in every form. The editor shows what it learnt, and anything can be forgotten. No AI service: the lessons are plain JSON that you store. [How it works](#auto-detect-that-learns) |
 | 🧱 **Builder** | 20 field types (text, date & time, currency, multi-select, checklist, rating, slider, toggle, signature, file…), drag/resize/snap-to-grid, undo/redo, keyboard shortcuts, fill order, page reorder/insert/delete |
 | ✏️ **Layout editing** | Add text, boxes and lines, or click any line of the original text to replace it, all without touching the file |
 | 🔀 **Conditional logic** | `visibleWhen` / `requiredWhen` / `readOnlyWhen` with nested AND/OR groups and 10 operators. Circular rules are rejected. |
@@ -403,9 +403,10 @@ others.
 
 | When the admin… | the next detection… |
 | --- | --- |
-| sets up a page: deletes, adds, moves, renames or retypes fields, groups boxes | **puts that page back the way it was saved.** This happens in the next revision of the form, and in any other form that has the same page (a cover page, say). Each field moves with the line of text next to it, so it still fits when the text has moved. |
+| sets up a page: deletes, adds, moves, renames or retypes fields, groups boxes, adds conditions and follow-up questions | **puts that page back the way it was saved**, conditions and follow-ups included. This happens in the next revision of the form, and in any other form that has the same page (a cover page, say). Each field moves with the line of text next to it, so it still fits when the text has moved. |
 | changes the settings of a suggestion: type, label, options, required, placeholder, help text, rules… | **gives every suggestion with that label the same settings, in every form.** A "Date of joining" changed to a Date once comes as a Date from then on. |
 | deletes a suggestion in two forms in a row | **stops suggesting that label**, until an admin keeps it in a form again or adds a field with that label by hand. |
+| draws a field by hand next to the same line of text in two forms, where auto-detect found nothing (after "Remarks:", say) | **draws that field next to that line in every form**, where there is room for it. |
 
 **An example.** Your forms all ask for a **Date of joining**.
 
@@ -419,19 +420,32 @@ others.
 The person filling the form sees nothing of this. They just get the right field: a date picker that must be
 filled in.
 
-A field put back from a page set up before says so in its properties. After auto-detect, the editor also says how
-many fields came from pages set up before.
+A field that auto-detect made from a lesson says so in its properties. After auto-detect, the editor also says how
+many fields came from pages set up before, and how many were set up as in other forms.
 
 - **How a page is recognised:** by the lines of text that appear only on that page of its document. Mostly the
   same text must be in the same place. A text that moved as a block still counts, a different layout does not.
-  Pages with hardly any text of their own (scans, photo pages) are not remembered, and neither are pages saved
-  without fields: they keep getting suggestions.
-- **Not learnt:** conditions and follow-up questions, because they point at other fields of one form. A setting
-  that the admin set differently on suggestions with the same label in one form is not learnt either. A field
-  that the admin adds by hand comes back on the same page only. On a new form, finding it is up to the detection
-  rules.
-- **What a lesson stores:** hashes of the page's lines, the labels of the suggestions, and the fields as the admin
-  saved them. It stores no answers and no other text from the page.
+  When the page's boxes and lines changed (the same text in another form), it is not taken for the page set up
+  before either. A page with hardly any text of its own (a scan) is recognised by its picture: the same scan, in
+  this file or in any other. A page saved without fields is not remembered: it keeps getting suggestions.
+- **Not learnt:** a setting that the admin set differently on suggestions with the same label in one form.
+  Conditions and follow-ups come back with the page they were set up on, not on other forms, because they point at
+  fields of that form. A field drawn by hand once comes back on its own page only; drawn next to the same line in
+  two forms, it is drawn in every form.
+- **What a lesson stores:** hashes of some lines of each page it remembers (a small picture for a scan), the labels
+  that the admin changed or deleted (kept labels only as hashes), and the fields as the admin saved them. It
+  stores no answers and no other text from the page.
+
+### See and forget what it learnt
+
+The editor's **Learnt** tab lists what auto-detect learnt: the labels it changes or leaves out, the fields it draws
+by hand, and how many pages it puts back. Each has **Forget**, and **Forget everything** starts from scratch. A
+field that auto-detect made from a lesson has **Forget this** in its properties: forget the page it came from, or
+what was learnt about its label.
+
+Forgetting is a lesson too: `onLesson` gets it and you store it like any other, so your server needs no delete.
+What was learnt before it no longer counts, and what admins teach after it counts again. The tab shows only where
+learning is on (`onLesson`); `hide={['learntTab']}` leaves it out.
 
 ### Turn it on
 
@@ -452,8 +466,8 @@ have stored:
   `addLesson(lessons, lesson)` does this for an array.
 - **Load the lessons before the editor opens.** Auto-detect runs as soon as the PDF is open.
 - **Angular / Vue / plain JS:** the same two options, in `mountEditor(el, { lessons, onLesson })`. A custom editor
-  on `useFormEditor` takes the same two options. Without the editor, `lessonFor(pdf, pages, session)` makes a
-  lesson and `detectDocument(…, lessons)` uses lessons.
+  on `useFormEditor` takes the same two options, and gets `learnt` and `forget` for its own Learnt view. Without
+  the editor, `lessonFor(pdf, pages, session, { OPS })` makes a lesson and `detectDocument(…, lessons)` uses lessons.
 
 ### Where to keep lessons
 
@@ -470,10 +484,13 @@ CREATE TABLE formlift_lessons (
 ```
 
 ```ts
+import compression from 'compression'
 import express from 'express'
 import { validateLesson } from 'formlift'
 
-const app = express().use(express.json({ limit: '5mb' })) // a lesson for a 300-page form is under 1 MB
+const app = express()
+  .use(compression()) // lessons are JSON: gzip makes them 4 to 8 times smaller
+  .use(express.json({ limit: '5mb' })) // a lesson for a 300-page form is about 0.5 MB at most
 
 // Every lesson, for the editor
 app.get('/api/formlift/lessons', async (req, res) => {
@@ -554,11 +571,20 @@ const [lessons, setLessons] = useState<Lesson[]>(() => JSON.parse(localStorage.g
   pdf={pdfUrl}
   onSave={saveForm}
   lessons={lessons}
-  onLesson={(lesson) => {
-    const all = addLesson(lessons, lesson, 50)
-    setLessons(all)
-    localStorage.setItem(KEY, JSON.stringify(all))
-  }}
+  onLesson={(lesson) =>
+    setLessons((list) => {
+      let all = addLesson(list, lesson, 50)
+      // localStorage is full: the oldest lessons make room
+      for (;;)
+        try {
+          localStorage.setItem(KEY, JSON.stringify(all))
+          return all
+        } catch {
+          if (all.length <= 1) return all
+          all = all.slice(1)
+        }
+    })
+  }
 />
 ```
 
@@ -567,10 +593,10 @@ const [lessons, setLessons] = useState<Lesson[]>(() => JSON.parse(localStorage.g
 - **Check lessons on the server.** A lesson comes from the browser, so run `validateLesson` before you store it.
   Detection also skips lessons that fail the check. Accept lessons only from people who may edit forms, because a
   lesson changes what auto-detect suggests to every admin.
-- **Size.** Most lessons are a few KB. A 300-page checklist set up page by page makes a lesson of about 0.7 MB.
-  `addLesson` keeps the newest 1000 lessons.
-- **Undo a lesson.** A newer lesson always wins, so set the page up again the right way and save. To start from
-  scratch, delete the stored lessons. Detection then uses only its rules again.
+- **Size.** A lesson holds only the pages the admin changed, so most are a few KB. A 300-page checklist with every
+  page changed makes about 0.5 MB, about 0.1 MB gzipped. `addLesson` keeps the newest 1000 lessons.
+- **Undo a lesson.** Forget it in the Learnt tab, or set the page up again the right way and save: a newer lesson
+  always wins. **Forget everything** starts from scratch, and so does deleting the stored lessons.
 
 ## Server side
 
@@ -637,7 +663,7 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 | `onError` | `(err: unknown) => void` | `console.error` | Error messages |
 | `className` | `string` | `'h-full'` | Classes on the root element |
 | `ref` | `Ref<FormEditorHandle>` | – | `{ save(), dirty, value }`, for example to save before a workflow step |
-| `hide` | `EditorPart[]` | `[]` | Parts to leave out: `back`, `title`, `status`, `undo`, `snap`, `zoom`, `editText`, `autoDetect`, `preview`, `save`, `tools`, `fieldTools`, `layoutTools`, `panel`, `propertiesTab`, `fieldsTab`, `pagesTab`, `problems` |
+| `hide` | `EditorPart[]` | `[]` | Parts to leave out: `back`, `title`, `status`, `undo`, `snap`, `zoom`, `editText`, `autoDetect`, `preview`, `save`, `tools`, `fieldTools`, `layoutTools`, `panel`, `propertiesTab`, `fieldsTab`, `pagesTab`, `learntTab`, `problems` |
 | `fieldTypes` | `FieldType[]` | all | Field types that can be added |
 | `elementTools` | `ElementTool[]` | all | Layout tools that can be added (`[]` = none) |
 | `components` | `FormliftComponents` | – | Replacement UI components and answer controls ([Your own UI](#your-own-ui)) |
@@ -646,7 +672,7 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 | `warnUnsaved` | `boolean` | `true` | Browser warning when leaving with unsaved changes |
 | `onDetected` | `(found: FieldDef[]) => void` | – | Called with the fields auto-detect suggested |
 | `lessons` | `Lesson[]` | – | What earlier saves taught auto-detect, from all your forms and admins ([Auto-detect that learns](#auto-detect-that-learns)) |
-| `onLesson` | `(lesson: Lesson) => unknown` | – | Called after a save that taught auto-detect something. Store the lesson, replacing the one with the same `id`. |
+| `onLesson` | `(lesson: Lesson) => unknown` | – | Called after a save that taught auto-detect something, and when the admin forgets something (Learnt tab). Store the lesson, replacing the one with the same `id`. |
 | `limits` | `Partial<Limits>` | `DEFAULT_LIMITS` | Size limits checked before saving, such as `{ maxFields: 20000 }` ([Limits](#limits)) |
 | `snapStep` | `number` | `0.005` | Snap-to-grid step as a fraction of the page |
 | `undoLimit` | `number` | `100` | Undo steps kept |
@@ -703,7 +729,7 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 
 | Hook | Gives |
 | --- | --- |
-| `useFormEditor(options)` | Everything `FormEditor` does, without UI: document, undo/redo, selection, drag/resize, pages, detect, save |
+| `useFormEditor(options)` | Everything `FormEditor` does, without UI: document, undo/redo, selection, drag/resize, pages, detect, what auto-detect learnt (`learnt`, `forget`), save |
 | `useFormFiller(options)` | Everything `FormFiller` does, without UI: answers, conditions, validation, autosave, uploads, questions |
 | `useQuestionFilter(questions, answers, options)` | Search and filters as data: `groups`, `inUse`, `list` |
 
@@ -727,8 +753,11 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 | `withoutField(fields, id)` / `newFollowUpField(type, trigger, fields)` | `FieldDef[]` | Remove a field (with its follow-up questions) / add a follow-up question |
 | `defaultLayout(pageSizes)` | `Layout` | The layout of an untouched document |
 | `detectDocument(pdf, OPS, pages, existing, onProgress?, signal?, lessons?)` | `Promise<FieldDef[]>` | Suggests fields for a whole document, using what the lessons taught |
-| `lessonFor(pdf, pages, session)` | `Promise<Lesson \| null>` | What a save taught auto-detect (`null` = nothing). The editor does this for you ([Auto-detect that learns](#auto-detect-that-learns)) |
+| `lessonFor(pdf, pages, session, { OPS })` | `Promise<Lesson \| null>` | What a save taught auto-detect (`null` = nothing). The editor does this for you ([Auto-detect that learns](#auto-detect-that-learns)) |
 | `addLesson(lessons, lesson, max?)` | `Lesson[]` | The lessons with `lesson` replacing the one with its `id`, keeping the newest `max` (default 1000) |
+| `learnt(lessons)` | `Learnt` | What the lessons taught, after what was forgotten: labels it changes or leaves out, fields it draws, pages it puts back |
+| `forgetting(what)` | `Lesson` | A lesson that forgets `what` (`{ all: true }`, or labels, drawn fields, pages from `learnt` / `whyLearnt`). Store it like any other |
+| `whyLearnt(field)` | `Forget \| undefined` | For a field auto-detect suggested in this session: what to forget so it does not do that again |
 | `validateLesson(lesson, limits?)` | `string[]` | Problems in a lesson from the browser (`[]` = fine). Run it before you store one, with the same `limits` as your forms |
 | `toQuestions(fields, textOf?, { categoryCode? })` | `Question[]` | Fields grouped as questions, used by the list view |
 | `filterQuestions(questions, answers, filters, values, search?)` | `Question[]` | The questions passing a search and picked filter values (see [Filters](#4-filters-you-choose-formlift-computes)) |
@@ -968,8 +997,9 @@ Nothing breaks. Check these:
 | What | Who | What to do |
 | --- | --- | --- |
 | Auto-detect learns from corrections | – | New, opt-in: store what `onLesson` gives you and pass it all back as `lessons`. See [Auto-detect that learns](#auto-detect-that-learns). Without `lessons`, detection suggests exactly what it did before. |
-| `fieldsSuggested` label | apps with their own `labels` | It now gets a third argument: how many of the fields came from pages set up before. Your function can ignore it. |
-| `rememberedField` label | apps with their own `labels` | New text, shown in the properties of a field put back from a page set up before. English default: `'Set up like this on the same page before. Check it.'` |
+| Learnt tab | apps that set `onLesson` | A new tab in the editor's panel shows what auto-detect learnt and forgets it. `hide={['learntTab']}` leaves it out. |
+| `fieldsSuggested` label | apps with their own `labels` | It now gets a third and a fourth argument: how many of the fields came from pages set up before, and how many were set up as in other forms. Your function can ignore them. |
+| New labels | apps with their own `labels` | `rememberedField`, `learntField`, `forgetThis`, `forgetThisHint`, `forgotten`, and the Learnt tab's `learntTab`, `learntHeading`, `learntNothing`, `learntLeftOut`, `learntRenamed`, `learntDrawn`, `learntPages`, `forget`, `forgetEverything`, `confirmForgetEverything`. Anything you leave out stays English. |
 
 ### 0.4 → 0.5
 
@@ -1224,8 +1254,8 @@ function MyFiller({ pdfUrl, fields }) {
 
 Or skip the PDF and show `f.questions` (fields grouped into questions, tables and option groups) as a plain list.
 For the editor, `useFormEditor` gives `fields`, `layout`, `selection`, `placeNew`, `startDrag` / `onDrag` /
-`endDrag`, `updateField`, `undo` / `redo`, `detect`, `save` and the rest. Hover the hook in your editor for the
-full list.
+`endDrag`, `updateField`, `undo` / `redo`, `detect`, `learnt` / `forget`, `save` and the rest. Hover the hook in
+your editor for the full list.
 
 ## Security
 
