@@ -473,6 +473,7 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 | `limits` | `Partial<Limits>` | `DEFAULT_LIMITS` | Size limits for answers ([Limits](#limits)) |
 | `zoomSteps` | `number[]` | `[0.5, 0.75, 1, 1.25, 1.5, 2]` | Steps of the zoom − / + buttons |
 | `listPageSize` | `number` | `100` | Questions shown per "Show more" step in the list view |
+| `listLoadMore` | `'button' \| 'scroll'` | `'button'` | List view: more questions with a "Show more" button, or by infinite scroll (button text: `labels.showMore`) |
 | `stickyToolbar` | `boolean` | `true` | Keep the toolbar on top while the content scrolls; `false` lets it scroll away |
 | `onChange` | `(answers: Answers) => void` | – | Every change of the answers as JSON. With it, `onSave` is optional |
 | `messages` | `Partial<AnswerMessages>` | English | Your own wording for answer errors (any language) |
@@ -750,6 +751,7 @@ cards. There is no switch back. Check these:
 | What | Who | What to do |
 | --- | --- | --- |
 | `<QuestionList>` needs `segments` | apps that draw `QuestionList` themselves | Pass `segments={f.segments}` and `pdf={f.pdf}` from `useFormFiller` (and `reading={f.reading}` for the loading message). `FormFiller` does this for you. |
+| Infinite scroll | – | New, opt-in: `listLoadMore="scroll"`. The default is still the "Show more" button. |
 
 ### 0.3 → 0.4
 

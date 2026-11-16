@@ -58,6 +58,8 @@ export interface FormFillerProps extends UseFormFillerOptions {
   zoomSteps?: readonly number[]
   /** Questions per "Show more" step in the list view. Default 100. */
   listPageSize?: number
+  /** How the list view shows more questions: a "Show more" button (default) or infinite scroll. */
+  listLoadMore?: 'button' | 'scroll'
   /**
    * true (default): the toolbar stays on top while the page or answers scroll.
    * false: it scrolls away with the content.
@@ -102,6 +104,7 @@ export default function FormFiller({
   className = 'h-full',
   zoomSteps,
   listPageSize,
+  listLoadMore,
   stickyToolbar = true,
   renderFieldExtras,
   ...options
@@ -299,6 +302,7 @@ export default function FormFiller({
               hideUnavailable={hideUnavailableFilters}
               renderToolbar={renderFilters}
               pageSize={listPageSize}
+              loadMore={listLoadMore}
             />
           </div>
         )}
