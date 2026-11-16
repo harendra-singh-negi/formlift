@@ -9,18 +9,27 @@
 //                 form, and a label deleted in the last two forms that had it is left out
 //   drawn.ts      a field drawn by hand next to a line of text twice is drawn next to that line in every form
 //   conditions.ts conditions and follow-ups come back with their page, pointing at the fields they were set up with
+//   patterns.ts   what admins do with boxes is learnt by the boxes' cues (cues.ts: what is around a box, measured
+//                 against the page's own text), so it carries over to forms auto-detect has never seen: boxes like
+//                 those admins kept are suggested (also kinds the rules never suggest), boxes like those they deleted
+//                 are not, and suggestions get the type, required and grouping admins gave boxes like them
+//                 (model.ts: logistic regression and counts, trained here from the lessons in milliseconds)
 // lesson.ts holds the JSON format and its check; knowledge.ts merges all lessons (after what was forgotten) and sums
 // them up for the editor's Learnt tab.
 
-import type { FieldDef } from '../form-logic'
+import { clashes } from '../coords'
+import type { FieldDef, Position } from '../form-logic'
 import { renamed } from './conditions'
+import type { Candidate, PageView } from './cues'
 import { drawnFor, drawnOf } from './drawn'
 import { knowledge } from './knowledge'
-import { adjust, notesOf } from './labels'
+import { adjust, notesOf, voted } from './labels'
 import { CONDITIONS, validateLesson, type EditSession, type Forget, type Lesson, type Suggestion } from './lesson'
 import { memoryOf, pagesFor, touchedPages, type Drawing } from './pages'
+import { examplesOf, patternsFor } from './patterns'
 import { labelHash, type TextPdf } from './text'
 
+export type { Candidate, PageView } from './cues'
 export { learnt, type Learnt } from './knowledge'
 export {
   addLesson,
@@ -30,6 +39,7 @@ export {
   validateLesson,
   type DrawnNote,
   type EditSession,
+  type Example,
   type FieldSettings,
   type Forget,
   type LabelNote,
@@ -51,15 +61,31 @@ export async function lessonFor(
   pdf: TextPdf,
   pages: { source: number | null }[],
   session: EditSession,
-  { at = Date.now(), drawing, forgotten }: { at?: number; drawing?: Drawing; forgotten?: Forget } = {},
+  {
+    at = Date.now(),
+    drawing,
+    view,
+    forgotten,
+  }: { at?: number; drawing?: Drawing; view?: (source: number, page: number) => Promise<PageView>; forgotten?: Forget } = {},
 ): Promise<Lesson | null> {
-  const { notes, kept, used } = notesOf(session, touchedPages(session))
+  const touched = touchedPages(session)
+  const { notes, kept, used } = notesOf(session, touched)
   const memory = await memoryOf(pdf, pages, session, drawing)
   const forgot = new Set([...(forgotten?.labels ?? []), ...(forgotten?.drawn ?? [])])
   const labels = notes.filter((n) => !forgot.has(labelHash(n.label)))
   const keep = kept.filter((h) => !forgot.has(h))
-  const drawn = (await drawnOf(pdf, pages, session, used)).filter((d) => !forgot.has(d.line))
-  if (!labels.length && !keep.length && !memory.length && !drawn.length) return null
+  // The pages it changed as auto-detect sees them, for what boxes teach (not when it was told to forget that).
+  const views = new Map<number, PageView>()
+  if (view && !forgotten?.patterns)
+    for (const n of [...touched].sort((a, b) => a - b)) {
+      const source = pages[n - 1]?.source
+      if (source) views.set(n, await view(source, n))
+    }
+  const { taught, placed } = examplesOf(views, session, touched)
+  // A field drawn in the place of a box auto-detect proposes is learnt from by its box (in any form), not also by the
+  // line next to it (only where that line is).
+  const drawn = (await drawnOf(pdf, pages, session, new Set([...used, ...placed]))).filter((d) => !forgot.has(d.line))
+  if (!labels.length && !keep.length && !memory.length && !drawn.length && !taught) return null
   return {
     version: 1,
     id: session.id,
@@ -68,13 +94,22 @@ export async function lessonFor(
     ...(keep.length > 0 && { kept: keep }),
     pages: memory,
     ...(drawn.length > 0 && { drawn }),
+    ...(taught && { cues: taught.cues, examples: taught.examples }),
   }
 }
 
 // Why learning made each field of a detection: what to forget to undo it. Only for this session's fields.
 const whys = new WeakMap<FieldDef, Forget>()
+// What the lessons' boxes taught at the last detection, and which lessons they were.
+let trained: { key: string; patterns: ReturnType<typeof patternsFor> } | undefined
+const taughtFor = new WeakMap<FieldDef, string[]>()
 /** What learning did to make a field auto-detect suggested in this session (what to forget to undo it). */
 export const whyLearnt = (field: FieldDef) => whys.get(field)
+/**
+ * For a field pattern learning suggested in this session (or gave its type, required or group): the cues of the boxes
+ * admins kept that made it so ("t:yes", "c:comment", "k=choice"…), for the editor to say why.
+ */
+export const taughtBy = (field: FieldDef) => taughtFor.get(field)
 
 /**
  * The lessons, ready for one detection run over `pdf` (its pages `sources`; `pageCount` pages in the layout).
@@ -85,10 +120,16 @@ export async function learnedFor(lessons: Lesson[] | undefined, pdf: TextPdf, so
   const unlimited = { maxFields: Infinity, maxPages: Infinity }
   const valid = (lessons ?? []).filter((l) => !validateLesson(l, unlimited).length)
   if (!valid.length) return null
-  const { votes, drawn: notes, memories } = knowledge(valid)
+  const { votes, drawn: notes, memories, taught } = knowledge(valid)
   const pages = await pagesFor(memories, pdf, sources)
   const hand = await drawnFor(notes, votes, pdf, sources, pageCount)
+  // The same lessons as the last run (an app may add to its list in place): what boxes taught is not trained again.
+  const key = valid.map((l) => `${l.id}@${l.at}`).join()
+  if (trained?.key !== key) trained = { key, patterns: patternsFor(taught) }
+  const { patterns } = trained
   return {
+    /** Whether boxes taught something: then detection proposes the boxes only learning suggests (`review`). */
+    patterns: !!patterns,
     /**
      * The fields of a page set up before, placed on layout page `page`, and where the admin removed fields; null
      * when the page is new.
@@ -96,6 +137,17 @@ export async function learnedFor(lessons: Lesson[] | undefined, pdf: TextPdf, so
     remembered: pages.remembered,
     /** `s` with what the admin changed for its label, or null to leave it out. */
     adjust: (s: Suggestion) => adjust(votes, s, pageCount),
+    /**
+     * The suggestions of a page from what its rules propose (`found`), not where the admin decided before
+     * (`decided`), with what was learnt about their labels and, where boxes taught something (`view`: the page with
+     * every box proposed on it), about boxes like them.
+     */
+    review(found: Candidate[], view: PageView | null, decided: Position[]): Suggestion[] {
+      const adjusted = new Map<Candidate, Suggestion | null>()
+      for (const c of found) adjusted.set(c, clashes(decided, c.field.position) ? null : adjust(votes, c.field, pageCount))
+      if (!patterns || !view) return found.flatMap((c) => adjusted.get(c) ?? [])
+      return patterns.review(view, adjusted, (label) => voted(votes, label), decided, pageCount)
+    },
     /** Fields the admin drew by hand next to a line of this page in other forms, where there is room for them. */
     drawn: hand.drawn,
     link,
@@ -133,6 +185,7 @@ function link(found: FieldDef[], from: Map<FieldDef, Suggestion>): FieldDef[] {
     const s = from.get(found[i])
     if (g.dialogOnly && s?.ref && !asked.has(g.key)) return false
     if (s?.why) whys.set(g, s.why)
+    if (s?.taught) taughtFor.set(g, s.taught)
     return true
   })
 }

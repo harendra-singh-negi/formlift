@@ -2,10 +2,11 @@
 // No UI and no runtime dependencies: the same checks run in the browser and on your server.
 export * from './core/form-logic'
 export { detectDocument, detectFields, extractShapes, lessonFor, type Ops, type Rect, type Seg, type Shapes } from './core/detect'
-export { addLesson, forgetting, learnt, validateLesson, whyLearnt, LEARNT, REMEMBERED } from './core/learn'
+export { addLesson, forgetting, learnt, taughtBy, validateLesson, whyLearnt, LEARNT, REMEMBERED } from './core/learn'
 export type {
   DrawnNote,
   EditSession,
+  Example,
   FieldSettings,
   Forget,
   LabelNote,

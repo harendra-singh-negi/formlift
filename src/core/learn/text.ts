@@ -32,6 +32,8 @@ export function hashOf(s: string) {
   return 4294967296 * (2097151 & h2) + (h1 >>> 0)
 }
 export const hash = (s: string) => hashOf(s).toString(36)
+/** A shorter hash (36 bits), for the words of cues: thousands of them in a long form's lesson. */
+export const shortHash = (s: string) => (hashOf(s) % 2 ** 36).toString(36)
 /** A label's hash, as lessons know it. */
 export const labelHash = (label: string) => hash(labelKey(label))
 

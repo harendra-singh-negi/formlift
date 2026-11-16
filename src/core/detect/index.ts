@@ -2,22 +2,81 @@
 //   page.ts      reads a pdf.js page: what it draws (shapes.ts) and its text
 //   acroform.ts  a page with fillable fields of its own gets those, as they are
 //   rules.ts     other pages are guessed from their drawing (checkboxes, table cells, answer lines…)
-//   ../learn     what admins taught it before: pages set up before, labels changed, fields drawn by hand
+//   candidates.ts  boxes the rules leave alone that learning suggests once admins kept boxes like them
+//   ../learn     what admins taught it before: pages set up before, labels changed, fields drawn by hand, and
+//                what they do with boxes, by the boxes' cues (in any form)
 // Suggestions get source 'ai' and a confidence, so the editor shows them as dashed boxes for the admin to check.
 
-import type { FieldDef } from '../form-logic'
+import type { FieldDef, Position } from '../form-logic'
 import { clashes } from '../coords'
 import { keyFor, keyMaker } from '../fields'
-import { toLines } from '../layout'
-import { learnedFor, lessonFor as learnFrom, type EditSession, type Forget, type Lesson, type Suggestion as Made } from '../learn'
+import { toLines, type TextLine } from '../layout'
+import {
+  learnedFor,
+  lessonFor as learnFrom,
+  type Candidate,
+  type EditSession,
+  type Forget,
+  type Lesson,
+  type PageView,
+  type Suggestion as Made,
+} from '../learn'
 import { ownFields } from './acroform'
-import { onDrawing, readDrawing, type PdfDoc } from './page'
-import { detectFields } from './rules'
-import type { Ops } from './shapes'
+import { latent } from './candidates'
+import { PRINTED_CHOICES } from './labels'
+import { onDrawing, readDrawing, type PdfDoc, type PdfPage } from './page'
+import { detectFields, proposals } from './rules'
+import type { Ops, Seg, Shapes } from './shapes'
 
 export { extractShapes, splitBoxChars, splitUnderscores, type Ops, type Rect, type Seg, type Shapes } from './shapes'
 export { tableCells } from './tables'
 export { detectFields, keyFor }
+
+/** What a page proposes: a page with fillable fields of its own gets those; the others what its rules find. */
+async function proposed(
+  page: PdfPage,
+  read: Awaited<ReturnType<typeof readDrawing>>,
+  lines: TextLine[],
+  n: number,
+  existing: FieldDef[],
+  prevText: string,
+) {
+  const own = await ownFields(page, lines, n)
+  const taken = existing.filter((f) => f.position.page === n).map((f) => f.position)
+  if (own.length)
+    return {
+      found: own.filter((s) => !clashes(taken, s.position)).map((field): Candidate => ({ field, kind: 'acroform', prior: 1 })),
+      cells: [],
+      own: true,
+    }
+  return { ...proposals(read.shapes, lines, read.size, n, existing, read.typed.rules, prevText), own: false }
+}
+
+/** A page as learning sees it: its text, drawing, and every box proposed on it (also those only learning suggests). */
+function viewOf(
+  read: { shapes: Shapes; typed: { rules: Seg[] }; size: { width: number; height: number } },
+  lines: TextLine[],
+  { found, cells, own }: { found: Candidate[]; cells: PageView['cells']; own: boolean },
+  n: number,
+  taken: Position[],
+): PageView {
+  const view: Omit<PageView, 'candidates'> = {
+    ...read.size,
+    lines: lines.map((l) => ({
+      text: l.text,
+      x: l.x,
+      y: l.y,
+      width: l.width,
+      height: l.height,
+      ...(PRINTED_CHOICES.test(l.text) && { choices: true }),
+    })),
+    cells,
+    rects: read.shapes.rects,
+    rules: [...read.shapes.hlines.filter((l) => !l.hair), ...read.typed.rules],
+  }
+  const more = own ? [] : latent(view, n, [...taken, ...found.map((c) => c.field.position)])
+  return { ...view, candidates: [...found, ...more] }
+}
 
 /**
  * What a save taught auto-detect (see learn.ts), or null when it taught nothing. `pdf`: the pdf.js document;
@@ -38,7 +97,16 @@ export function lessonFor(
       const { shapes, typed, size } = await readDrawing(await pdf.getPage(source), OPS)
       return onDrawing(shapes, typed.rules, size)
     })
-  return learnFrom(pdf, pages, session, { ...options, drawing })
+  // A page the admin changed, as detection sees it on a blank form: what boxes teach is learnt from it.
+  const view =
+    OPS &&
+    (async (source: number, n: number) => {
+      const page = await pdf.getPage(source)
+      const read = await readDrawing(page, OPS)
+      const lines = toLines(read.typed.items, page.view, undefined, read.drawn.vlines)
+      return viewOf(read, lines, await proposed(page, read, lines, n, [], ''), n, [])
+    })
+  return learnFrom(pdf, pages, session, { ...options, drawing, view })
 }
 
 /**
@@ -50,7 +118,8 @@ export function lessonFor(
  * (confidence REMEMBERED), with their conditions and follow-ups, plus what auto-detect finds there now where the
  * admin kept or removed nothing; other suggestions get the admin's changes for their label, or are left out, and
  * fields the admin drew by hand next to a line in other forms are drawn there on pages not set up before
- * (confidence LEARNT).
+ * (confidence LEARNT). Where admins taught what they do with boxes, a box is suggested, left out, typed and grouped
+ * as they did with boxes like it in any form (confidence: how likely it is a field).
  */
 export async function detectDocument(
   pdf: PdfDoc,
@@ -75,7 +144,8 @@ export async function detectDocument(
     if (!p.source) prevText = ''
     else {
       const page = await pdf.getPage(p.source)
-      const { drawn, shapes, typed, size } = await readDrawing(page, OPS)
+      const read = await readDrawing(page, OPS)
+      const { drawn, shapes, typed, size } = read
       const all = [...existing, ...found]
       // Text on both sides of a column line is in two cells: "Tagged Role | Manager" is not one line.
       const lines = toLines(typed.items, page.view, undefined, drawn.vlines)
@@ -88,26 +158,23 @@ export async function detectDocument(
       // now and did not then still is.
       const decided = remembered ? [...remembered.fields.map((s) => s.position), ...remembered.removed] : []
       // A page with fillable fields of its own gets those; guessing from the drawing is for the other pages.
-      const own = await ownFields(page, lines, i + 1)
-      const made = own.length
-        ? own.filter((s) => !clashes(taken, s.position))
-        : detectFields(shapes, lines, size, i + 1, all, typed.rules, prevText)
-      for (const s of made) {
-        if (clashes(decided, s.position)) continue
-        const t = learned ? learned.adjust(s) : s
-        if (t) suggested.push(t)
+      const made = await proposed(page, read, lines, i + 1, all, prevText)
+      if (!learned) suggested.push(...made.found.map((c) => c.field))
+      else {
+        const view = learned.patterns ? viewOf(read, lines, made, i + 1, taken) : null
+        suggested.push(...learned.review(made.found, view, decided))
       }
       // Fields drawn by hand elsewhere: not on a page set up before (where the admin drew what they wanted).
       if (learned && !remembered)
         suggested.push(...learned.drawn(p.source, i + 1, [...taken, ...suggested.map((s) => s.position)]))
       for (const s of suggested) {
-        const { ref, why, ...field } = s
+        const { ref, why, taught, ...field } = s
         const id =
           typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `d${Date.now()}${Math.random()}`
         const key = keyOf(field.label, field.type)
         const f = { ...field, id, key, label: field.label || field.type }
         found.push(f)
-        if (ref || why) from.set(f, s)
+        if (ref || why || taught) from.set(f, s)
       }
       // The page's last lines, bottom up: a heading under a note ("PART 1 – SUMMARY" / "(concise overview…)").
       const bottom = [...lines].sort((a, b) => b.y - a.y).slice(0, 2)

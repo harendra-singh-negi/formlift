@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import { moveBy, resizeBy, snap, toPage } from '../../core/coords'
 import { detectDocument, lessonFor, type Ops } from '../../core/detect'
 import { duplicate, newField, newId, refreshed, reorder, withField, withoutField } from '../../core/fields'
-import { addLesson, forgetting, learnt, LEARNT, REMEMBERED, type Forget, type Lesson } from '../../core/learn'
+import { addLesson, forgetting, learnt, taughtBy, LEARNT, REMEMBERED, type Forget, type Lesson } from '../../core/learn'
 import { layerOpen } from '../ui/useOutsideClose'
 import {
   defaultLayout,
@@ -383,7 +383,12 @@ export function useFormEditor({
     const learn = onLessonRef.current
     if (!learn) return
     const f = forgotten.current
-    forgotten.current = { labels: [...(f.labels ?? []), ...(what.labels ?? [])], drawn: [...(f.drawn ?? []), ...(what.drawn ?? [])] }
+    forgotten.current = {
+      labels: [...(f.labels ?? []), ...(what.labels ?? [])],
+      drawn: [...(f.drawn ?? []), ...(what.drawn ?? [])],
+      // What boxes taught: this session's boxes are not learnt from either.
+      ...((f.patterns || what.patterns) && { patterns: true as const }),
+    }
     // Everything: this session learns again from what the document is now.
     if (what.all) session.current = { id: newId(), before: fields, suggested: [] }
     void Promise.resolve(teach(forgetting(what), learn)).catch(notifyError)
@@ -431,7 +436,7 @@ export function useFormEditor({
                 fresh.length,
                 stop.signal.aborted,
                 fresh.filter((f) => f.confidence === REMEMBERED).length,
-                fresh.filter((f) => f.confidence === LEARNT).length,
+                fresh.filter((f) => f.confidence === LEARNT || taughtBy(f)).length,
               )
             : auto
               ? L.noFieldsFoundAuto

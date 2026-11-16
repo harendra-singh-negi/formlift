@@ -118,3 +118,8 @@ export function adjust(votes: Map<string, Vote[]>, s: Suggestion, pageCount: num
   return { ...changed, confidence: LEARNT, why: { labels: v.keys } }
 }
 
+/** Whether the lessons voted on a label by name: kept, changed or deleted suggestions with it. */
+export const voted = (votes: Map<string, Vote[]>, label: string) => {
+  const k = labelKey(label)
+  return !!k && !!votes.get(hash(k))?.length
+}

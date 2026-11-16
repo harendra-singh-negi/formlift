@@ -31,11 +31,12 @@ npm run dev
 
 ```
 src/core/          framework-free logic: form model (form-logic.ts), fields, layout, list view (flow.ts), questions
-src/core/detect/   auto-detect: what a page draws (shapes, tables), the rules that suggest fields (rules.ts) and a
-                   PDF's own fields (acroform.ts); index.ts runs it all
-src/core/learn/    learning from the admin's saves: one module per kind of learning (pages, labels, drawn) and the
-                   lesson format with its check (lesson.ts); index.ts makes a lesson and applies them all
-src/core/fixtures/ PDFs for the tests
+src/core/detect/   auto-detect: what a page draws (shapes, tables), the rules that suggest fields (rules.ts), a
+                   PDF's own fields (acroform.ts), boxes only learning suggests (candidates.ts); index.ts runs it all
+src/core/learn/    learning from the admin's saves: one module per kind of learning (pages, labels, drawn,
+                   patterns), the lesson format and its check (lesson.ts), cues of a box (cues.ts), the small
+                   models (model.ts); index.ts makes a lesson and applies them all
+src/core/fixtures/ PDFs and the synthetic form maker (forms.ts) for tests
 src/react/         FormEditor, FormFiller and their components; ui/ = small internal UI kit
 src/server/        completedPdf (pdf-lib)
 src/style.css      Tailwind source, compiled and scoped to .fl-root by scripts/build-css.mjs
@@ -43,6 +44,17 @@ example/           the live demo (deployed to GitHub Pages)
 ```
 
 Each module starts with a few lines on what it does and how it fits in. Read them before you change one.
+
+### How auto-detect and learning fit together
+
+1. `detect/page.ts` reads a page: its drawing (`shapes.ts`) and text. `detect/rules.ts` turns that into suggestions,
+   each with the rule that made it (its `kind`) and that rule's confidence.
+2. `learn/` is given every lesson. Each kind of learning has two halves: `…Of(session)` writes its part of a lesson
+   when the admin saves, and `…For(lessons)` applies what all lessons know at the next detection.
+3. Pattern learning (`learn/patterns.ts`) does not look at words alone: every box gets its cues (`learn/cues.ts`),
+   measured against the page's own text, so what is learnt in one form carries over to others. `detect/candidates.ts`
+   proposes boxes the rules never suggest; they appear only once admins kept boxes like them.
+4. Without lessons, detection is exactly the rules' output. Keep it so: learning only ever acts on lessons.
 
 ## Before you open a pull request
 
@@ -59,6 +71,9 @@ All three must pass, and CI runs them again on your PR.
 - **Auto-detect changes must stay generic.** Measure rules relative to the text height or box size, never
   absolute positions or the wording of one document. Add a small synthetic PDF to `src/core/fixtures/`
   (generated with pdf-lib) and a case in `detect.fixtures.test.ts` for the layout you fixed.
+- **Measure learning changes.** `npm run eval` prints how many corrections forms auto-detect has never seen still
+  need, without and with lessons, and what learning made worse. `src/core/learn/patterns.test.ts` fails when
+  learning stops carrying over or makes a right field wrong.
 - **Keep the core dependency-free.** `src/core` must not import React, pdf.js or pdf-lib at runtime.
 - **Do not change the JSON shape** of `FieldDef`, `Layout` or `Answers` in a breaking way without an issue
   first, because stored forms depend on it.

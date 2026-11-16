@@ -154,6 +154,8 @@ export const DEFAULT_LABELS = {
   learntRenamed: (label: string) => `renamed “${label}”`,
   learntDrawn: (times: number) => `drawn by hand next to its line ${times} times`,
   learntPages: (n: number) => `${n} page${n === 1 ? '' : 's'} set up before come${n === 1 ? 's' : ''} back as set up.`,
+  learntPatterns: (boxes: number, saves: number) =>
+    `Learnt from ${boxes} boxes in ${saves} save${saves === 1 ? '' : 's'}: boxes like the ones you kept are suggested in any form, with the type and grouping you gave them; boxes like the ones you deleted are not.`,
   forget: 'Forget',
   forgetEverything: 'Forget everything',
   confirmForgetEverything: 'Forget everything auto-detect learnt? It learns again from your next save.',
@@ -174,6 +176,28 @@ export const DEFAULT_LABELS = {
     `Suggested automatically${sure != null ? ` (${sure}% sure)` : ''}. Check it.`,
   rememberedField: 'Set up like this on the same page before. Check it.',
   learntField: 'Set up as you did before. Check it.',
+  patternField: (sure: number | null) =>
+    `Suggested as admins set up boxes like this in other forms${sure != null ? ` (${sure}% sure)` : ''}. Check it.`,
+  /** Why pattern learning suggested a field, in a few words: one cue (see learn/cues.ts), or null to leave it out. */
+  learntCue: (cue: string) => {
+    const [, family, word] = cue.match(/^([lratc]):(.+)$/) ?? []
+    if (family) return ({ l: `after “${word}”`, r: `before “${word}”`, a: `under “${word}”`, t: `“${word}” printed in it`, c: `column “${word}”` } as Record<string, string>)[family]
+    return (
+      ({
+        'k=choice': 'answers printed in it',
+        't-choices': 'answers printed in it',
+        'k=fill': 'a filled box',
+        'k=blank': 'a blank cell',
+        'k=space': 'space after a label',
+        'cell-blank': 'a blank cell',
+        framed: 'a framed box',
+        rule: 'on an answer line',
+        'rule-dashed': 'on a dotted line',
+        sq: 'a small square',
+        grouped: 'answered as one with the boxes beside it',
+      } as Record<string, string>)[cue] ?? null
+    )
+  },
   forgetThis: 'Forget this',
   forgetThisHint: 'Auto-detect will not do this again',
   fieldId: (id: string) => `ID ${id}`,

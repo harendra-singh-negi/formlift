@@ -40,7 +40,11 @@ export function knowledge(lessons: Lesson[]) {
   const memories = live.flatMap((l) =>
     l.pages.flatMap((m, i) => (forgotPages.has(`${l.id}#${i}`) ? [] : [{ at: l.at, id: l.id, i, m }])),
   )
-  return { votes, drawn, memories }
+  // What boxes taught: the examples after the last "forget patterns".
+  let from = 0
+  for (const [i, l] of live.entries()) if (l.forget?.patterns) from = i
+  const taught = live.slice(from).flatMap((l) => (l.examples?.length ? [{ cues: l.cues ?? [], examples: l.examples }] : []))
+  return { votes, drawn, memories, taught }
 }
 
 /** What auto-detect learnt (for a "what it learnt" view): changes and deletions per label, fields it draws, pages. */
@@ -51,12 +55,14 @@ export interface Learnt {
   drawn: { line: string; settings: FieldSettings; times: number; at: number }[]
   /** Pages it puts back as they were set up (a page saved in several sessions counts once). */
   pages: number
+  /** What boxes taught (pattern learning): how many boxes, from how many saves. */
+  patterns: { boxes: number; saves: number }
 }
 
 /** What the lessons taught, after what was forgotten. */
 export function learnt(lessons: Lesson[] | undefined): Learnt {
   const unlimited = { maxFields: Infinity, maxPages: Infinity }
-  const { votes, drawn, memories } = knowledge((lessons ?? []).filter((l) => !validateLesson(l, unlimited).length))
+  const { votes, drawn, memories, taught } = knowledge((lessons ?? []).filter((l) => !validateLesson(l, unlimited).length))
   const labels = [...votes]
     .flatMap(([h, vs]) => {
       const last = vs.slice(-2)
@@ -75,5 +81,6 @@ export function learnt(lessons: Lesson[] | undefined): Learnt {
     )
     .sort((a, b) => b.at - a.at)
   const pages = new Set(memories.map(({ m }) => m.image ?? m.text.map((t) => t[0]).join()))
-  return { labels, drawn: fields, pages: pages.size }
+  const boxes = taught.reduce((n, t) => n + t.examples.reduce((m, e) => m + (e.n ?? 1), 0), 0)
+  return { labels, drawn: fields, pages: pages.size, patterns: { boxes, saves: taught.length } }
 }

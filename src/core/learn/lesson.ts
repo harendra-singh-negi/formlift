@@ -10,6 +10,7 @@ import {
   type Condition,
   type FieldDef,
   type FieldGroup,
+  type FieldType,
   type FollowUp,
   type Limits,
   type Rule,
@@ -124,6 +125,29 @@ export interface Forget {
   drawn?: string[]
   /** Pages set up before: [lesson id, index in its pages]. */
   pages?: [lesson: string, page: number][]
+  /** What was learnt about boxes by their cues (the examples of the lessons before this one). */
+  patterns?: true
+}
+
+/**
+ * What the admin did with one box on a page they changed: one auto-detect proposed (kept or deleted), or a field
+ * they drew. By its cues (see cues.ts), so that it carries over to boxes like it in any form.
+ */
+export interface Example {
+  /** Its cues: indexes in the lesson's `cues`. */
+  c: number[]
+  /** 1: a field the admin wanted there; 0: a box auto-detect proposed that they deleted or left empty. */
+  y: 0 | 1
+  /** For a box auto-detect proposed: how likely its rules said it was a field (0 to 1). */
+  p?: number
+  /** The type the admin gave it (y = 1). */
+  t?: FieldType
+  /** Required. */
+  r?: true
+  /** Answered together with the boxes beside it: one of them ('single', Y / N / NA) or any ('multiple'). */
+  g?: 'single' | 'multiple'
+  /** How many boxes were exactly like this. Default 1. */
+  n?: number
 }
 
 /**
@@ -140,6 +164,10 @@ export interface Lesson {
   kept?: string[]
   pages: PageMemory[]
   drawn?: DrawnNote[]
+  /** The cues its examples use: structure as it is ("k=cell", "h1"), words as hashes ("c:1x9…"). */
+  cues?: string[]
+  /** What the admin did with the boxes on the pages they changed (see Example). */
+  examples?: Example[]
   forget?: Forget
 }
 
@@ -156,15 +184,36 @@ export interface EditSession {
 export const REMEMBERED = 0.99
 /** The confidence of a suggestion changed or drawn as the admin did in other forms. */
 export const LEARNT = 0.98
-// Lines a page memory may hold (a lesson that comes in is checked against it).
+// Lines a page memory may hold, and cues and examples a lesson may hold (a lesson that comes in is checked).
 const MAX_MARKS = 5000
+const MAX_CUES = 100_000
+export const MAX_EXAMPLES = 50_000
+// A cue as lessons keep it: letters, digits and = | : . + ~ ^ $ - (words only as hashes).
+const CUE = /^[\w=|:.+~^$-]{1,80}$/
+const okExample = (e: Example, cues: number) =>
+  !!e &&
+  typeof e === 'object' &&
+  Array.isArray(e.c) &&
+  e.c.length <= 200 &&
+  e.c.every((i) => Number.isInteger(i) && i >= 0 && i < cues) &&
+  (e.y === 0 || e.y === 1) &&
+  (e.p == null || (typeof e.p === 'number' && e.p >= 0 && e.p <= 1)) &&
+  (e.t == null || (FIELD_TYPES as readonly string[]).includes(e.t)) &&
+  (e.r == null || e.r === true) &&
+  (e.g == null || e.g === 'single' || e.g === 'multiple') &&
+  (e.n == null || (Number.isInteger(e.n) && e.n >= 1 && e.n <= 1_000_000)) &&
+  Object.keys(e).every((k) => 'cypt rgn'.includes(k) && k.length === 1)
 
 /** A field's own settings (what a lesson keeps of it). */
 export const settingsOf = (f: FieldDef) =>
   Object.fromEntries(SETTINGS.filter((k) => f[k] !== undefined).map((k) => [k, f[k]])) as FieldSettings
 
 /** A suggestion as learning makes it: `ref` names it for conditions; `why` is what to forget to undo it. */
-export type Suggestion = Omit<FieldDef, 'id' | 'key'> & { ref?: string; why?: Forget }
+/**
+ * A suggestion as learning makes it: `ref` names it for conditions; `why` is what to forget to undo it; `taught`:
+ * the cues of the boxes admins kept that made pattern learning suggest it (or give it its type).
+ */
+export type Suggestion = Omit<FieldDef, 'id' | 'key'> & { ref?: string; why?: Forget; taught?: string[] }
 
 /** A lesson that forgets `what` of the lessons before it. Store it like any other. */
 export const forgetting = (what: Forget, at = Date.now()): Lesson => ({
@@ -277,6 +326,7 @@ export function validateLesson(lesson: unknown, limits?: Partial<Limits>): strin
     (typeof f !== 'object' ||
       Array.isArray(f) ||
       (f.all != null && f.all !== true) ||
+      (f.patterns != null && f.patterns !== true) ||
       (f.labels != null && !hashes(f.labels)) ||
       (f.drawn != null && !hashes(f.drawn)) ||
       (f.pages != null &&
@@ -294,7 +344,15 @@ export function validateLesson(lesson: unknown, limits?: Partial<Limits>): strin
           )
         )))
   )
-    errors.push('forget may only hold all (true), labels, drawn (hashes) and pages ([lesson id, index])')
+    errors.push('forget may only hold all, patterns (true), labels, drawn (hashes) and pages ([lesson id, index])')
+  const cues = l.cues
+  if (cues != null && !(Array.isArray(cues) && cues.length <= MAX_CUES && cues.every((c) => typeof c === 'string' && CUE.test(c))))
+    errors.push(`cues must be a list of at most ${MAX_CUES} cues`)
+  else if (l.examples != null)
+    if (!Array.isArray(l.examples) || l.examples.length > MAX_EXAMPLES)
+      errors.push(`examples must be a list of at most ${MAX_EXAMPLES}`)
+    else if (!l.examples.every((e) => okExample(e, cues?.length ?? 0)))
+      errors.push('Every example needs c (cue indexes) and y (0 or 1), and only p (0 to 1), t (a type), r, g and n')
   if (!Array.isArray(l.pages) || l.pages.length > maxPages) {
     errors.push(`pages must be a list of at most ${maxPages}`)
     return errors
