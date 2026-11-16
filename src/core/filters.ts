@@ -208,9 +208,9 @@ export const builtinFilters = (labels: { type?: (t: FieldType) => string } = {})
 export const resolveFilters = (sources: FilterSource[], questions: Question[]) =>
   sources.flatMap((s) => (typeof s === 'function' ? s(questions) : [s]))
 
-/** The text search looks in: section, intro, title and the parts' labels. */
+/** The text search looks in: section, intro, title, the parts' labels and the document's text around it. */
 export const searchText = (q: Question) =>
-  `${q.section ?? ''} ${q.intro ?? ''} ${q.title} ${q.parts.map((p) => p.field.label).join(' ')}`
+  `${q.section ?? ''} ${q.intro ?? ''} ${q.title} ${q.parts.map((p) => p.field.label).join(' ')} ${q.text ?? ''}`
 
 /** The questions that pass the search and every picked filter value. */
 export function filterQuestions(

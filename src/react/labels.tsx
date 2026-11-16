@@ -269,6 +269,7 @@ export const DEFAULT_LABELS = {
   clearAll: 'Clear all',
   all: 'All',
   noQuestionMatches: 'No question matches these filters.',
+  readingDocument: (done: number, total: number) => `Reading the document… page ${done} of ${total}`,
   showMore: (left: number) => `Show more (${left} left)`,
   pageTag: (n: number) => `p.${n}`,
   remove: (what: string) => `Remove ${what}`,

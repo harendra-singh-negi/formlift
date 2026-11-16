@@ -66,7 +66,11 @@ export default function PdfPages({
     let opened: PDFDocumentProxy | null = null
     Promise.all([loadPdfJs(), readPdf(loadRef.current)])
       // isEvalSupported off (pdf.js < 5.5; newer never evals): pdf.js never compiles code from the document (fonts).
-      .then(([lib, data]) => lib.getDocument({ data, ...({ isEvalSupported: false } as object) }).promise)
+      // fontExtraProperties: pdf.js 6 gives a font's real name ('ABCDEF+Arial-BoldMT') only with it; the list view
+      // reads bold / italic / mono text from that name.
+      .then(([lib, data]) =>
+        lib.getDocument({ data, fontExtraProperties: true, ...({ isEvalSupported: false } as object) }).promise,
+      )
       .then(async (pdf) => {
         opened = pdf
         const list: PageSize[] = []

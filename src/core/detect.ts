@@ -27,11 +27,17 @@ export interface Rect {
   filled: boolean
   /** Drawn with curves (a circle or rounded box). */
   round?: boolean
+  /** Fill colour (#rrggbb) when filled. */
+  fill?: string
 }
 export interface Shapes {
   hlines: Seg[]
   vlines: Seg[]
   rects: Rect[]
+  /** Pictures drawn on the page: their boxes. */
+  images?: { x: number; y: number; w: number; h: number }[]
+  /** The page's text as drawn, glyph by glyph (no spaces), with its fill colour and advance width (font units). */
+  ink?: { ch: string; color: string; w: number }[]
 }
 
 type Matrix = [number, number, number, number, number, number]
@@ -61,6 +67,12 @@ export interface Ops {
   eoFillStroke: number
   closeFillStroke: number
   closeEOFillStroke: number
+  // Colours, text and pictures (for the list view's flow); pdf.js OPS has them all.
+  setFillRGBColor?: number
+  showText?: number
+  paintImageXObject?: number
+  paintInlineImageXObject?: number
+  paintImageMaskXObject?: number
 }
 // pdf.js DrawOPS inside a constructPath's path data.
 const MOVE = 0
@@ -68,14 +80,26 @@ const LINE = 1
 const CURVE = 2
 const CLOSE = 3
 
+// pdf.js 5+ passes a fill colour as '#rrggbb'; older builds as r, g, b (0–255).
+const hexOf = (args: unknown[]) =>
+  typeof args[0] === 'string'
+    ? args[0]
+    : `#${args
+        .slice(0, 3)
+        .map((v) => Math.round(Number(v)).toString(16).padStart(2, '0'))
+        .join('')}`
+
 /**
- * Lines and rectangles a page draws, in points from the top left, from pdf.js `page.getOperatorList()`.
- * Follows the transform stack (save / restore / cm / form XObjects) and the dash state.
+ * Lines and rectangles a page draws, in points from the top left, from pdf.js `page.getOperatorList()`, with
+ * their fill colours, the pictures it paints and the colour of every glyph of its text.
+ * Follows the transform stack (save / restore / cm / form XObjects), the dash state and the fill colour.
  */
 export function extractShapes(fnArray: number[], argsArray: unknown[][], OPS: Ops, viewBox: number[]): Shapes {
   const [vx0, , , vy1] = viewBox
-  const out: Shapes = { hlines: [], vlines: [], rects: [] }
-  let state = { ctm: [1, 0, 0, 1, 0, 0] as Matrix, dashed: false }
+  const out: Required<Shapes> = { hlines: [], vlines: [], rects: [], images: [], ink: [] }
+  let state = { ctm: [1, 0, 0, 1, 0, 0] as Matrix, dashed: false, fill: '#000000' }
+  const pictures = new Set([OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintImageMaskXObject])
+  pictures.delete(undefined)
   const stack: (typeof state)[] = []
   const strokeOps = new Set([
     OPS.stroke,
@@ -100,6 +124,23 @@ export function extractShapes(fnArray: number[], argsArray: unknown[][], OPS: Op
     if (fn === OPS.save) stack.push(state)
     else if (fn === OPS.restore) state = stack.pop() ?? state
     else if (fn === OPS.transform) state = { ...state, ctm: mul(state.ctm, args as number[]) }
+    else if (fn === OPS.setFillRGBColor) state = { ...state, fill: hexOf(args) }
+    else if (fn === OPS.showText) {
+      for (const g of (args[0] as unknown[] | undefined) ?? []) {
+        const glyph = g as { unicode?: string; width?: number } | null
+        // Ligatures as getTextContent writes them ("ﬁ" → "fi"), sharing the glyph's width.
+        const chars = [...(glyph?.unicode?.replace(/[\uFB00-\uFB06]/g, (c) => c.normalize('NFKC')) ?? '')]
+        for (const ch of chars)
+          if (ch.trim()) out.ink.push({ ch, color: state.fill, w: (Number(glyph?.width) || 0) / chars.length })
+      }
+    } else if (pictures.has(fn)) {
+      // A picture fills the unit square of its transform.
+      const m = state.ctm
+      const xs = [m[4], m[0] + m[4], m[2] + m[4], m[0] + m[2] + m[4]].map((x) => x - vx0)
+      const ys = [m[5], m[1] + m[5], m[3] + m[5], m[1] + m[3] + m[5]].map((y) => vy1 - y)
+      const [x, y] = [Math.min(...xs), Math.min(...ys)]
+      out.images.push({ x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y })
+    }
     else if (fn === OPS.setDash)
       state = { ...state, dashed: Array.isArray(args[0]) && (args[0] as number[]).length > 0 }
     else if (fn === OPS.paintFormXObjectBegin) {
@@ -143,7 +184,16 @@ export function extractShapes(fnArray: number[], argsArray: unknown[][], OPS: Op
         const ys = c.map((p) => p[1])
         const x = Math.min(...xs)
         const y = Math.min(...ys)
-        out.rects.push({ x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y, stroked, filled, round: true })
+        out.rects.push({
+          x,
+          y,
+          w: Math.max(...xs) - x,
+          h: Math.max(...ys) - y,
+          stroked,
+          filled,
+          round: true,
+          ...(filled && { fill: state.fill }),
+        })
       }
       for (const s of subs) {
         const xs = s.map((p) => p[0])
@@ -161,7 +211,7 @@ export function extractShapes(fnArray: number[], argsArray: unknown[][], OPS: Op
             out.hlines.push({ x0: x, y0: y + h / 2, x1: x + w, y1: y + h / 2, dashed: false })
           else if (filled && !stroked && w < 2 && h > 10)
             out.vlines.push({ x0: x + w / 2, y0: y, x1: x + w / 2, y1: y + h, dashed: false })
-          else out.rects.push({ x, y, w, h, stroked, filled })
+          else out.rects.push({ x, y, w, h, stroked, filled, ...(filled && { fill: state.fill }) })
           // (Not for checkbox-sized squares; a flat table row of 15 pt still counts.)
           if (stroked && (w > 16 || h > 16)) {
             // A stroked box's edges are rules too (table outlines).
@@ -340,7 +390,7 @@ function joinSegs(lines: Seg[], vertical: boolean): Seg[] {
 }
 
 /** Cells of ruled tables: regions between solid lines that are closed on every side. */
-function tableCells(h: Seg[], v: Seg[], lastTextY = Infinity) {
+export function tableCells(h: Seg[], v: Seg[], lastTextY = Infinity) {
   const TOL = 2
   const vs = joinSegs(
     v.filter((l) => !l.dashed && l.y1 - l.y0 > 8),

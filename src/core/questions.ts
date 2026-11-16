@@ -25,6 +25,8 @@ export interface Question {
   tags?: Record<string, string>
   /** What a run of rows with the same choices asks ("Evaluation of the level of compliance…"), shown over them. */
   intro?: string
+  /** The document's text around it in the list (its flow segment), for search. */
+  text?: string
 }
 
 /** Text lines of a form page (page fractions, top-left origin, as field positions), when known. */

@@ -289,6 +289,9 @@ export default function FormFiller({
           <div className={`bg-hover ${stickyToolbar ? 'flex-1 overflow-auto' : 'flex-none'}`}>
             <QuestionList
               questions={ff.questions}
+              segments={ff.segments}
+              pdf={ff.pdf}
+              reading={ff.reading}
               answers={answers}
               control={control}
               filters={listFilters}

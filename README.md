@@ -63,7 +63,7 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 | 🔀 **Conditional logic** | `visibleWhen` / `requiredWhen` / `readOnlyWhen` with nested AND/OR groups and 10 operators. Circular rules are rejected. |
 | ☑️ **Groups, follow-ups, comments** | Boxes that allow exactly one or several ticks, follow-up dialogs ("No" → ask why), 💬 comments per field, and an `onFieldChange` hook for your own logic. [Guide](#guide-groups-follow-ups-comments-and-your-own-logic) |
 | ✅ **Validation** | Required, length, min/max, regex, email, phone, date and options. The **same code** runs in the browser and on your server. |
-| 📱 **Filler** | Fields stay pinned to the page at every zoom, plus a list view with search and filters for phones. Includes autosave, signatures and file uploads. |
+| 📱 **Filler** | Fields stay pinned to the page at every zoom. The list view is the whole PDF reflowed for any screen (its text with bold, colours and highlights, its tables, its pictures) with the answers in place, plus search and filters. Includes autosave, signatures and file uploads. |
 | 📄 **Completed PDF** | Answers, signature images and embedded attachments in a new PDF. Runs in Node, Bun, Deno, workers or the browser. |
 | 🎨 **Isolated styling** | All CSS is scoped to `.fl-root` with no global reset, so it never clashes with your app (Tailwind included). Theme it with CSS variables. |
 | 🧩 **Headless core** | Zero-dependency core you can use with any framework, or with none |
@@ -742,6 +742,15 @@ const fields = await detectDocument(pdf, OPS as unknown as Ops, pages, [])
 What changed for your code, per release. The full list of changes is in the
 [CHANGELOG](./CHANGELOG.md).
 
+### 0.4 → next
+
+The list view is now the whole PDF reflowed (text, tables, pictures, answers in place), not a list of question
+cards. There is no switch back. Check these:
+
+| What | Who | What to do |
+| --- | --- | --- |
+| `<QuestionList>` needs `segments` | apps that draw `QuestionList` themselves | Pass `segments={f.segments}` and `pdf={f.pdf}` from `useFormFiller` (and `reading={f.reading}` for the loading message). `FormFiller` does this for you. |
+
 ### 0.3 → 0.4
 
 Nothing breaks. Check these:
@@ -906,7 +915,8 @@ with `options` (label + count), `available`, `value`, `set`, and a `section` hin
 ```
 
 Headless: `useQuestionFilter(f.questions, f.answers, { filters, search, initial, predicate, onChange })` gives the
-same object; render `fs.list` yourself or pass it to `<QuestionList questions={…} filter={fs} toolbar={false} />`.
+same object; render `fs.list` yourself or pass it to
+`<QuestionList questions={f.questions} segments={f.segments} pdf={f.pdf} filter={fs} toolbar={false} … />`.
 On the server (no React): `filterQuestions(questions, answers, resolveFilters(filters, questions), values, search)`.
 
 ### 5. Headless: hooks only
