@@ -60,6 +60,8 @@ export interface FormFillerProps extends UseFormFillerOptions {
   listPageSize?: number
   /** How the list view shows more questions: a "Show more" button (default) or infinite scroll. */
   listLoadMore?: 'button' | 'scroll'
+  /** Your classes on the list view's document (its paper). It fills the width by default. */
+  listPaperClassName?: string
   /**
    * true (default): the toolbar stays on top while the page or answers scroll.
    * false: it scrolls away with the content.
@@ -105,6 +107,7 @@ export default function FormFiller({
   zoomSteps,
   listPageSize,
   listLoadMore,
+  listPaperClassName,
   stickyToolbar = true,
   renderFieldExtras,
   ...options
@@ -303,6 +306,7 @@ export default function FormFiller({
               renderToolbar={renderFilters}
               pageSize={listPageSize}
               loadMore={listLoadMore}
+              paperClassName={listPaperClassName}
             />
           </div>
         )}
