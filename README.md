@@ -1014,6 +1014,7 @@ Nothing breaks. Check these:
 | Learnt tab | apps that set `onLesson` | A new tab in the editor's panel shows what auto-detect learnt and forgets it. `hide={['learntTab']}` leaves it out. |
 | Auto-detect again | – | It now also remakes the suggestions of the same editing session that the admin has not touched, with what auto-detect learnt meanwhile (before, it only added fields where nothing was placed). Fields the admin changed, and fields of a saved form, stay as they are. |
 | `fieldsSuggested` label | apps with their own `labels` | It now gets a third and a fourth argument: how many of the fields came from pages set up before, and how many follow what the admin taught it. Your function can ignore them. |
+| Word tables with hairline borders | – | Auto-detect now reads tables whose borders are drawn as very thin filled bars (as Word draws them, 0.48 pt): forms like that got no suggestions before. In a grid of labels and answers, a cell is named by its label alone (not "Last inspection – Yes"), and a blank cell in a table's number column is no longer suggested. |
 | New labels | apps with their own `labels` | `rememberedField`, `learntField`, `forgetThis`, `forgetThisHint`, `forgotten`, and the Learnt tab's `learntTab`, `learntHeading`, `learntNothing`, `learntLeftOut`, `learntRenamed`, `learntDrawn`, `learntPages`, `forget`, `forgetEverything`, `confirmForgetEverything`. Anything you leave out stays English. |
 
 ### 0.4 → 0.5

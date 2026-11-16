@@ -4,6 +4,9 @@ import type { FieldType } from '../form-logic'
 
 // Labels that say little on their own ("Comments:" under an item); named after the item above them.
 export const GENERIC = /^(comments?|remarks?|notes?|observations?|findings?)$/i
+// The answers printed in place of boxes: "Yes/No/NA", "Y / N", "Pass | Fail", "OK/Not OK", "Satisfactory/Unsatisfactory".
+const ANSWER = String.raw`(?:yes|no|n\.?\s?a\.?|y|n|ok|not ok|pass|fail|true|false|sat|unsat|satisfactory|unsatisfactory|good|fair|poor|done|not done|complied|not complied)`
+export const PRINTED_CHOICES = new RegExp(String.raw`^\s*${ANSWER}(?:\s*[/|]\s*${ANSWER}){1,4}\s*$`, 'i')
 // A list item: "-not working", "• HC", "a. …", "1) …", "A1. …".
 export const LIST_ITEM = /^([-–•●▪◦*]|\(?(\d{1,2}|[a-z]|[A-Z]\d{1,2})[.)]\s)/
 // A label is short; a long sentence next to a line is prose, not the line's name. One that ends in ":" is a

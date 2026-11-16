@@ -131,3 +131,65 @@ describe('one-line boxes', () => {
     expect(fields.map((f) => `${f.type}: ${f.label}`).sort()).toEqual(['email: Email Address', 'text: Full Name', 'text: Vessel'])
   })
 })
+
+describe('tables drawn with hairlines (Word draws borders as 0.48 pt filled bars)', () => {
+  async function fields(bytes: Uint8Array) {
+    const pdf = await getDocument({ data: bytes.slice(), verbosity: 0 }).promise
+    const pages = []
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const v = (await pdf.getPage(i)).view
+      pages.push({ source: i, width: v[2] - v[0], height: v[3] - v[1] })
+    }
+    return detectDocument(pdf as never, OPS as unknown as Ops, pages, [])
+  }
+
+  it('reads their cells: every blank cell of a grid of labels is an answer', async () => {
+    const { makeForm } = await import('../fixtures/forms')
+    const form = await makeForm({ seed: 3, styles: ['grid'], borders: 'hair' })
+    const found = await fields(form.bytes)
+    expect(found.map((f) => f.label).sort()).toEqual(form.truth.map((t) => t.label).sort())
+  })
+
+  it('names a cell by its label alone in a grid of labels and answers; a number column and printed answers name nothing', async () => {
+    const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+    const doc = await PDFDocument.create()
+    const font = await doc.embedFont(StandardFonts.Helvetica)
+    const page = doc.addPage([595, 842])
+    const H = 842
+    const say = (text: string, x: number, top: number) => page.drawText(text, { x, y: H - top - 9, size: 10, font })
+    const hair = (x0: number, y0: number, x1: number, y1: number) =>
+      page.drawRectangle({ x: x0 - 0.24, y: H - y1 - 0.24, width: x1 - x0 + 0.48, height: y1 - y0 + 0.48, color: rgb(0, 0, 0) })
+    // A grid, every cell closed: walls at xs, rows at ys (from the top).
+    const grid = (xs: number[], ys: number[]) => {
+      for (const y of ys) hair(xs[0], y, xs[xs.length - 1], y)
+      for (const x of xs) hair(x, ys[0], x, ys[ys.length - 1])
+    }
+    // Labels and answers: "Visited before:" is answered with a box, the others in the blank cell after them.
+    grid([40, 160, 300, 400, 555], [60, 80, 100, 120])
+    say('Vessel:', 44, 65)
+    say('Date:', 304, 65)
+    say('Visited before:', 44, 85)
+    say('Yes', 164, 85)
+    page.drawRectangle({ x: 190, y: H - 95, width: 8, height: 8, borderWidth: 0.8, borderColor: rgb(0, 0, 0) })
+    say('Port:', 304, 85)
+    say('Last inspection:', 44, 105)
+    say('Plan:', 304, 105)
+    // A checklist: its number column has no number on a heading row, and its answers are printed ("Yes/No").
+    grid([40, 64, 400, 555], [160, 180, 200, 220])
+    say('1', 44, 165)
+    say('Copy of identity proof', 68, 165)
+    say('Yes/No', 460, 165)
+    say('Documents', 68, 185)
+    say('2', 44, 205)
+    say('Address proof', 68, 205)
+    const found = await fields(await doc.save())
+    const labels = found.map((f) => `${f.type}: ${f.label}`)
+    expect(labels).toEqual(
+      expect.arrayContaining(['text: Vessel', 'date: Date', 'text: Port', 'text: Last inspection', 'text: Plan', 'text: Address proof']),
+    )
+    // Not "Last inspection – Yes" (the box above is an answer) nor "Address proof – Yes/No".
+    expect(labels.filter((l) => l.includes(' – '))).toEqual([])
+    // Nothing in the number column.
+    expect(found.filter((f) => f.position.x * 595 < 64)).toEqual([])
+  })
+})
