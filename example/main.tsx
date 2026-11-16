@@ -266,6 +266,8 @@ function Demo() {
             autoDetect={isTour ? false : undefined}
             // The demo follows every change so Fill / Code always show the latest; Save also keeps it on reload.
             onChange={setForm}
+            // Long documents too (a 1001-page form with 12 000 fields). Your app sets its own, the same as its server.
+            limits={{ maxFields: 20_000, maxPages: 2_000 }}
             onSave={(doc) => {
               setForm(doc)
               store.set(`fl-form:${docKey}`, doc)

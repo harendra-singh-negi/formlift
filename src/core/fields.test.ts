@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { validateFields } from './form-logic'
-import { duplicate, newField, reorder, uniqueKey, withField } from './fields'
+import { duplicate, newField, refreshed, reorder, uniqueKey, withField } from './fields'
 
 describe('field helpers', () => {
   it('new fields get unique keys and a box inside the page', () => {
@@ -51,5 +51,29 @@ describe('field helpers', () => {
     expect(withField(f, { ...f[1], key: 'site_name_1' })[1].key).toBe('site_name_2')
     expect(withField(f, { ...f[1], position: { ...f[1].position, x: 0.1 } })[1].key).toBe('site_name_2')
     expect(validateFields(f, 1)).toEqual([])
+  })
+
+  it('a new detection replaces untouched suggestions only where it made them differently', () => {
+    const at = (page: number, y: number) => ({ ...newField('text', page, 0.5, y, []), source: 'ai' as const, confidence: 0.8 })
+    const same = at(1, 0.1)
+    const renamed = at(1, 0.2)
+    const dropped = at(1, 0.3)
+    const later = at(3, 0.1) // a page the stopped detection did not reach
+    const found = [
+      // made again as it was: marked remembered now, its box kept to 0.0001 of the page
+      { ...same, id: 'n1', key: 'n1', confidence: 0.99, position: { ...same.position, x: Math.round(same.position.x * 1e4) / 1e4 + 1e-9 } },
+      { ...renamed, id: 'n2', key: 'n2', label: 'Location' },
+    ]
+    const { fresh, gone } = refreshed([same, renamed, dropped, later], found, 2)
+    expect(fresh.map((f) => f.label)).toEqual(['Location'])
+    expect([...gone]).toEqual([renamed, dropped])
+  })
+
+  it('a renamed field changes only the fields that use it', () => {
+    const a = newField('text', 1, 0.5, 0.1, [])
+    const b = { ...newField('text', 1, 0.5, 0.2, [a]), visibleWhen: { logic: 'and' as const, rules: [{ fieldKey: a.key, op: 'isNotEmpty' as const }] } }
+    const c = newField('text', 1, 0.5, 0.3, [a, b])
+    const f = withField([a, b, c], { ...a, label: 'Site Name' })
+    expect([f[1] === b, f[2] === c]).toEqual([false, true])
   })
 })

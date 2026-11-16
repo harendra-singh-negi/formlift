@@ -37,7 +37,7 @@ test('auto-detect learns from a save: Start over brings the changes back', async
     .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('fl-lessons') ?? '[]').length))
     .toBe(2)
   await page.getByRole('button', { name: 'Start over' }).click()
-  await expect(page.locator('.toast')).toContainText('5 fields suggested (1 as you set them up in other forms)')
+  await expect(page.locator('.toast')).toContainText('5 fields suggested (1 as you taught it)')
   await expect(page.getByRole('button', { name: 'Text field Location' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Checkbox field No' })).toBeVisible()
 })

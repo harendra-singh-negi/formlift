@@ -2,7 +2,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { moveBy, resizeBy, snap, toPage } from '../../core/coords'
 import { detectDocument, lessonFor, type Ops } from '../../core/detect'
-import { duplicate, newField, newId, reorder, withField, withoutField } from '../../core/fields'
+import { duplicate, newField, newId, refreshed, reorder, withField, withoutField } from '../../core/fields'
 import { addLesson, forgetting, learnt, LEARNT, REMEMBERED, type Forget, type Lesson } from '../../core/learn'
 import { layerOpen } from '../ui/useOutsideClose'
 import {
@@ -11,6 +11,7 @@ import {
   fieldStates,
   validateFields,
   type AnswerRule,
+  type Condition,
   type Limits,
   validateLayout,
   type Answers,
@@ -87,6 +88,14 @@ export interface UseFormEditorOptions {
   onError?: (error: unknown) => void
   /** Your own text for every button, heading and message (any language). Default: DEFAULT_LABELS (English). */
   labels?: Partial<Labels>
+}
+
+// The fields a field's conditions and follow-up use.
+const keysUsedBy = (f: FieldDef): string[] => {
+  const keys: string[] = []
+  const walk = (c?: Condition) => c?.rules.forEach((r) => ('rules' in r ? walk(r) : keys.push(r.fieldKey)))
+  ;[f.visibleWhen, f.requiredWhen, f.readOnlyWhen, f.followUp?.when].forEach(walk)
+  return [...keys, ...(f.followUp?.fields ?? [])]
 }
 
 const isDefault = (l: Layout, sizes: PageSize[]) =>
@@ -385,29 +394,44 @@ export function useFormEditor({
       if (!pdf || !layout || detecting) return
       const stop = new AbortController()
       setDetecting({ done: 0, total: layout.pages.length, stop })
+      let shown = Date.now()
+      let reached = 0
+      // This session's suggestions the admin has not touched (and no other field uses) are made again, with what
+      // auto-detect learnt since: set up the first pages of a long form, save, and the rest follow.
+      const usedKeys = new Set(fields.flatMap(keysUsedBy))
+      const made = new Set(session.current.suggested)
+      const untouched = new Set(fields.filter((f) => made.has(f) && !usedKeys.has(f.key)))
       try {
         const lib = await loadPdfJs()
         const found = await detectDocument(
           pdf,
           lib.OPS as unknown as Ops,
           layout.pages,
-          fields,
-          (done, total) => setDetecting((d) => d && { ...d, done, total }),
+          fields.filter((f) => !untouched.has(f)),
+          (done, total) => {
+            reached = done
+            // Twice a second, not once a page: each step draws the editor again, and a long document has hundreds
+            // of pages and thousands of fields.
+            if (done < total && Date.now() - shown < 500) return
+            shown = Date.now()
+            setDetecting((d) => d && { ...d, done, total })
+          },
           stop.signal,
           lessonsRef.current,
         )
-        if (found.length) {
-          session.current.suggested.push(...found)
-          setFields((l) => [...l, ...found])
-          onDetectedRef.current?.(found)
+        const { fresh, gone } = refreshed([...untouched], found, reached)
+        if (fresh.length || gone.size) {
+          session.current.suggested = [...session.current.suggested.filter((f) => !gone.has(f)), ...fresh]
+          setFields((l) => [...l.filter((f) => !gone.has(f)), ...fresh])
+          if (fresh.length) onDetectedRef.current?.(fresh)
         }
         notify(
-          found.length
+          fresh.length
             ? L.fieldsSuggested(
-                found.length,
+                fresh.length,
                 stop.signal.aborted,
-                found.filter((f) => f.confidence === REMEMBERED).length,
-                found.filter((f) => f.confidence === LEARNT).length,
+                fresh.filter((f) => f.confidence === REMEMBERED).length,
+                fresh.filter((f) => f.confidence === LEARNT).length,
               )
             : auto
               ? L.noFieldsFoundAuto
@@ -474,6 +498,7 @@ export function useFormEditor({
   }
 
   const learntNow = useMemo(() => (onLesson ? learnt(allLessons) : null), [onLesson, allLessons])
+  const previewStates = useMemo(() => fieldStates(fields, previewAnswers), [fields, previewAnswers])
 
   // Fields and layout items per page.
   const counts: Record<number, number> = {}
@@ -541,7 +566,7 @@ export function useFormEditor({
     },
     previewAnswers,
     setPreviewAnswers,
-    previewStates: fieldStates(fields, previewAnswers),
+    previewStates,
     pdf,
     /** Pass to PdfPages' onLoaded. */
     onPdfLoaded: (s: PageSize[], d: PDFDocumentProxy) => {

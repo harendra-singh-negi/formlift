@@ -47,7 +47,7 @@ export default function LearntPanel({ learnt, onForget }: { learnt: Learnt; onFo
             <span className="min-w-0 flex-1">
               <b>{d.settings.label}</b>{' '}
               <span className="text-muted">
-                {typeName(L, d.settings.type)} · {L.learntDrawn(d.forms)}
+                {typeName(L, d.settings.type)} · {L.learntDrawn(d.times)}
               </span>
             </span>
             {forget({ drawn: [d.line] })}
