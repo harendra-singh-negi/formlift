@@ -26,6 +26,18 @@ export function fitInPage(p: Position): Position {
   return { ...p, width, height, x: clamp(p.x, 0, 1 - width), y: clamp(p.y, 0, 1 - height) }
 }
 
+/** How much two spans [a0, a1] and [b0, b1] share. */
+export const overlap = (a0: number, a1: number, b0: number, b1: number) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0))
+
+/** Covers more than 30 % of a box already placed (or of itself, the smaller one): the same place. */
+export const clashes = (taken: Position[], p: Position) =>
+  taken.some(
+    (t) =>
+      t.page === p.page &&
+      overlap(t.x, t.x + t.width, p.x, p.x + p.width) * overlap(t.y, t.y + t.height, p.y, p.y + p.height) >
+        0.3 * Math.min(t.width * t.height, p.width * p.height),
+  )
+
 /** Moves a box by a fraction delta (dragged), snapped, kept inside the page. */
 export function moveBy(p: Position, dx: number, dy: number, grid = 0): Position {
   return fitInPage({ ...p, x: snap(p.x + dx, grid), y: snap(p.y + dy, grid) })
