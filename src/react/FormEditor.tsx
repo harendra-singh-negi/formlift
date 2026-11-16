@@ -18,6 +18,7 @@ import ElementProperties from './components/ElementProperties'
 import { AnswerControl } from './components/FieldControl'
 import FieldOrderList from './components/FieldOrderList'
 import FieldProperties from './components/FieldProperties'
+import LearntPanel from './components/LearntPanel'
 import LayoutElementView from './components/LayoutElementView'
 import PagesPanel from './components/PagesPanel'
 import PdfPages, { type PdfSource } from './components/PdfPages'
@@ -27,6 +28,7 @@ import { useFormEditor, type FormDoc, type UseFormEditorOptions } from './hooks/
 import { toolName, typeName, useLabels } from './labels'
 import { boxStyle } from '../core/coords'
 import { applyAnswer, type FieldType } from '../core/form-logic'
+import { whyLearnt } from '../core/learn'
 import type { ElementTool } from '../core/layout'
 import {
   Button,
@@ -60,6 +62,7 @@ export type EditorPart =
   | 'propertiesTab'
   | 'fieldsTab'
   | 'pagesTab'
+  | 'learntTab'
   | 'problems'
 
 const DRAG_TYPE = 'application/x-doc-item' // "field:<type>" or "element:<tool>"
@@ -135,6 +138,8 @@ export default function FormEditor({
     ...(shows('propertiesTab') ? ['props'] : []),
     ...(shows('fieldsTab') ? ['fields'] : []),
     ...(shows('pagesTab') ? ['pages'] : []),
+    // What auto-detect learnt: only where it learns (onLesson).
+    ...(shows('learntTab') && options.onLesson ? ['learnt'] : []),
     ...tabs.map((t) => t.id),
   ]
   const [tab, setTabState] = useState<string>(panelTabs[0] ?? 'props')
@@ -180,6 +185,8 @@ export default function FormEditor({
   if (loadError) return <p className="fl-root p-6 text-center text-sm text-danger">{loadError}</p>
 
   const { previewStates, previewAnswers, counts, pageHeight } = ed
+  // How learning made the selected field, when it did (this session's suggestions): what Forget this forgets.
+  const why = selectedField && ed.learnt ? whyLearnt(selectedField) : undefined
 
   // Drag onto a page, or tap it and then tap the page (touch screens have no drag and drop).
   const toolItem = (key: string, label: string) => (
@@ -557,6 +564,7 @@ export default function FormEditor({
                     { value: 'props', label: L.propertiesTab },
                     { value: 'fields', label: L.fieldsTab(fields.length) },
                     { value: 'pages', label: L.pagesTab(pageCount) },
+                    { value: 'learnt', label: L.learntTab },
                     ...tabs.map((t) => ({ value: t.id, label: t.label })),
                   ].filter((o) => panelTabs.includes(o.value))}
                   value={tab}
@@ -611,6 +619,7 @@ export default function FormEditor({
                         onFieldsChange={ed.setFields}
                         onSelect={(id) => ed.setSelection({ kind: 'field', id })}
                         rules={options.rules}
+                        onForget={why && (() => ed.forget(why))}
                       />
                     ) : selectedElement ? (
                       <ElementProperties
@@ -661,6 +670,8 @@ export default function FormEditor({
                   ) : (
                     <EmptyText>{L.loadingPages}</EmptyText>
                   ))}
+
+                {tab === 'learnt' && ed.learnt && <LearntPanel learnt={ed.learnt} onForget={ed.forget} />}
 
                 {tabs.find((t) => t.id === tab)?.content}
               </div>

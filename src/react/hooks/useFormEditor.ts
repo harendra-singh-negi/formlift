@@ -1,9 +1,9 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { moveBy, resizeBy, snap, toPage } from '../../core/coords'
-import { detectDocument, type Ops } from '../../core/detect'
+import { detectDocument, lessonFor, type Ops } from '../../core/detect'
 import { duplicate, newField, newId, reorder, withField, withoutField } from '../../core/fields'
-import { lessonFor, REMEMBERED, type Lesson } from '../../core/learn'
+import { addLesson, forgetting, learnt, LEARNT, REMEMBERED, type Forget, type Lesson } from '../../core/learn'
 import { layerOpen } from '../ui/useOutsideClose'
 import {
   defaultLayout,
@@ -62,8 +62,9 @@ export interface UseFormEditorOptions {
    */
   lessons?: Lesson[]
   /**
-   * After a save that taught auto-detect something. Store `lesson` in place of the one with the same `id` (the same
-   * editing session saved again; `addLesson` does this), else add it, and pass them all as `lessons` from then on.
+   * After a save that taught auto-detect something, and when the admin tells it to forget something (`forget`, the
+   * Learnt tab). Store `lesson` in place of the one with the same `id` (the same editing session saved again;
+   * `addLesson` does this), else add it, and pass them all as `lessons` from then on.
    */
   onLesson?: (lesson: Lesson) => unknown
   /** Delete, Ctrl+Z / Ctrl+Y, Ctrl+D, arrows, Escape on window. Default true. */
@@ -131,10 +132,11 @@ export function useFormEditor({
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
   const [detecting, setDetecting] = useState<{ done: number; total: number; stop: AbortController } | null>(null)
   const autoDetected = useRef(false)
-  // This editing session, for lessons: the fields it started with and every suggestion auto-detect added.
-  const [sessionId] = useState(newId)
-  const [before] = useState(initialValue.fields)
-  const suggested = useRef<FieldDef[]>([])
+  // This editing session, for lessons: the fields it started with and every suggestion auto-detect added; what the
+  // admin told auto-detect to forget in it; the lessons it gave onLesson (they count before the app passes them back).
+  const session = useRef({ id: newId(), before: initialValue.fields, suggested: [] as FieldDef[] })
+  const forgotten = useRef<Forget>({})
+  const [given, setGiven] = useState<Lesson[]>([])
   const drag = useRef<{
     sel: NonNullable<Selection>
     mode: 'move' | 'resize'
@@ -349,15 +351,35 @@ export function useFormEditor({
     setSelection({ kind: 'element', id: el.id })
   }
 
+  // Lessons in effect: the app's, and the ones this session gave it (in place of those with the same id).
+  const allLessons = useMemo(
+    () => (given.length ? [...(lessons ?? []).filter((l) => !given.some((g) => g.id === l.id)), ...given] : (lessons ?? [])),
+    [lessons, given],
+  )
   // Suggested fields for the whole document (source 'ai'); one undo step removes them all.
   const onDetectedRef = useRef(onDetected)
-  const lessonsRef = useRef(lessons)
+  const lessonsRef = useRef(allLessons)
   const onLessonRef = useRef(onLesson)
   useEffect(() => {
     onDetectedRef.current = onDetected
-    lessonsRef.current = lessons
+    lessonsRef.current = allLessons
     onLessonRef.current = onLesson
   })
+  function teach(lesson: Lesson, learn: (lesson: Lesson) => unknown) {
+    setGiven((g) => addLesson(g, lesson))
+    return learn(lesson)
+  }
+  /** Makes auto-detect forget `what` (from `learnt`, or `whyLearnt(field)`): a lesson for onLesson. */
+  function forget(what: Forget) {
+    const learn = onLessonRef.current
+    if (!learn) return
+    const f = forgotten.current
+    forgotten.current = { labels: [...(f.labels ?? []), ...(what.labels ?? [])], drawn: [...(f.drawn ?? []), ...(what.drawn ?? [])] }
+    // Everything: this session learns again from what the document is now.
+    if (what.all) session.current = { id: newId(), before: fields, suggested: [] }
+    void Promise.resolve(teach(forgetting(what), learn)).catch(notifyError)
+    notify(L.forgotten)
+  }
   const detect = useCallback(
     async (auto = false) => {
       if (!pdf || !layout || detecting) return
@@ -375,7 +397,7 @@ export function useFormEditor({
           lessonsRef.current,
         )
         if (found.length) {
-          suggested.current.push(...found)
+          session.current.suggested.push(...found)
           setFields((l) => [...l, ...found])
           onDetectedRef.current?.(found)
         }
@@ -385,6 +407,7 @@ export function useFormEditor({
                 found.length,
                 stop.signal.aborted,
                 found.filter((f) => f.confidence === REMEMBERED).length,
+                found.filter((f) => f.confidence === LEARNT).length,
               )
             : auto
               ? L.noFieldsFoundAuto
@@ -432,8 +455,14 @@ export function useFormEditor({
       // What the save taught auto-detect, worked out after it (it reads the pages' text once per document).
       const learn = onLessonRef.current
       if (learn && pdf && layout)
-        void lessonFor(pdf, layout.pages, { id: sessionId, before, suggested: suggested.current, saved: fields })
-          .then((lesson) => lesson && learn(lesson))
+        void loadPdfJs()
+          .then((lib) =>
+            lessonFor(pdf, layout.pages, { ...session.current, saved: fields }, {
+              OPS: lib.OPS as unknown as Ops,
+              forgotten: forgotten.current,
+            }),
+          )
+          .then((lesson) => lesson && teach(lesson, learn))
           .catch(notifyError)
       return true
     } catch (err) {
@@ -443,6 +472,8 @@ export function useFormEditor({
       setBusy(false)
     }
   }
+
+  const learntNow = useMemo(() => (onLesson ? learnt(allLessons) : null), [onLesson, allLessons])
 
   // Fields and layout items per page.
   const counts: Record<number, number> = {}
@@ -519,6 +550,9 @@ export function useFormEditor({
     },
     pageSizes: sizes,
     detect,
+    /** What auto-detect learnt, after what was forgotten (for a Learnt view); null without onLesson (no learning). */
+    learnt: learntNow,
+    forget,
     /** Progress while detecting; `stop.abort()` keeps what was found so far. */
     detecting,
   }
