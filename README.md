@@ -84,7 +84,7 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 | | |
 | --- | --- |
 | 🔍 **Auto-detect** | Answer lines, checkboxes, typed blanks and table cells come from the PDF's own vector drawing. Sizes are measured relative to the text, so it works at any font size, scale or orientation. |
-| 🧠 **Learns from your corrections** | Each save teaches auto-detect. A page you set up comes back the way you saved it, conditions included (in the next revision of the form, in any form that has the same page, even a scanned one). What you change about a label applies to that label in every form, and a field you draw by hand next to the same text in two forms is drawn there in every form. The editor shows what it learnt, and anything can be forgotten. No AI service: the lessons are plain JSON that you store. [How it works](#auto-detect-that-learns) |
+| 🧠 **Learns from your corrections** | Each save teaches auto-detect. A page you set up comes back the way you saved it, conditions included (in the next revision of the form, in any form that has the same page, even a scanned one). What you change about a label applies to that label in every form, and a field you draw by hand next to the same text twice is drawn there in every form. The editor shows what it learnt, and anything can be forgotten. No AI service: the lessons are plain JSON that you store. [How it works](#auto-detect-that-learns) |
 | 🧱 **Builder** | 20 field types (text, date & time, currency, multi-select, checklist, rating, slider, toggle, signature, file…), drag/resize/snap-to-grid, undo/redo, keyboard shortcuts, fill order, page reorder/insert/delete |
 | ✏️ **Layout editing** | Add text, boxes and lines, or click any line of the original text to replace it, all without touching the file |
 | 🔀 **Conditional logic** | `visibleWhen` / `requiredWhen` / `readOnlyWhen` with nested AND/OR groups and 10 operators. Circular rules are rejected. |
@@ -406,7 +406,7 @@ others.
 | sets up a page: deletes, adds, moves, renames or retypes fields, groups boxes, adds conditions and follow-up questions | **puts that page back the way it was saved**, conditions and follow-ups included. This happens in the next revision of the form, and in any other form that has the same page (a cover page, say). Each field moves with the line of text next to it, so it still fits when the text has moved. |
 | changes the settings of a suggestion: type, label, options, required, placeholder, help text, rules… | **gives every suggestion with that label the same settings, in every form.** A "Date of joining" changed to a Date once comes as a Date from then on. |
 | deletes a suggestion in two forms in a row | **stops suggesting that label**, until an admin keeps it in a form again or adds a field with that label by hand. |
-| draws a field by hand next to the same line of text in two forms, where auto-detect found nothing (after "Remarks:", say) | **draws that field next to that line in every form**, where there is room for it. |
+| draws a field by hand next to the same line of text twice (on two pages of a long form, or in two forms), where auto-detect found nothing (after "Remarks:", say) | **draws that field next to that line in every form**, where there is room for it. |
 
 **An example.** Your forms all ask for a **Date of joining**.
 
@@ -421,17 +421,21 @@ The person filling the form sees nothing of this. They just get the right field:
 filled in.
 
 A field that auto-detect made from a lesson says so in its properties. After auto-detect, the editor also says how
-many fields came from pages set up before, and how many were set up as in other forms.
+many fields came from pages set up before, and how many follow what you taught it.
 
 - **How a page is recognised:** by the lines of text that appear only on that page of its document. Mostly the
   same text must be in the same place. A text that moved as a block still counts, a different layout does not.
   When the page's boxes and lines changed (the same text in another form), it is not taken for the page set up
   before either. A page with hardly any text of its own (a scan) is recognised by its picture: the same scan, in
   this file or in any other. A page saved without fields is not remembered: it keeps getting suggestions.
-- **Not learnt:** a setting that the admin set differently on suggestions with the same label in one form.
-  Conditions and follow-ups come back with the page they were set up on, not on other forms, because they point at
-  fields of that form. A field drawn by hand once comes back on its own page only; drawn next to the same line in
-  two forms, it is drawn in every form.
+- **Long forms:** only the pages an admin changed teach auto-detect, because a page left as it was may not have
+  been looked at yet. Set up the first page or two of a long form (a 1001-page form repeats the same page, say),
+  save, and **Auto-detect** again: the other pages follow what you did. (Auto-detect again remakes only the
+  suggestions of this session that nobody touched; fields an admin changed or saved before stay as they are.)
+- **Not learnt:** a setting that the admin set differently on suggestions with the same label, on the pages they
+  changed. Conditions and follow-ups come back with the page they were set up on, not on other forms, because they
+  point at fields of that form. A field drawn by hand once comes back on its own page only; drawn next to the same
+  line twice, it is drawn in every form.
 - **What a lesson stores:** hashes of some lines of each page it remembers (a small picture for a scan), the labels
   that the admin changed or deleted (kept labels only as hashes), and the fields as the admin saved them. It
   stores no answers and no other text from the page.
@@ -594,7 +598,10 @@ const [lessons, setLessons] = useState<Lesson[]>(() => JSON.parse(localStorage.g
   Detection also skips lessons that fail the check. Accept lessons only from people who may edit forms, because a
   lesson changes what auto-detect suggests to every admin.
 - **Size.** A lesson holds only the pages the admin changed, so most are a few KB. A 300-page checklist with every
-  page changed makes about 0.5 MB, about 0.1 MB gzipped. `addLesson` keeps the newest 1000 lessons.
+  page changed makes about 0.5 MB, about 0.1 MB gzipped; a 1001-page form with 12 000 fields, all changed, about
+  2 MB (0.2 MB gzipped). `addLesson` keeps the newest 1000 lessons.
+- **Forms over 5000 fields or 1000 pages** need higher `limits`: in the editor, in `validateFields` on your server,
+  and in `validateLesson` (the same values everywhere).
 - **Undo a lesson.** Forget it in the Learnt tab, or set the page up again the right way and save: a newer lesson
   always wins. **Forget everything** starts from scratch, and so does deleting the stored lessons.
 
@@ -998,7 +1005,8 @@ Nothing breaks. Check these:
 | --- | --- | --- |
 | Auto-detect learns from corrections | – | New, opt-in: store what `onLesson` gives you and pass it all back as `lessons`. See [Auto-detect that learns](#auto-detect-that-learns). Without `lessons`, detection suggests exactly what it did before. |
 | Learnt tab | apps that set `onLesson` | A new tab in the editor's panel shows what auto-detect learnt and forgets it. `hide={['learntTab']}` leaves it out. |
-| `fieldsSuggested` label | apps with their own `labels` | It now gets a third and a fourth argument: how many of the fields came from pages set up before, and how many were set up as in other forms. Your function can ignore them. |
+| Auto-detect again | – | It now also remakes the suggestions of the same editing session that the admin has not touched, with what auto-detect learnt meanwhile (before, it only added fields where nothing was placed). Fields the admin changed, and fields of a saved form, stay as they are. |
+| `fieldsSuggested` label | apps with their own `labels` | It now gets a third and a fourth argument: how many of the fields came from pages set up before, and how many follow what the admin taught it. Your function can ignore them. |
 | New labels | apps with their own `labels` | `rememberedField`, `learntField`, `forgetThis`, `forgetThisHint`, `forgotten`, and the Learnt tab's `learntTab`, `learntHeading`, `learntNothing`, `learntLeftOut`, `learntRenamed`, `learntDrawn`, `learntPages`, `forget`, `forgetEverything`, `confirmForgetEverything`. Anything you leave out stays English. |
 
 ### 0.4 → 0.5
