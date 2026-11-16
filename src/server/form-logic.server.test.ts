@@ -273,3 +273,17 @@ test('completedPdf: follow-up answers and comments go on pages at the end', asyn
   const notes = await pageText(3);
   assert.ok(notes.includes('Comments') && notes.includes('Asha, 2026-11-12 10:05: Checked with class'), notes);
 });
+
+test("the original's own fillable fields are printed as they look and removed from the completed PDF", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595, 842]);
+  doc.getForm().createTextField('name').addToPage(page, { x: 40, y: 760, width: 240, height: 22 });
+  const fields = [field('name', { position: { page: 1, x: 40 / 595, y: 60 / 842, width: 240 / 595, height: 22 / 842 } })];
+  const out = await completedPdf(await doc.save(), fields, { name: 'Asha Verma' });
+  const back = await PDFDocument.load(out);
+  assert.equal(back.getForm().getFields().length, 0);
+  assert.equal(back.getPage(0).node.Annots()?.size() ?? 0, 0);
+  const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const text = await (await (await getDocument({ data: out }).promise).getPage(1)).getTextContent();
+  assert.ok(text.items.some((i) => 'str' in i && i.str === 'Asha Verma'));
+});

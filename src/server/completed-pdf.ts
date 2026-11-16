@@ -83,6 +83,27 @@ function wrap(font: PDFFont, text: string, size: number, width: number): string[
 type Block = { heading?: string; lines: string[] };
 
 /** A4 pages at the end with headed blocks of text: follow-up answers and comments that have no box on a page. */
+/**
+ * The original's own fillable fields, printed as they look and then removed: left in, an empty field sits on top of
+ * the answer printed in its place (and some viewers paint it over the answer). A field pdf-lib cannot print (no
+ * appearance) is just removed.
+ */
+function printOwnFields(doc: PDFDocument) {
+  try {
+    doc.getForm().flatten({ updateFieldAppearances: false });
+  } catch {
+    // Removed below, with whatever flatten left.
+  }
+  doc.catalog.delete(PDFName.of('AcroForm'));
+  for (const page of doc.getPages()) {
+    const annots = page.node.Annots();
+    for (let i = (annots?.size() ?? 0) - 1; i >= 0; i--) {
+      const a = annots!.lookup(i); // undefined: a field flatten already deleted
+      if (!(a instanceof PDFDict) || a.get(PDFName.of('Subtype')) === PDFName.of('Widget')) annots!.remove(i);
+    }
+  }
+}
+
 function appendPages(doc: PDFDocument, fonts: Fonts, title: string, blocks: Block[]) {
   if (!blocks.length) return;
   const [W, H, M] = [595, 842, 50];
@@ -276,6 +297,7 @@ export async function completedPdf(
 ): Promise<Uint8Array> {
   const T = { ...APPENDIX_TEXT, ...options.text };
   const src = await PDFDocument.load(original, { updateMetadata: false });
+  printOwnFields(src);
   const plan = layout ?? defaultLayout(src.getPages().map((p) => p.getSize()));
   const doc = layout ? await PDFDocument.create() : src;
   if (layout) {
