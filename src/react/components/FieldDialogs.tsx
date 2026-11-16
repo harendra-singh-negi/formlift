@@ -30,7 +30,7 @@ export function FieldDialog({
           {fields.map((f) => (
             <div key={f.id} className="flex flex-col gap-1.5">
               <span className="font-semibold">{f.label || f.key}</span>
-              <div className={`relative [container-type:size] ${SIZE[f.type] ?? 'h-10 w-full'}`}>{control(f)}</div>
+              <div className={`relative [container-type:size] [&_:is(input,textarea,select)]:text-[16px] ${SIZE[f.type] ?? 'h-10 w-full'}`}>{control(f)}</div>
               {f.helpText && <small className="text-muted">{f.helpText}</small>}
               {errors[f.key] && <small className="text-danger">{errors[f.key]}</small>}
             </div>
