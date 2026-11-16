@@ -12,7 +12,17 @@
     "pdfjs",
     "pdf-lib",
     "conditional-logic",
-    "document-forms"
+    "document-forms",
+    "pdf-form-builder",
+    "pdf-to-form",
+    "form-filler",
+    "pdf-editor",
+    "signature",
+    "angular",
+    "vue",
+    "svelte",
+    "web-component",
+    "typescript"
   ],
   "license": "MIT",
   "author": "Harendra Singh Negi",
