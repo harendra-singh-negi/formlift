@@ -349,8 +349,17 @@ const cluster = (values: number[], tol: number) => {
   return out
 }
 const overlap = (a0: number, a1: number, b0: number, b1: number) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0))
+const overlapArea = (r: Rect, c: { x0: number; y0: number; x1: number; y1: number }) =>
+  overlap(r.x, r.x + r.w, c.x0, c.x1) * overlap(r.y, r.y + r.h, c.y0, c.y1)
+// Grey, from light grey to black (not white): the shading of headings and bars, never of a place to write.
+const isGrey = (hex: string) => {
+  const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  return Math.max(...c) - Math.min(...c) < 10 && Math.min(...c) < 250
+}
 // Labels that say little on their own ("Comments:" under an item); named after the item above them.
 const GENERIC = /^(comments?|remarks?|notes?|observations?|findings?)$/i
+// A list item: "-not working", "• HC", "a. …", "1) …", "A1. …".
+const LIST_ITEM = /^([-–•●▪◦*]|\(?(\d{1,2}|[a-z]|[A-Z]\d{1,2})[.)]\s)/
 // A label is short; a long sentence next to a line is prose, not the line's name. One that ends in ":" is a
 // label whatever its length (shortened).
 const cleanLabel = (s: string) => {
@@ -508,6 +517,11 @@ export function detectFields(
       const cy = (t.y0 + t.y1) / 2
       return cx > x0 && cx < x1 && cy > y0 && cy < y1 && !/^_+$/.test(t.text)
     })
+  // Painted grey: an empty heading row or a cell left blank on purpose (a place to write is never grey).
+  const greyed = (b: { x0: number; y0: number; x1: number; y1: number }) =>
+    shapes.rects.some(
+      (r) => r.filled && r.fill && isGrey(r.fill) && overlapArea(r, b) > 0.8 * (b.x1 - b.x0) * (b.y1 - b.y0),
+    )
   // The numbered item a "Comments:" / "Remarks:" belongs to: the nearest "1.2.3 …" line above it.
   const itemAbove = (t: PtText) =>
     texts
@@ -639,6 +653,7 @@ export function detectFields(
         boxes.some((b) => b.x > t.x0 && b.x < t.x1 && b.y > t.y0 && b.y < t.y1),
     )
     if (boxCells.length >= 2) continue
+    if (greyed(c)) continue
     let label = headersOf(c)
     // A lone empty box (no table around it) a few lines tall is a free-text answer, named by the text right above
     // it, or by the end of the previous page when it starts the page ("PART 1 – SUMMARY" ... next page: the box).
@@ -844,6 +859,19 @@ export function detectFields(
       (o) => o !== t && Math.abs(o.x0 - t.x0) < 2 && t.y0 - o.y1 > -2 && t.y0 - o.y1 < lineH * 0.6,
     )
     if (prev && !/:\s*$/.test(prev.text) && !GENERIC.test(cleanLabel(t.text))) continue
+    // A line heading a list asks nothing: "A manifold connection is:" over "-Secured with …", "-Not fully bolted";
+    // "A. Senior officer familiar with:" over "A1. Company MOC procedure?" (a numbered question with a note under
+    // it does ask).
+    const below: PtText[] = []
+    for (let u = t; below.length < 2; ) {
+      const next = texts.find(
+        (o) => o.y0 - u.y1 > -2 && o.y0 - u.y1 < lineH * 0.6 && o.x0 > t.x0 - 2 && o.x0 < t.x1 && !/:\s*$/.test(o.text),
+      )
+      if (!next) break
+      below.push((u = next))
+    }
+    const heads = below.length === 2 || LIST_ITEM.test(below[0]?.text ?? '')
+    if (heads && !GENERIC.test(cleanLabel(t.text)) && !/^\(?\d/.test(t.text)) continue
     const midY = (t.y0 + t.y1) / 2
     if (out.some((o) => midY > o.y - 2 && midY < o.y + o.h + 2 && o.x >= t.x1 - 4 && o.x - t.x1 < 250)) continue
     const cell = cells.find((c) => t.x0 > c.x0 - 1 && t.x1 < c.x1 + 1 && midY > c.y0 && midY < c.y1)
@@ -969,6 +997,7 @@ export function detectFields(
         }))
       : [{ a: x0, b: end, name: '' }]
     for (const p of parts) {
+      if (greyed({ x0: p.a, y0, x1: p.b, y1 })) continue
       const name = [label, p.name].filter(Boolean).join(' – ')
       out.push({
         type: y1 - y0 > lineH * 2.2 ? 'textarea' : typeFor(p.name || label),
