@@ -6,6 +6,14 @@
 
 Auto-detect fields · Drag-and-drop builder · Conditional logic · Validation · Fill-in UI · Completed PDF
 
+For **React, Angular, Vue, Svelte or plain JS** · Runs in the browser, so PDFs never leave the user's device · MIT
+
+Built for the forms your team already has as PDFs: inspection checklists, onboarding sheets, permits, audit reports.
+
+```bash
+npm i formlift
+```
+
 [![npm version](https://img.shields.io/npm/v/formlift?color=0f766e&label=npm)](https://www.npmjs.com/package/formlift)
 [![npm downloads](https://img.shields.io/npm/dm/formlift?color=0f766e)](https://www.npmjs.com/package/formlift)
 [![types](https://img.shields.io/npm/types/formlift?color=0f766e)](https://www.npmjs.com/package/formlift)
@@ -14,7 +22,7 @@ Auto-detect fields · Drag-and-drop builder · Conditional logic · Validation �
 
 **[▶ Live demo](https://harendra-singh-negi.github.io/formlift/)** · [Quick start](#quick-start) · [API](#api-reference) · [Server](#server-side) · [Theming](#theming) · [Your own UI](#your-own-ui) · [FAQ](#faq)
 
-<img src="./docs/builder.png" alt="formlift builder: suggested fields over a PDF page" width="860" />
+<img src="./docs/demo.gif" alt="formlift: upload a PDF, fields are suggested automatically, then fill it in the browser" width="860" />
 
 </div>
 
@@ -34,6 +42,22 @@ reports. Rebuilding each one in a form tool takes days and loses the original la
 4. **Export** a completed PDF with the answers, signatures and attachments.
 
 The original file is never modified. The whole form is plain JSON that you store wherever you like.
+
+## How it compares
+
+| | formlift | pdf-lib / pdf.js | Commercial PDF SDKs | Online form builders |
+| --- | --- | --- | --- | --- |
+| Keeps the original PDF layout | ✅ | ✅ | ✅ | ❌ rebuilt from scratch |
+| Suggests fields automatically | ✅ no AI, runs locally | ❌ | varies, often paid add-on | ❌ |
+| Drag-and-drop builder UI | ✅ | ❌ you build it | ✅ | ✅ |
+| Conditional logic & validation | ✅ same code client + server | ❌ | limited | ✅ |
+| Fill on phones (reflowed list view) | ✅ | ❌ | varies | ✅ |
+| Completed PDF output | ✅ | ✅ low-level | ✅ | export varies |
+| Your data stays in your app | ✅ | ✅ | ✅ | ❌ hosted by vendor |
+| Price | Free, MIT | Free, MIT | Paid licence | Subscription |
+
+Use **pdf-lib** if you only need to fill an existing AcroForm in code. Use **formlift** when people need to turn
+ordinary PDFs into forms, fill them, and get a PDF back.
 
 ## Live demo
 
