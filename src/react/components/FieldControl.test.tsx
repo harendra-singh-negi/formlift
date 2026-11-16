@@ -59,3 +59,15 @@ it('read-only multi-select opens to show every choice, with its boxes locked', a
   act(() => root.unmount())
   el.remove()
 })
+
+it('a signature whose picture is not at hand shows as signed, not as a broken image', () => {
+  const el = document.createElement('div')
+  const root = createRoot(el)
+  const sig: FieldDef = { ...field, key: 'sign', type: 'signature', label: 'Master' }
+  act(() => root.render(<FieldControl field={sig} value="stored-file-id" onChange={() => {}} />))
+  expect(el.querySelector('img')).toBeNull()
+  expect(el.textContent?.trim()).toBe('Signed')
+  act(() => root.render(<FieldControl field={sig} value="stored-file-id" onChange={() => {}} signatureSrc="blob:x" />))
+  expect(el.querySelector('img')?.getAttribute('src')).toBe('blob:x')
+  act(() => root.unmount())
+})

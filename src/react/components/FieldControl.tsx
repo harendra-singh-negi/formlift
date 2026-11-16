@@ -1,5 +1,5 @@
 import type { FormliftComponents } from '../ui/slots'
-import { Paperclip, PenLine, Star } from 'lucide-react'
+import { Check, Paperclip, PenLine, Star } from 'lucide-react'
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import {
   answerText,
@@ -495,12 +495,17 @@ export default function FieldControl({
             onClick={() => setSigning(true)}
             className={`flex h-full w-full cursor-pointer items-center justify-center rounded-sm border ${border} bg-primary-soft/50 disabled:cursor-default`}
           >
-            {text ? (
+            {text && (text.startsWith('data:') || signatureSrc) ? (
               <img
                 src={text.startsWith('data:') ? text : signatureSrc}
                 alt={L.signature}
                 className="max-h-full max-w-full object-contain"
               />
+            ) : text ? (
+              // Signed, its picture not at hand (loading, or kept where this page cannot read it).
+              <span className="inline-flex items-center gap-1 text-[clamp(8px,45cqh,13px)] text-navy">
+                <Check size={12} /> {L.signed}
+              </span>
             ) : (
               <span className="inline-flex items-center gap-1 text-[clamp(8px,45cqh,13px)] text-primary">
                 <PenLine size={12} /> {L.sign}

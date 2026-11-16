@@ -252,6 +252,8 @@ export const DEFAULT_LABELS = {
   // Answer controls
   signature: 'Signature',
   sign: 'Sign',
+  /** A signature given whose picture cannot be shown (still loading, or not stored where it can be read). */
+  signed: 'Signed',
   signTitle: (name: string) => `Sign: ${name}`,
   signatureFileName: (name: string) => `Signature - ${name}.png`,
   attachedFile: 'Attached file',
