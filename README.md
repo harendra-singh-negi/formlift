@@ -72,7 +72,8 @@ The demo runs the same components you install from npm. Pick what to see:
 
 Each tour row says how to try it. Then:
 
-1. **Build**: open a sample PDF or upload your own, review the suggested fields and edit them.
+1. **Build**: open a sample PDF or upload your own, review the suggested fields and edit them. Save, then press
+   **Start over**: auto-detect brings your changes back.
 2. **Fill**: answer the form on the page or in the list view, then download the completed PDF.
 3. **Code**: see the exact JSON your app receives from `onSave` and the code that wires it up.
 
@@ -403,8 +404,20 @@ others.
 | When the admin… | the next detection… |
 | --- | --- |
 | sets up a page: deletes, adds, moves, renames or retypes fields, groups boxes | **puts that page back the way it was saved.** This happens in the next revision of the form, and in any other form that has the same page (a cover page, say). Each field moves with the line of text next to it, so it still fits when the text has moved. |
-| changes the settings of a suggestion: type, label, options, required, placeholder, help text, rules… | **gives every suggestion with that label the same settings, in every form.** An "IMO number" changed to a Number once comes as a Number from then on. |
+| changes the settings of a suggestion: type, label, options, required, placeholder, help text, rules… | **gives every suggestion with that label the same settings, in every form.** A "Date of joining" changed to a Date once comes as a Date from then on. |
 | deletes a suggestion in two forms in a row | **stops suggesting that label**, until an admin keeps it in a form again or adds a field with that label by hand. |
+
+**An example.** Your forms all ask for a **Date of joining**.
+
+1. **First form.** Auto-detect finds the blank next to "Date of joining:" and suggests a plain **Text** field. The
+   admin changes it to **Date**, ticks **Required** and saves.
+2. **Every form after that.** Auto-detect suggests "Date of joining" as a required **Date** field straight away.
+   Nobody has to fix it again: not this admin, and not anyone else in your company who shares the lessons.
+3. **Next revision of the first form.** The page with "Date of joining" comes back exactly as the admin left it,
+   with all its other fields too, even if a new line of text above it pushed everything down a little.
+
+The person filling the form sees nothing of this. They just get the right field: a date picker that must be
+filled in.
 
 A field put back from a page set up before says so in its properties. After auto-detect, the editor also says how
 many fields came from pages set up before.

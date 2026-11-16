@@ -3,7 +3,7 @@
 // Everything stays in this browser (localStorage); a real app saves through onSave on its own server.
 import { StrictMode, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { validateAnswers, type Answers, type Comments } from 'formlift'
+import { addLesson, validateAnswers, type Answers, type Comments, type Lesson } from 'formlift'
 import { FormEditor, FormFiller, setPdfWorker, type FormDoc } from 'formlift/react'
 import { completedPdf } from 'formlift/server'
 import 'formlift/style.css'
@@ -89,7 +89,8 @@ const HINTS: Record<Step, ReactNode> = {
   build: (
     <>
       <b>Step 1 · Build.</b> Fields were suggested automatically (dashed). Click one to edit it, drag new fields
-      from the left, try <b>Edit text</b> or <b>Preview</b>, then go to <b>Fill</b>.
+      from the left, try <b>Edit text</b> or <b>Preview</b>, then go to <b>Fill</b>. Auto-detect learns from what
+      you <b>Save</b>: press <b>Start over</b> and your changes come back.
     </>
   ),
   fill: (
@@ -143,6 +144,9 @@ function Demo() {
   const [comments, setComments] = useState<Comments | undefined>(() => store.get(`fl-comments:${docKey}`))
   const [step, setStep] = useState<Step>('build')
   const [toast, setToast] = useState('')
+  // What auto-detect learnt from every save, for all PDFs (a real app keeps them on its server: see the README).
+  const [lessons, setLessons] = useState<Lesson[]>(() => store.get('fl-lessons') ?? [])
+  const [round, setRound] = useState(0)
   // the tour starts from its ready-made form (each feature already set up)
   const startForm = form ?? (isTour ? tour?.form : undefined)
   useEffect(() => {
@@ -252,7 +256,7 @@ function Demo() {
         {!pdf && <p className="loading">Preparing the tour…</p>}
         {step === 'build' && pdf && (
           <FormEditor
-            key={docKey}
+            key={`${docKey}:${round}`}
             pdf={pdf}
             initialValue={startForm}
             title={upload?.name ?? SAMPLES.find((s) => s.file === sample)?.label}
@@ -264,6 +268,28 @@ function Demo() {
               setForm(doc)
               store.set(`fl-form:${docKey}`, doc)
             }}
+            lessons={lessons}
+            onLesson={(lesson) => {
+              const next = addLesson(lessons, lesson, 50)
+              setLessons(next)
+              store.set('fl-lessons', next)
+            }}
+            notify={setToast}
+            toolbar={
+              !isTour && (
+                <button
+                  className="btn ghost"
+                  title="Remove this form's fields and detect again, with what auto-detect learnt from your saves"
+                  onClick={() => {
+                    store.set(`fl-form:${docKey}`, null)
+                    setForm(undefined)
+                    setRound((r) => r + 1)
+                  }}
+                >
+                  Start over
+                </button>
+              )
+            }
             onError={(e) => alert(e instanceof Error ? e.message : String(e))}
           />
         )}
@@ -305,7 +331,7 @@ function Demo() {
           />
         )}
         {step === 'code' && startForm && (
-          <CodeView form={startForm} answers={answers ?? {}} comments={comments ?? {}} errors={errors} />
+          <CodeView form={startForm} answers={answers ?? {}} comments={comments ?? {}} errors={errors} lessons={lessons} />
         )}
       </main>
     </div>
@@ -317,19 +343,23 @@ function CodeView({
   answers,
   comments,
   errors,
+  lessons,
 }: {
   form: FormDoc
   answers: Answers
   comments: Comments
   errors: Record<string, string>
+  lessons: Lesson[]
 }) {
   const json = (v: unknown) => JSON.stringify(v, null, 2)
   const usage = `import { FormEditor, FormFiller } from 'formlift/react'
 import { validateAnswers } from 'formlift'
 import 'formlift/style.css'
 
-// Builder: onSave receives the "Form JSON" shown here; store it
-<FormEditor pdf={pdfUrl} initialValue={form} onSave={saveForm} />
+// Builder: onSave receives the "Form JSON" shown here; store it.
+// onLesson: what each save taught auto-detect; store them all and pass them back as lessons
+<FormEditor pdf={pdfUrl} initialValue={form} onSave={saveForm}
+  lessons={lessons} onLesson={saveLesson} />
 
 // Filler: onSave receives the "Answers" and "Comments" shown here; store them
 <FormFiller pdf={pdfUrl} fields={form.fields} layout={form.layout}
@@ -358,6 +388,12 @@ validateAnswers(form.fields, answers) // → ${json(errors).replace(/\n\s*/g, ' 
           Comments <span>onSave info.comments</span>
         </h3>
         <pre>{json(comments)}</pre>
+      </section>
+      <section className="card">
+        <h3>
+          Lessons <span>{lessons.length} · FormEditor onLesson</span>
+        </h3>
+        <pre>{json(lessons)}</pre>
       </section>
       <section className="card" style={{ gridColumn: '1 / -1' }}>
         <h3>

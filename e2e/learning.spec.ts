@@ -1,0 +1,28 @@
+import { expect, test } from '@playwright/test'
+
+// Auto-detect learns from a save: the demo keeps the lessons (onLesson) and passes them back (lessons). After
+// "Start over" the page comes back as the admin left it, not as first suggested.
+
+test('auto-detect learns from a save: Start over brings the changes back', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await page.goto('/')
+  await page.getByRole('combobox', { name: 'Sample PDF' }).selectOption({ label: 'Form' })
+  await expect(page.getByRole('tab', { name: 'Fields (5)' })).toBeVisible()
+
+  // The admin deletes "No" and renames "Vessel name", then saves.
+  await page.getByRole('button', { name: 'Checkbox field No' }).click()
+  await page.keyboard.press('Delete')
+  await page.getByRole('button', { name: 'Text field Vessel name' }).click()
+  await page.getByLabel('Label', { exact: true }).fill('Ship name')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('fl-lessons') ?? '[]').length))
+    .toBe(1)
+
+  await page.getByRole('button', { name: 'Start over' }).click()
+  await expect(page.locator('.toast')).toContainText('4 fields suggested (4 from pages set up before)')
+  await expect(page.getByRole('button', { name: 'Text field Ship name' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Checkbox field No' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Text field Ship name' }).click()
+  await expect(page.getByText('Set up like this on the same page before. Check it.')).toBeVisible()
+})
