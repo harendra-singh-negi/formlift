@@ -214,6 +214,23 @@ describe('detectFields', () => {
     expect(pt(f).x + pt(f).w).toBe(548)
   })
 
+  it('"Comments" takes text under a dated item; "to" in a sentence makes no date', () => {
+    const shapes = {
+      ...none,
+      hlines: [h(50, 550, 300), h(50, 550, 320), h(250, 500, 360, true)],
+      vlines: [v(50, 300, 320), v(550, 300, 320)],
+    }
+    const lines = [
+      text('1.1.8 Date the vessel was delivered', 52, 285, 250),
+      text('Comments:', 55, 305, 105),
+      text('Name of person to contact:', 55, 350, 200),
+    ]
+    expect(detectFields(shapes, lines, size, 1).map((f) => [f.type, f.label])).toEqual([
+      ['text', 'Name of person to contact'],
+      ['text', '1.1.8 Date the vessel was delivered – Comments'],
+    ])
+  })
+
   it('skips places already covered by a field', () => {
     const shapes = { ...none, rects: [{ x: 100, y: 200, w: 9, h: 9, stroked: true, filled: false }] }
     const existing = [
