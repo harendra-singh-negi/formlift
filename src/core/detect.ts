@@ -508,6 +508,11 @@ export function detectFields(
       const cy = (t.y0 + t.y1) / 2
       return cx > x0 && cx < x1 && cy > y0 && cy < y1 && !/^_+$/.test(t.text)
     })
+  // The numbered item a "Comments:" / "Remarks:" belongs to: the nearest "1.2.3 …" line above it.
+  const itemAbove = (t: PtText) =>
+    texts
+      .filter((o) => o.y1 <= t.y0 + 1 && t.y0 - o.y1 < 400 && /^\d+(\.\d+)+[a-z]?\b/i.test(o.text))
+      .sort((a, b) => b.y1 - a.y1)[0]
 
   // Ruled tables first: cells name the checkboxes and answer boxes inside them.
   const cells = tableCells(
@@ -741,16 +746,30 @@ export function detectFields(
     stack.forEach((s) => used.add(s))
     const first = stack[0]
     const lastRule = stack[stack.length - 1]
+    // Text written on the rule itself (a dotted border under a line): a short label at its start ("Comments:")
+    // has its answer after it; text on the first of stacked rules names the lines under it ("… details of actions
+    // required:" over two dotted lines); any other text makes the rule that text's border, not an answer line.
+    const on = texts.filter(
+      (t) => first.y0 - t.y1 > -3 && first.y0 - t.y1 < 4 && overlap(t.x0, t.x1, first.x0, first.x1) > 2,
+    )
+    const multi = stack.length > 1
+    const lead =
+      on.length === 1 && (multi || (on[0].x0 < first.x0 + 2 * em && on[0].text.length <= 40)) ? on[0] : undefined
+    if (on.length && !lead) continue
+    const x0 = lead && !multi ? lead.x1 + 4 : first.x0
+    if (x0 !== first.x0 && first.x1 - x0 < em * 5) continue
     // Label: text on the same line to the left, or just above-left for a block.
     // Label: text on the same line to the left (with no other answer line in between), plus a column header
     // right above when the rule sits in a row of rules (RANK / NAME / SIGNATURE / DATE).
-    const left = texts
-      .filter((t) => t.x1 <= first.x0 + 6 && first.x0 - t.x1 < 220 && first.y0 >= t.y0 - 2 && first.y0 - t.y1 < 10)
-      .filter(
-        (t) =>
-          !rules.some((r) => r !== first && Math.abs(r.y0 - first.y0) < 2 && r.x0 >= t.x1 - 1 && r.x1 <= first.x0 + 1),
-      )
-      .sort((a, b) => b.x1 - a.x1)[0]
+    const left =
+      lead ??
+      texts
+        .filter((t) => t.x1 <= first.x0 + 6 && first.x0 - t.x1 < 220 && first.y0 >= t.y0 - 2 && first.y0 - t.y1 < 10)
+        .filter(
+          (t) =>
+            !rules.some((r) => r !== first && Math.abs(r.y0 - first.y0) < 2 && r.x0 >= t.x1 - 1 && r.x1 <= first.x0 + 1),
+        )
+        .sort((a, b) => b.x1 - a.x1)[0]
     const rowOfRules = rules.filter((r) => Math.abs(r.y0 - first.y0) < 2).length >= 3
     // A solid rule across most of the page is a separator unless a "Label:" right before it names it; dotted
     // rules are always answer lines.
@@ -771,28 +790,30 @@ export function detectFields(
     // A header written on two lines ("DATE" over "(Reviewed)") is read as one.
     const head = header[0]
     const headAbove = head && header.find((t) => t !== head && head.y0 - t.y1 < 6 && head.y0 >= t.y1 - 1)
-    const label = [left, headAbove, head]
+    let label = [left, headAbove, head]
       .filter((t) => t)
       .map((t) => cleanLabel(t!.text))
       .filter(Boolean)
       .join(' – ')
+    const item = lead && GENERIC.test(label) && itemAbove(lead)
+    if (item) label = `${item.text.slice(0, 60).trim()} – ${label}`
     // An unnamed line across the page is a border (e.g. the bottom of a table), not an answer line.
     if (!label && first.x1 - first.x0 > 0.7 * W) continue
     // Top: about one line above the rule, but below any text above it.
     const above = texts
-      .filter((t) => t.y1 <= first.y0 - 1 && overlap(t.x0, t.x1, first.x0, first.x1) > 2 && first.y0 - t.y1 < lineH)
+      .filter((t) => t.y1 <= first.y0 - 1 && overlap(t.x0, t.x1, x0, first.x1) > 2 && first.y0 - t.y1 < lineH)
       .reduce((m, t) => Math.max(m, t.y1), -Infinity)
-    const top = Math.max(first.y0 - lineH, above + 0.5)
+    const top = lead && multi ? first.y0 : Math.max(first.y0 - lineH, above + 0.5)
     // The next row starts right under it, from its left end: a separator between rows, not an answer line.
     if (texts.some((t) => t.y0 - lastRule.y0 > -1 && t.y0 - lastRule.y0 < 4 && Math.abs(t.x0 - first.x0) < 8)) continue
-    // No room to write above it (text right on top): a separator under a paragraph, not an answer line.    if (lastRule.y0 - top < lineH * 0.6) continue
-    const multi = stack.length > 1
+    // No room to write above it (text right on top): a separator under a paragraph, not an answer line.
+    if (lastRule.y0 - top < lineH * 0.6) continue
     out.push({
       type: multi ? 'textarea' : typeFor(label),
       label,
-      x: first.x0,
+      x: x0,
       y: top,
-      w: first.x1 - first.x0,
+      w: first.x1 - x0,
       h: lastRule.y0 - top,
       confidence: label ? 0.8 : 0.5,
     })
@@ -837,9 +858,10 @@ export function detectFields(
       ...shapes.vlines.filter((v) => v.x0 > t.x1 + 2 && v.y0 < midY && v.y1 > midY).map((v) => v.x0 - 2),
     )
     const top = Math.max(cell.y0 + 1.5, t.y0 - 2)
+    // Down to the next line written under it, the label's own column too ("Comments:" under "1.1.2 IMO number:").
     const bottom = Math.min(
       cell.y1 - 1.5,
-      ...texts.filter((o) => o.y0 > t.y1 && overlap(o.x0, o.x1, t.x1, right) > 0).map((o) => o.y0 - 1),
+      ...texts.filter((o) => o.y0 > t.y1 && overlap(o.x0, o.x1, t.x0, right) > 0).map((o) => o.y0 - 1),
     )
     const x = t.x1 + 4
     if (right - x < em * 5 || bottom - top < lineH * 0.6 || textIn(x, top, right, bottom).length) continue
@@ -854,9 +876,7 @@ export function detectFields(
     let label = cleanLabel(t.text)
     // "Comments:" / "Remarks:" say little on their own: name them after the numbered item above them.
     if (GENERIC.test(label)) {
-      const item = texts
-        .filter((o) => o.y1 <= t.y0 + 1 && t.y0 - o.y1 < 400 && /^\d+(\.\d+)+[a-z]?\b/i.test(o.text))
-        .sort((a, b) => b.y1 - a.y1)[0]
+      const item = itemAbove(t)
       // A box with only "Finding" in it: the block it closes, when a box right above starts with a short heading
       // ("HW", "PR", "HF"): one Finding box per block, each with its own name.
       let tag = ''

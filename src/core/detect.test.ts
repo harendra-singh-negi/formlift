@@ -231,6 +231,28 @@ describe('detectFields', () => {
     ])
   })
 
+  it('"Comments:" written on a dotted line (its border): the answer goes after the label, not over it', () => {
+    const shapes = {
+      ...none,
+      hlines: [h(50, 550, 300), h(50, 550, 330), h(52, 548, 318, true)],
+      vlines: [v(50, 300, 330), v(550, 300, 330)],
+    }
+    const lines = [text('2.3.1 Was the PSC report on board?', 52, 270, 250), text('Comments:', 55, 306, 105, 316)]
+    const found = detectFields(shapes, lines, size, 1)
+    expect(found).toHaveLength(1)
+    expect(found[0]).toMatchObject({ type: 'text', label: '2.3.1 Was the PSC report on board? – Comments' })
+    expect(pt(found[0]).x).toBe(109)
+    expect(pt(found[0]).x + pt(found[0]).w).toBe(548)
+  })
+
+  it('a label on the first of stacked dotted lines names the lines under it', () => {
+    const shapes = { ...none, hlines: [h(50, 550, 300, true), h(50, 550, 316, true)] }
+    const lines = [text('In case of a score below 3 please provide details of the actions required:', 55, 288, 420, 298)]
+    const [f] = detectFields(shapes, lines, size, 1)
+    expect(f).toMatchObject({ type: 'textarea', label: 'In case of a score below 3 please provide details of the…' })
+    expect(pt(f)).toMatchObject({ y: 300, h: 16 })
+  })
+
   it('skips places already covered by a field', () => {
     const shapes = { ...none, rects: [{ x: 100, y: 200, w: 9, h: 9, stroked: true, filled: false }] }
     const existing = [
