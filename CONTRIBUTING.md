@@ -30,12 +30,19 @@ npm run dev
 ## Project layout
 
 ```
-src/core/      framework-free logic: form model, validation, conditions, auto-detect (detect.ts), questions
-src/react/     FormEditor, FormFiller and their components; ui/ = small internal UI kit
-src/server/    completedPdf (pdf-lib)
-src/style.css  Tailwind source, compiled and scoped to .fl-root by scripts/build-css.mjs
-example/       the live demo (deployed to GitHub Pages)
+src/core/          framework-free logic: form model (form-logic.ts), fields, layout, list view (flow.ts), questions
+src/core/detect/   auto-detect: what a page draws (shapes, tables), the rules that suggest fields (rules.ts) and a
+                   PDF's own fields (acroform.ts); index.ts runs it all
+src/core/learn/    learning from the admin's saves: one module per kind of learning (pages, labels, drawn) and the
+                   lesson format with its check (lesson.ts); index.ts makes a lesson and applies them all
+src/core/fixtures/ PDFs for the tests
+src/react/         FormEditor, FormFiller and their components; ui/ = small internal UI kit
+src/server/        completedPdf (pdf-lib)
+src/style.css      Tailwind source, compiled and scoped to .fl-root by scripts/build-css.mjs
+example/           the live demo (deployed to GitHub Pages)
 ```
+
+Each module starts with a few lines on what it does and how it fits in. Read them before you change one.
 
 ## Before you open a pull request
 

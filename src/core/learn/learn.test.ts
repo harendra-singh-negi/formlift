@@ -4,8 +4,8 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { detectDocument, lessonFor as lessonWithDrawing, type Ops } from './detect'
-import { validateFields, type FieldDef, type FieldType } from './form-logic'
+import { detectDocument, lessonFor as lessonWithDrawing, type Ops } from '../detect'
+import { validateFields, type FieldDef, type FieldType } from '../form-logic'
 import {
   addLesson,
   forgetting,
@@ -18,7 +18,7 @@ import {
   whyLearnt,
   type EditSession,
   type Lesson,
-} from './learn'
+} from '.'
 
 // A made-up PDF: pages of text lines [text, x, y] in points (600 × 800, y from the top). It draws nothing.
 type Line = [string, number, number]
@@ -318,7 +318,7 @@ describe('fields drawn by hand', () => {
 
 describe('scanned pages', () => {
   it('are known again by their picture', async () => {
-    const file = path.join(__dirname, 'fixtures', 'scanned.pdf')
+    const file = path.join(__dirname, '..', 'fixtures', 'scanned.pdf')
     const pdf = await getDocument({ data: new Uint8Array(fs.readFileSync(file)), verbosity: 0 }).promise
     const box = { ...field('s', 'Inspector', 'text', 0.34, 0.13), source: 'manual' as const }
     const lesson = json((await lessonFor(pdf, PAGES, session([], [box])))!)
@@ -523,7 +523,7 @@ describe('storing lessons', () => {
 // The whole round trip on a real PDF: detect, change, save, detect again.
 describe('on a real PDF', () => {
   async function load(file: string | Uint8Array) {
-    const data = typeof file === 'string' ? new Uint8Array(fs.readFileSync(path.join(__dirname, 'fixtures', file))) : file
+    const data = typeof file === 'string' ? new Uint8Array(fs.readFileSync(path.join(__dirname, '..', 'fixtures', file))) : file
     const pdf = await getDocument({ data, verbosity: 0 }).promise
     const v = (await pdf.getPage(1)).view
     return { pdf, pages: [{ source: 1, width: v[2] - v[0], height: v[3] - v[1] }] }

@@ -7,11 +7,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { validateFields } from './form-logic'
-import { detectDocument, type Ops } from './detect'
+import { validateFields } from '../form-logic'
+import { detectDocument, type Ops } from '.'
 
 async function detect(file: string) {
-  const data = new Uint8Array(fs.readFileSync(path.join(__dirname, 'fixtures', file)))
+  const data = new Uint8Array(fs.readFileSync(path.join(__dirname, '..', 'fixtures', file)))
   const pdf = await getDocument({ data }).promise
   const pages = []
   for (let i = 1; i <= pdf.numPages; i++) {

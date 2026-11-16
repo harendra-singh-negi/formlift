@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateFields } from './form-logic'
+import { validateFields } from '../form-logic'
 import {
   detectFields,
   extractShapes,
@@ -9,8 +9,8 @@ import {
   type Ops,
   type Seg,
   type Shapes,
-} from './detect'
-import type { TextLine } from './layout'
+} from '.'
+import type { TextLine } from '../layout'
 
 const W = 595
 const H = 842
