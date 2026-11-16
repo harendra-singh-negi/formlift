@@ -139,3 +139,22 @@ test('phone: the Filters popover opens as a dialog that fits the screen, Escape 
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
 })
+
+test('phone list: a label keeps its field with it, and the field fills its line', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fl-sample', JSON.stringify('tour:types')))
+  await page.setViewportSize({ width: 390, height: 780 })
+  await page.goto('/')
+  await openTab(page, /Fill/)
+  await page.getByRole('tab', { name: 'List', exact: true }).click()
+  // "Text area" and its box, a line of the page laid out in cells: together, the box the paper's full width
+  // (it used to shrink to a sliver, and a label's field could wrap away from it).
+  // Typed in place (a phone opens no dialog here: the list's boxes are full size).
+  const area = page.locator('ul').getByRole('textbox', { name: 'Notes', exact: true })
+  await expect(area).toBeVisible()
+  const line = () =>
+    area.evaluate((el) => {
+      const group = el.closest('[class*="contents"]')
+      return { label: (group?.firstElementChild as HTMLElement | null)?.innerText, wide: el.getBoundingClientRect().width > 300 }
+    })
+  await expect.poll(line).toEqual({ label: 'Text area', wide: true })
+})

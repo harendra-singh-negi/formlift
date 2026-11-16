@@ -16,10 +16,13 @@ import {
   type FieldDef,
   type Layout,
 } from '../../core/form-logic'
+import { extractShapes, type Ops } from '../../core/detect'
+import { flowSegments, flowText, pageFlow, readPage, type PageRead } from '../../core/flow'
 import { toLines, type PdfTextItem, type TextLine } from '../../core/layout'
 import { toQuestions as builtinToQuestions, type PageText, type Question } from '../../core/questions'
 import type { PageSize } from '../components/PdfPages'
 import { useLabels, type Labels } from '../labels'
+import { loadPdfJs } from '../pdfjs'
 
 /** A file answer (upload or signature PNG) as your storage knows it. The answer's value is its `id`. */
 export interface AnswerFileInfo {
@@ -179,40 +182,86 @@ export function useFormFiller({
 
   const states = useMemo(() => fieldStates(fields, answers), [fields, answers])
 
-  // The PDF's text per original page, read on first need (loadPageText): questions get their own words as titles.
+  // The PDF read page by page on first need (loadPageText): its text lines (questions get their own words as
+  // titles) and its text, tables, colours and pictures for the list view's flow. Read once per document.
   const [wantText, setWantText] = useState(false)
-  const [pageText, setPageText] = useState<Record<number, TextLine[]> | null>(null)
+  const [pages, setPages] = useState<Record<number, { lines: TextLine[]; read: PageRead }> | null>(null)
+  const [reading, setReading] = useState(0)
   useEffect(() => {
-    if (!wantText || !pdf || pageText) return
+    if (!wantText || !pdf || pages) return
     let live = true
     ;(async () => {
-      const out: Record<number, TextLine[]> = {}
-      for (let i = 1; i <= pdf.numPages; i++) {
+      const { OPS } = await loadPdfJs()
+      const out: Record<number, { lines: TextLine[]; read: PageRead }> = {}
+      const step = Math.ceil(pdf.numPages / 20)
+      for (let i = 1; i <= pdf.numPages && live; i++) {
         const page = await pdf.getPage(i)
-        out[i] = toLines((await page.getTextContent()).items as PdfTextItem[], page.view)
+        // The operator list first: it loads the page's fonts, whose names tell bold and italic text.
+        const ops = await page.getOperatorList({ intent: 'print' })
+        const items = (await page.getTextContent()).items as PdfTextItem[]
+        const fontOf = (id: string) => {
+          try {
+            return page.commonObjs.has(id) ? (page.commonObjs.get(id) as { name?: string })?.name : undefined
+          } catch {
+            return undefined
+          }
+        }
+        const shapes = extractShapes(ops.fnArray, ops.argsArray as unknown[][], OPS as unknown as Ops, page.view)
+        out[i] = { lines: toLines(items, page.view, fontOf), read: readPage(items, shapes, page.view, fontOf) }
+        page.cleanup() // its decoded pictures: the list draws the ones it shows again from the page
+        if (i % step === 0) setReading(i)
       }
-      if (live) setPageText(out)
-    })().catch(() => live && setPageText({}))
+      if (live) setPages(out)
+    })().catch(() => live && setPages({}))
     return () => {
       live = false
     }
-  }, [wantText, pdf, pageText])
+  }, [wantText, pdf, pages])
   // Rebuilt when fields are shown / hidden by conditions, not on every keystroke.
   const visibleKeys = fields
     .filter((f) => states[f.key]?.visible)
     .map((f) => f.key)
     .join(',')
-  const questions = useMemo(() => {
+  const listed = useMemo(() => {
     const keys = new Set(visibleKeys.split(','))
     const textOf = (page: number) => {
       const source = layout ? layout.pages[page - 1]?.source : page
-      return source ? pageText?.[source] : undefined
+      return source ? pages?.[source]?.lines : undefined
     }
     return toQuestions(
       fields.filter((f) => keys.has(f.key) && !f.dialogOnly),
       textOf,
     )
-  }, [fields, layout, visibleKeys, pageText, toQuestions])
+  }, [fields, layout, visibleKeys, pages, toQuestions])
+  // The form as a flow, page by page: the original page as read (none yet: its fields alone), the fields on it,
+  // the layout's own text and white-outs.
+  const flow = useMemo(() => {
+    const last = Math.max(1, ...fields.map((f) => f.position.page))
+    const sheets =
+      layout?.pages ??
+      (pdfSizes.length ? pdfSizes : Array.from({ length: last }, () => ({ width: 595, height: 842 }))).map((s, i) => ({
+        source: i + 1,
+        ...s,
+      }))
+    return sheets.flatMap((p, i) =>
+      pageFlow(
+        p.source ? pages?.[p.source]?.read : undefined,
+        { page: i + 1, ...p },
+        fields.filter((f) => f.position.page === i + 1 && !f.dialogOnly),
+        layout?.elements.filter((e) => e.page === i + 1),
+      ),
+    )
+  }, [fields, layout, pdfSizes, pages])
+  // Cut where questions end; each question searchable by the document's text around it.
+  const segments = useMemo(() => flowSegments(flow, listed), [flow, listed])
+  const questions = useMemo(() => {
+    const text = new Map<string, string>()
+    for (const s of segments) {
+      const t = flowText(s.blocks)
+      for (const id of s.questions) text.set(id, t)
+    }
+    return listed.map((q) => (text.has(q.id) ? { ...q, text: text.get(q.id) } : q))
+  }, [segments, listed])
 
   // Loads the stored signatures shown on the page (once each).
   const loading = useRef(new Set<string>())
@@ -414,7 +463,14 @@ export function useFormFiller({
     signatureSrc: (f: FieldDef) => signatures[String(answers[f.key])],
     /** Visible fields grouped as questions (tables, option groups), titled from the PDF text once loaded. */
     questions,
-    /** Reads the PDF text so `questions` get real titles (call when you first show them). */
+    /**
+     * The document as a flow (its text, tables, colours, pictures and the fields in place), cut where questions
+     * end: what the list view shows. Fields alone until the PDF is read (loadPageText).
+     */
+    segments,
+    /** While loadPageText reads the PDF: pages read so far. */
+    reading: wantText && pdf && !pages ? { done: reading, total: pdf.numPages } : null,
+    /** Reads the PDF so `questions` get real titles and `segments` the document's text (call when you first show them). */
     loadPageText: () => setWantText(true),
     pdf,
     pdfSizes,

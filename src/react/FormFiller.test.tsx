@@ -162,8 +162,13 @@ it('lets you draw the list filters yourself', () => {
   const mine = el.querySelector<HTMLButtonElement>('[data-my-filter]')!
   expect(mine.textContent).toBe('2/2')
   expect(el.querySelector('[aria-label="Search questions"]')).toBeNull()
+  // The list is the document's flow (here, no PDF read: the fields alone), with the answer controls in it.
+  const inList = (label: string) => el.querySelector(`ul [aria-label="${label}"]`)
+  expect(inList('Name')).not.toBeNull()
+  expect(inList('Status')).not.toBeNull()
   act(() => mine.click())
   expect(mine.textContent).toBe('0/2')
+  expect(inList('Name')).toBeNull()
 })
 
 it('offers only the filters you list, and you decide on the ones this form has nothing for', () => {
