@@ -109,7 +109,7 @@
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run typecheck && npm test",
-    "demo:build": "npm run build && vite build",
+    "demo:build": "npm run build && cp README.md example/public/llms-full.txt && vite build",
     "prepare": "npm run build"
   },
   "peerDependencies": {
