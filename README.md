@@ -769,7 +769,7 @@ const fields = await detectDocument(pdf, OPS as unknown as Ops, pages, [])
 What changed for your code, per release. The full list of changes is in the
 [CHANGELOG](./CHANGELOG.md).
 
-### 0.4 → next
+### 0.4 → 0.5
 
 The list view is now the whole PDF reflowed (text, tables, pictures, answers in place), not a list of question
 cards. There is no switch back. Check these:
