@@ -171,7 +171,7 @@ it('lets you draw the list filters yourself', () => {
   expect(inList('Name')).toBeNull()
 })
 
-it('the list shows more with a button, or by itself as its end scrolls into view', () => {
+it('the list shows more with a button, or by itself as its end scrolls into view; its paper takes your classes', () => {
   const seen: (() => void)[] = []
   vi.stubGlobal(
     'IntersectionObserver',
@@ -184,11 +184,12 @@ it('the list shows more with a button, or by itself as its end scrolls into view
   const draw = (loadMore: 'button' | 'scroll') =>
     act(() =>
       root.render(
-        <FormFiller pdf="x.pdf" fields={fields} views={['list']} listPageSize={1} listLoadMore={loadMore} />,
+        <FormFiller pdf="x.pdf" fields={fields} views={['list']} listPageSize={1} listLoadMore={loadMore} listPaperClassName="mine" />,
       ),
     )
   const shown = () => el.querySelectorAll('ul [aria-label="Name"], ul [aria-label="Status"]').length
   draw('button')
+  expect(el.querySelector('ul.mine')).not.toBeNull()
   expect(shown()).toBe(1)
   act(() => button('Show more (1 left)').click())
   expect(shown()).toBe(2)

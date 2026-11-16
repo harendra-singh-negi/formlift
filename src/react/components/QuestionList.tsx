@@ -46,6 +46,7 @@ export default function QuestionList({
   renderToolbar,
   pageSize = PAGE,
   loadMore = 'button',
+  paperClassName = '',
 }: {
   questions: Question[]
   /** The document's flow, cut where questions end (useFormFiller's `segments`). */
@@ -66,6 +67,8 @@ export default function QuestionList({
   pageSize?: number
   /** How more questions come: a "Show more" button (default), or by themselves as the end scrolls into view. */
   loadMore?: 'button' | 'scroll'
+  /** Your classes on the document's paper, e.g. `max-w-5xl mx-auto` for a narrower page. Default: full width. */
+  paperClassName?: string
 }) {
   const L = useLabels()
   const own = useQuestionFilter(questions, answers, { filters, search })
@@ -182,7 +185,7 @@ export default function QuestionList({
       )}
       {!reading && page.length > 0 && (
         // The document on its paper: as wide as a page reads well, cells stacked on a narrow screen (@container).
-        <ul className="@container mx-auto my-0 max-w-[64rem] list-none rounded-md bg-white p-3 text-[14px] leading-snug text-ink shadow-[0_1px_6px_rgba(15,23,42,0.14)] sm:p-5 lg:text-[15px]">
+        <ul className={`@container my-0 list-none rounded-md bg-white p-3 text-[14px] leading-snug text-ink shadow-[0_1px_6px_rgba(15,23,42,0.14)] sm:p-5 lg:text-[15px] ${paperClassName}`}>
           {page.map((s) => (
             <li
               key={`${s.blocks[0].page}:${s.blocks[0].y}`}
