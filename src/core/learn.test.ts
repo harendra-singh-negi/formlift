@@ -99,7 +99,7 @@ describe('page memory', () => {
     // Revision 2: a line added after "Permit number:" pushes the lines under it 40 pt down.
     const revised: Line[] = [...REPORT.slice(0, 3), ['Call sign:', 50, 180], ['Manager:', 50, 220], ['Date of inspection:', 50, 260]]
     const learned = (await learnedFor([lesson!], fakePdf(revised, FLOOR), [1, 2], 2))!
-    const back = learned.remembered(1, 1)
+    const back = learned.remembered(1, 1)?.fields
     expect(back?.map((f) => [f.label, f.type, f.source, f.confidence])).toEqual([
       ['Location', 'text', 'ai', REMEMBERED],
       ['Inspected on', 'date', 'ai', REMEMBERED],
@@ -142,7 +142,7 @@ describe('page memory', () => {
     const group = { id: 'g1', mode: 'single' as const }
     const boxes = [field('y', 'Yes', 'checkbox', 0.5, 0.11, { group }), field('n', 'No', 'checkbox', 0.6, 0.11, { group })]
     const lesson = (await lessonFor(fakePdf(REPORT, FLOOR), PAGES, session([], boxes)))!
-    const back = (await learnedFor([lesson], fakePdf(REPORT, FLOOR), [1, 2], 2))!.remembered(1, 1)!
+    const back = (await learnedFor([lesson], fakePdf(REPORT, FLOOR), [1, 2], 2))!.remembered(1, 1)!.fields
     expect(back[0].group?.id).not.toBe('g1')
     expect(back[0].group?.id).toBe(back[1].group?.id)
   })
@@ -151,7 +151,7 @@ describe('page memory', () => {
     const many: Line[] = Array.from({ length: 40 }, (_, i) => [`Question ${i + 1}: what was checked`, 50, 40 + i * 18])
     const lesson = json((await lessonFor(fakePdf(many), [{ source: 1 }], session([], [drawn])))!)
     expect([lesson.pages[0].text.length, lesson.pages[0].lines]).toEqual([24, 40])
-    expect((await learnedFor([lesson], fakePdf(many), [1], 1))!.remembered(1, 1)).toHaveLength(1)
+    expect((await learnedFor([lesson], fakePdf(many), [1], 1))!.remembered(1, 1)?.fields).toHaveLength(1)
     // Half of its lines another page's: not this page.
     const half = many.map(([t, x, y], i): Line => [i % 2 ? `Other ${i}` : t, x, y])
     expect((await learnedFor([lesson], fakePdf(half), [1], 1))!.remembered(1, 1)).toBeNull()
@@ -163,7 +163,7 @@ describe('page memory', () => {
     const lesson = (await lessonFor(fakePdf(REPORT, FLOOR), PAGES, session([site], saved), { drawing: onLines }))!
     expect(lesson.pages[0].onDrawing).toEqual([0, 1])
     const learned = (await learnedFor([lesson], fakePdf(REPORT, FLOOR), [1, 2], 2))!
-    expect(learned.remembered(1, 1, () => true)).toHaveLength(2)
+    expect(learned.remembered(1, 1, () => true)?.fields).toHaveLength(2)
     expect(learned.remembered(1, 1, () => false)).toBeNull()
   })
 })
@@ -536,6 +536,30 @@ describe('on a real PDF', () => {
     a.label === b.label &&
     JSON.stringify(a.options) === JSON.stringify(b.options) &&
     (['x', 'y', 'width', 'height'] as const).every((k) => Math.abs(a.position[k] - b.position[k]) < 0.001)
+
+  it('puts the saved page back with what auto-detect finds now and did not then, but not what the admin removed', async () => {
+    const doc = await PDFDocument.create()
+    const font = await doc.embedFont(StandardFonts.Helvetica)
+    const page = doc.addPage([595, 842])
+    const form = doc.getForm()
+    page.drawText('Crew change request', { x: 40, y: 800, size: 14, font })
+    for (const [i, label] of ['Full Name', 'Email Address', 'Phone Number'].entries()) {
+      page.drawText(label, { x: 40, y: 740 - i * 60, size: 10, font })
+      form.createTextField(`f${i}`).addToPage(page, { x: 40, y: 712 - i * 60, width: 240, height: 22 })
+    }
+    const { pdf, pages } = await load(await doc.save())
+    const [name, email] = await run(pdf, pages)
+    // Saved when auto-detect found only two of them: the admin renamed one and removed the other.
+    const saved = [{ ...name, label: 'Name' }]
+    const lesson = json(await lessonWithDrawing(pdf, pages, session([name, email], saved), { OPS: OPS as unknown as Ops }))!
+    expect(lesson.pages[0].removed).toHaveLength(1)
+    expect(validateLesson(lesson)).toEqual([])
+    const again = await run(pdf, pages, [lesson])
+    expect(again.map((f) => [f.label, f.confidence])).toEqual([
+      ['Name', REMEMBERED],
+      ['Phone Number', 1],
+    ])
+  })
 
   it('puts the saved page back, and applies the label lessons alone where the page is new', async () => {
     const { pdf, pages } = await load('big_14pt_landscape.pdf')

@@ -119,6 +119,11 @@ export interface PageMemory {
   /** The lines the fields move with (fields in a row share one). */
   anchors?: Mark[]
   fields: RememberedField[]
+  /**
+   * Boxes (page fractions) of fields the admin had there and removed or moved away: suggested again there, never.
+   * Other suggestions on the page are new to the admin (auto-detect did not make them then) and still come.
+   */
+  removed?: [x: number, y: number, width: number, height: number][]
 }
 
 /** What the admin told auto-detect to forget of the lessons before this one. */
@@ -500,6 +505,10 @@ async function memoryOf(
     // A page left without fields may just not be done yet: it keeps getting suggestions (and loses wrong ones label
     // by label).
     if (!fields.some((f) => !f.dialogOnly)) continue
+    const kept = fields.map((f) => f.position)
+    const removed = given
+      .filter((f) => f.position.page === n && !f.dialogOnly && !clashes(kept, f.position))
+      .map(({ position: p }): [number, number, number, number] => [r4(p.x), r4(p.y), r4(p.width), r4(p.height)])
     const mine = own(source)
     // Too little text of its own (a scan, a page like many others): known by its picture, if it can be drawn.
     const image = mine.length < MIN_OWN ? await inkOf(pdf, source) : undefined
@@ -519,6 +528,7 @@ async function memoryOf(
         ...(image && { image }),
         ...(onDrawing.length >= 2 && { onDrawing }),
         fields: [],
+        ...(removed.length && { removed }),
       },
     })
   }
@@ -795,6 +805,7 @@ export function validateLesson(lesson: unknown, limits?: Partial<Limits>): strin
       !Array.isArray(fields) ||
       fields.length > maxFields ||
       (p.anchors != null && !(Array.isArray(p.anchors) && p.anchors.length <= maxFields && p.anchors.every(isMark))) ||
+      (p.removed != null && !(Array.isArray(p.removed) && p.removed.length <= maxFields && p.removed.every((b) => box4(b, 2)))) ||
       (p.onDrawing != null &&
         !(
           Array.isArray(p.onDrawing) &&
@@ -1012,8 +1023,15 @@ export async function learnedFor(lessons: Lesson[] | undefined, pdf: TextPdf, so
     })
 
   return {
-    /** The fields of a page set up before, placed on layout page `page`; null when the page is new. */
-    remembered(source: number, page: number, onDrawing?: (p: Position) => boolean): Suggestion[] | null {
+    /**
+     * The fields of a page set up before, placed on layout page `page`, and where the admin removed fields; null
+     * when the page is new.
+     */
+    remembered(
+      source: number,
+      page: number,
+      onDrawing?: (p: Position) => boolean,
+    ): { fields: Suggestion[]; removed: Position[] } | null {
       const mine = own(source)
       const here = uniqueOn(texts.get(source)?.lines ?? [])
       const found: { x: Memory; score: number; shift: number[] }[] = []
@@ -1039,7 +1057,10 @@ export async function learnedFor(lessons: Lesson[] | undefined, pdf: TextPdf, so
         const sample = x.m.onDrawing ?? []
         const still = onDrawing ? sample.filter((j) => back[j] && onDrawing(back[j].position)).length : sample.length
         if (2 * still < sample.length) continue
-        return back.map((s) => ({ ...s, why }))
+        const removed = (x.m.removed ?? []).map(([rx, ry, width, height]) =>
+          fitInPage({ page, x: rx + shift[0], y: ry + shift[1], width, height }),
+        )
+        return { fields: back.map((s) => ({ ...s, why })), removed }
       }
       return null
     },

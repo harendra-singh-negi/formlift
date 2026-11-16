@@ -1236,8 +1236,9 @@ export function lessonFor(
  * drawing. Runs page by page so the page stays responsive; `onProgress(done, total)`; stop early with `signal`.
  * New fields get ids and keys; existing fields are never duplicated.
  * `lessons`: what earlier saves taught (see learn.ts). A page set up before gets its fields back as they were
- * (confidence REMEMBERED), with their conditions and follow-ups; other suggestions get the admin's changes for their
- * label, or are left out, and fields the admin drew by hand next to a line in other forms are drawn there
+ * (confidence REMEMBERED), with their conditions and follow-ups, plus what auto-detect finds there now where the
+ * admin kept or removed nothing; other suggestions get the admin's changes for their label, or are left out, and
+ * fields the admin drew by hand next to a line in other forms are drawn there on pages not set up before
  * (confidence LEARNT).
  */
 export async function detectDocument(
@@ -1270,21 +1271,24 @@ export async function detectDocument(
       const remembered = learned?.remembered(p.source, i + 1, onDrawing(shapes, typed.rules, size))
       const taken = all.filter((f) => f.position.page === i + 1).map((f) => f.position)
       const suggested: Made[] = []
+      // A page set up before: its fields as they were (overlaps among them too), where nothing is placed yet.
+      if (remembered) suggested.push(...remembered.fields.filter((s) => s.dialogOnly || !clashes(taken, s.position)))
+      // What the admin decided on that page (kept, changed, removed) is not suggested again; what auto-detect finds
+      // now and did not then still is.
+      const decided = remembered ? [...remembered.fields.map((s) => s.position), ...remembered.removed] : []
       // A page with fillable fields of its own gets those; guessing from the drawing is for the other pages.
-      const own = remembered ? [] : await ownFields(page, lines, i + 1)
-      if (remembered)
-        // A page set up before: its fields as they were (overlaps among them too), where nothing is placed yet.
-        suggested.push(...remembered.filter((s) => s.dialogOnly || !clashes(taken, s.position)))
-      else {
-        const made = own.length
-          ? own.filter((s) => !clashes(taken, s.position))
-          : detectFields(shapes, lines, size, i + 1, all, typed.rules, prevText)
-        for (const s of made) {
-          const t = learned ? learned.adjust(s) : s
-          if (t) suggested.push(t)
-        }
-        if (learned) suggested.push(...learned.drawn(p.source, i + 1, [...taken, ...suggested.map((s) => s.position)]))
+      const own = await ownFields(page, lines, i + 1)
+      const made = own.length
+        ? own.filter((s) => !clashes(taken, s.position))
+        : detectFields(shapes, lines, size, i + 1, all, typed.rules, prevText)
+      for (const s of made) {
+        if (clashes(decided, s.position)) continue
+        const t = learned ? learned.adjust(s) : s
+        if (t) suggested.push(t)
       }
+      // Fields drawn by hand elsewhere: not on a page set up before (where the admin drew what they wanted).
+      if (learned && !remembered)
+        suggested.push(...learned.drawn(p.source, i + 1, [...taken, ...suggested.map((s) => s.position)]))
       for (const s of suggested) {
         const { ref, why, ...field } = s
         const id =
