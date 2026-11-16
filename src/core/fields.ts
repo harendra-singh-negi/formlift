@@ -30,16 +30,29 @@ export function uniqueKey(base: string, fields: FieldDef[]) {
 
 /** A field key from a label: "PERMIT NUMBER" → permit_number_1 (unique among `fields`). */
 export function keyFor(label: string, type: FieldType, fields: { key: string }[]) {
-  const slug = label
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 40)
-  const base = /^[a-z]/.test(slug) ? slug : `${type}${slug ? '_' + slug : ''}`
-  const used = new Set(fields.map((f) => f.key))
-  let i = 1
-  while (used.has(`${base}_${i}`)) i++
-  return `${base}_${i}`
+  return keyMaker(fields.map((f) => f.key))(label, type)
+}
+
+/**
+ * keyFor for many new fields in a row, each call O(1) on average (a 1000-page form names 12000 fields): the keys
+ * keyFor would give one after another. `taken`: the keys in use.
+ */
+export function keyMaker(taken: string[]) {
+  const used = new Set(taken)
+  const from = new Map<string, number>() // base → the next number that may be free
+  return (label: string, type: FieldType) => {
+    const slug = label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 40)
+    const base = /^[a-z]/.test(slug) ? slug : `${type}${slug ? '_' + slug : ''}`
+    let i = from.get(base) ?? 1
+    while (used.has(`${base}_${i}`)) i++
+    from.set(base, i + 1)
+    used.add(`${base}_${i}`)
+    return `${base}_${i}`
+  }
 }
 
 type Cond = FieldDef['visibleWhen']
