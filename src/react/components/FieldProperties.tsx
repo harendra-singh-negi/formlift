@@ -13,6 +13,7 @@ import {
 } from '../../core/form-logic'
 import { fitInPage } from '../../core/coords'
 import { newFollowUpField } from '../../core/fields'
+import { REMEMBERED } from '../../core/learn'
 import { typeName, useLabels } from '../labels'
 import ConditionBuilder from './ConditionBuilder'
 import { Checkbox, FormField, Select, TextArea, TextInput } from '../ui/slots'
@@ -80,7 +81,9 @@ export default function FieldProperties({
       <Section title={L.fieldSection}>
         {field.source === 'ai' && (
           <p className="m-0 rounded bg-folder/15 px-2 py-1 text-[12px]">
-            {L.suggestedAutomatically(field.confidence != null ? Math.round(field.confidence * 100) : null)}
+            {field.confidence === REMEMBERED
+              ? L.rememberedField
+              : L.suggestedAutomatically(field.confidence != null ? Math.round(field.confidence * 100) : null)}
           </p>
         )}
         <p className="m-0 font-mono text-[11px] text-faint">{L.fieldId(field.id)}</p>

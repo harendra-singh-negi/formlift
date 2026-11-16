@@ -2,7 +2,8 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { moveBy, resizeBy, snap, toPage } from '../../core/coords'
 import { detectDocument, type Ops } from '../../core/detect'
-import { duplicate, newField, reorder, withField, withoutField } from '../../core/fields'
+import { duplicate, newField, newId, reorder, withField, withoutField } from '../../core/fields'
+import { lessonFor, REMEMBERED, type Lesson } from '../../core/learn'
 import { layerOpen } from '../ui/useOutsideClose'
 import {
   defaultLayout,
@@ -55,6 +56,16 @@ export interface UseFormEditorOptions {
   autoDetect?: boolean
   /** Called with the suggested fields after a detect that found some. */
   onDetected?: (found: FieldDef[]) => void
+  /**
+   * What earlier saves taught auto-detect: every lesson `onLesson` gave you, from all your forms and admins. Pages
+   * set up before then come back as they were, and changes made to a label apply to that label in every form.
+   */
+  lessons?: Lesson[]
+  /**
+   * After a save that taught auto-detect something. Store `lesson` in place of the one with the same `id` (the same
+   * editing session saved again; `addLesson` does this), else add it, and pass them all as `lessons` from then on.
+   */
+  onLesson?: (lesson: Lesson) => unknown
   /** Delete, Ctrl+Z / Ctrl+Y, Ctrl+D, arrows, Escape on window. Default true. */
   keyboard?: boolean
   /** Field types that can be added. Default: all (FIELD_TYPES). */
@@ -91,6 +102,8 @@ export function useFormEditor({
   onChange,
   autoDetect,
   onDetected,
+  lessons,
+  onLesson,
   keyboard = true,
   warnUnsaved = true,
   fieldTypes = FIELD_TYPES,
@@ -118,6 +131,10 @@ export function useFormEditor({
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
   const [detecting, setDetecting] = useState<{ done: number; total: number; stop: AbortController } | null>(null)
   const autoDetected = useRef(false)
+  // This editing session, for lessons: the fields it started with and every suggestion auto-detect added.
+  const [sessionId] = useState(newId)
+  const [before] = useState(initialValue.fields)
+  const suggested = useRef<FieldDef[]>([])
   const drag = useRef<{
     sel: NonNullable<Selection>
     mode: 'move' | 'resize'
@@ -334,8 +351,12 @@ export function useFormEditor({
 
   // Suggested fields for the whole document (source 'ai'); one undo step removes them all.
   const onDetectedRef = useRef(onDetected)
+  const lessonsRef = useRef(lessons)
+  const onLessonRef = useRef(onLesson)
   useEffect(() => {
     onDetectedRef.current = onDetected
+    lessonsRef.current = lessons
+    onLessonRef.current = onLesson
   })
   const detect = useCallback(
     async (auto = false) => {
@@ -351,14 +372,20 @@ export function useFormEditor({
           fields,
           (done, total) => setDetecting((d) => d && { ...d, done, total }),
           stop.signal,
+          lessonsRef.current,
         )
         if (found.length) {
+          suggested.current.push(...found)
           setFields((l) => [...l, ...found])
           onDetectedRef.current?.(found)
         }
         notify(
           found.length
-            ? L.fieldsSuggested(found.length, stop.signal.aborted)
+            ? L.fieldsSuggested(
+                found.length,
+                stop.signal.aborted,
+                found.filter((f) => f.confidence === REMEMBERED).length,
+              )
             : auto
               ? L.noFieldsFoundAuto
               : L.noNewFieldsFound,
@@ -402,6 +429,12 @@ export function useFormEditor({
       await onSave({ fields, layout: layoutToSave })
       setSaved(sent)
       notify(L.saved)
+      // What the save taught auto-detect, worked out after it (it reads the pages' text once per document).
+      const learn = onLessonRef.current
+      if (learn && pdf && layout)
+        void lessonFor(pdf, layout.pages, { id: sessionId, before, suggested: suggested.current, saved: fields })
+          .then((lesson) => lesson && learn(lesson))
+          .catch(notifyError)
       return true
     } catch (err) {
       notifyError(err)
