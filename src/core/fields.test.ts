@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { validateFields } from './form-logic'
-import { duplicate, newField, refreshed, reorder, uniqueKey, withField } from './fields'
+import { duplicate, keyFor, keyMaker, newField, refreshed, reorder, uniqueKey, withField } from './fields'
 
 describe('field helpers', () => {
   it('new fields get unique keys and a box inside the page', () => {
@@ -75,5 +75,18 @@ describe('field helpers', () => {
     const c = newField('text', 1, 0.5, 0.3, [a, b])
     const f = withField([a, b, c], { ...a, label: 'Site Name' })
     expect([f[1] === b, f[2] === c]).toEqual([false, true])
+  })
+})
+
+describe('keyMaker', () => {
+  it('gives the keys keyFor would give one after another', () => {
+    const next = keyMaker(['full_name_1', 'full_name_3'])
+    expect([next('Full Name', 'text'), next('Full Name', 'text'), next('Full Name', 'text'), next('2nd', 'date')]).toEqual([
+      'full_name_2',
+      'full_name_4',
+      'full_name_5',
+      'date_2nd_1',
+    ])
+    expect(keyFor('Full Name', 'text', [{ key: 'full_name_1' }])).toBe('full_name_2')
   })
 })

@@ -8,7 +8,7 @@
 
 import type { FieldDef, FieldType, Position } from './form-logic'
 import { clashes, fitInPage, overlap } from './coords'
-import { keyFor } from './fields'
+import { keyFor, keyMaker } from './fields'
 import { toLines, type TextLine } from './layout'
 import { learnedFor, lessonFor as learnFrom, type EditSession, type Forget, type Lesson, type Suggestion as Made } from './learn'
 
@@ -672,6 +672,16 @@ export function detectFields(
       if (!label && !atTop) continue
       label ||= 'Text'
     }
+    // A lone one-line box named right above it (where the box starts) or on its left, as web forms have it: an input.
+    if (!label && lone && c.y1 - c.y0 > lineH * 1.2 && c.y1 - c.y0 <= lineH * 3 && c.x1 - c.x0 > em * 8) {
+      const cy = (c.y0 + c.y1) / 2
+      const name =
+        texts
+          .filter((t) => t.y1 <= c.y0 + 1 && c.y0 - t.y1 < lineH * 1.5 && Math.abs(t.x0 - c.x0) < em * 2)
+          .sort((a, b) => b.y1 - a.y1)[0] ??
+        texts.filter((t) => t.y0 < cy && t.y1 > cy && t.x1 <= c.x0 + 1 && c.x0 - t.x1 < em * 6).sort((a, b) => b.x1 - a.x1)[0]
+      label = name ? cleanLabel(name.text) : ''
+    }
     // A row of answer cells (every cell in it blank) under a header too long to be a name ("OPEN ITEMS, MEMORANDA,
     // … (Where Class records …)"): the header's start names it.
     const head = cells.find(
@@ -1072,7 +1082,7 @@ export { keyFor }
 
 interface PdfPage {
   view: number[]
-  getOperatorList(o?: { intent?: string }): Promise<{ fnArray: number[]; argsArray: unknown[] }>
+  getOperatorList(o?: { intent?: string; annotationMode?: number }): Promise<{ fnArray: number[]; argsArray: unknown[] }>
   getTextContent(): Promise<{ items: unknown[] }>
   getAnnotations?(): Promise<unknown[]>
 }
@@ -1162,8 +1172,9 @@ type Item = { str: string; transform: number[]; width: number }
 
 /** A page as detection reads it: what it draws (with typed boxes and "____" runs) and its text without them. */
 async function readDrawing(page: PdfPage, OPS: Ops) {
-  // 'print' intent: its operator list is not the one the canvas renderer caches and rewrites.
-  const ops = await page.getOperatorList({ intent: 'print' })
+  // 'print' intent: its operator list is not the one the canvas renderer caches and rewrites. Annotations left out
+  // (pdf.js AnnotationMode.DISABLE): a fillable field's look is not the page's drawing (and comes out of place here).
+  const ops = await page.getOperatorList({ intent: 'print', annotationMode: 0 })
   const text = await page.getTextContent()
   const split = splitBoxChars(text.items as Item[], page.view)
   const typed = splitUnderscores(split.items, page.view)
@@ -1245,6 +1256,7 @@ export async function detectDocument(
     ? await learnedFor(lessons, pdf, pages.flatMap((p) => (p.source ? [p.source] : [])), pages.length)
     : null
   let prevText = ''
+  const keyOf = keyMaker(existing.map((f) => f.key))
   for (let i = 0; i < pages.length; i++) {
     if (signal?.aborted) break
     const p = pages[i]
@@ -1277,7 +1289,7 @@ export async function detectDocument(
         const { ref, why, ...field } = s
         const id =
           typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `d${Date.now()}${Math.random()}`
-        const key = keyFor(field.label, field.type, [...existing, ...found])
+        const key = keyOf(field.label, field.type)
         const f = { ...field, id, key, label: field.label || field.type }
         found.push(f)
         if (ref || why) from.set(f, s)

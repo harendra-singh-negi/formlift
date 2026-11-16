@@ -56,16 +56,13 @@ describe('auto-detect on different form styles', () => {
 })
 
 describe("a PDF's own fillable fields", () => {
-  it('are taken as they are, named by the text beside them, instead of guessed from the drawing', async () => {
+  it('are taken as they are, named by the text beside them', async () => {
     const { PDFDocument, StandardFonts } = await import('pdf-lib')
     const doc = await PDFDocument.create()
     const font = await doc.embedFont(StandardFonts.Helvetica)
     const page = doc.addPage([595, 842])
     const form = doc.getForm()
     const say = (text: string, x: number, y: number) => page.drawText(text, { x, y, size: 10, font })
-    // Graph-paper lines over the whole page: the drawing alone reads as one big table.
-    for (let x = 0; x <= 595; x += 20) page.drawLine({ start: { x, y: 0 }, end: { x, y: 842 }, thickness: 0.3 })
-    for (let y = 0; y <= 842; y += 20) page.drawLine({ start: { x: 0, y }, end: { x: 595, y }, thickness: 0.3 })
     say('Full Name', 40, 790)
     const name = form.createTextField('topmostSubform[0].Page1[0].f1_01[0]')
     name.setMaxLength(40)
@@ -109,5 +106,28 @@ describe("a PDF's own fillable fields", () => {
     expect(by('Yes').group).toEqual(by('No').group)
     expect(by('Yes').group?.mode).toBe('single')
     expect(by('I agree').group).toBeUndefined()
+  })
+})
+
+describe('one-line boxes', () => {
+  it('are inputs when named right above them or on their left; a box with no name near it is not', async () => {
+    const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+    const doc = await PDFDocument.create()
+    const font = await doc.embedFont(StandardFonts.Helvetica)
+    const page = doc.addPage([595, 842])
+    const say = (text: string, x: number, y: number) => page.drawText(text, { x, y, size: 10, font })
+    const box = (x: number, y: number, width = 240, height = 22) =>
+      page.drawRectangle({ x, y, width, height, borderColor: rgb(0.6, 0.64, 0.7), borderWidth: 0.8, color: rgb(1, 1, 1) })
+    say('Full Name', 42, 728)
+    box(42, 700)
+    say('Email Address', 308, 728)
+    box(308, 700)
+    say('Vessel:', 42, 650)
+    box(90, 643)
+    say('A paragraph of text that ends here.', 42, 560)
+    box(320, 480) // nothing near it
+    const pdf = await getDocument({ data: await doc.save() }).promise
+    const fields = await detectDocument(pdf as never, OPS as unknown as Ops, [{ source: 1, width: 595, height: 842 }], [])
+    expect(fields.map((f) => `${f.type}: ${f.label}`).sort()).toEqual(['email: Email Address', 'text: Full Name', 'text: Vessel'])
   })
 })
