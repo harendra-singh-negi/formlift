@@ -31,14 +31,14 @@ const session = (suggested: FieldDef[], saved: FieldDef[], before: FieldDef[] = 
 const lessonOf = async (s: EditSession, at = 1) => (await lessonFor(fakePdf([['x', 0, 0]]), [], s, at))!
 
 const REPORT: Line[] = [
-  ['Vessel inspection report', 50, 60],
-  ['Vessel name:', 50, 100],
-  ['IMO number:', 50, 140],
-  ['Master:', 50, 180],
+  ['Site inspection report', 50, 60],
+  ['Site name:', 50, 100],
+  ['Permit number:', 50, 140],
+  ['Manager:', 50, 180],
   ['Date of inspection:', 50, 220],
 ]
-const DECK: Line[] = [
-  ['Deck checklist', 50, 60],
+const FLOOR: Line[] = [
+  ['Floor checklist', 50, 60],
   ['Hatch covers', 50, 100],
   ['Mooring lines', 50, 140],
   ['Lifeboats', 50, 180],
@@ -48,34 +48,34 @@ const at = (fields: { position: FieldDef['position'] }[] | null | undefined) =>
   (fields ?? []).map((f) => [Math.round(f.position.x * 1000) / 1000, Math.round(f.position.y * 1000) / 1000])
 
 describe('page memory', () => {
-  const vessel = field('a', 'Vessel name', 'text', 0.25, 0.11)
+  const site = field('a', 'Site name', 'text', 0.25, 0.11)
   const drawn = { ...field('b', 'Inspected on', 'date', 0.35, 0.265), source: 'manual' as const }
-  const saved = [{ ...vessel, label: 'Ship' }, drawn]
-  const teach = () => lessonFor(fakePdf(REPORT, DECK), PAGES, session([vessel], saved))
+  const saved = [{ ...site, label: 'Location' }, drawn]
+  const teach = () => lessonFor(fakePdf(REPORT, FLOOR), PAGES, session([site], saved))
 
   it('remembers the pages the admin changed, as saved', async () => {
     const lesson = (await teach())!
     expect(validateLesson(lesson)).toEqual([])
-    expect(lesson.pages).toHaveLength(1) // the deck page was left as it was
+    expect(lesson.pages).toHaveLength(1) // the floor page was left as it was
     expect(lesson.pages[0].fields.map((f) => [f.settings.label, f.settings.type])).toEqual([
-      ['Ship', 'text'],
+      ['Location', 'text'],
       ['Inspected on', 'date'],
     ])
-    expect(JSON.stringify(lesson)).not.toMatch(/inspection report|IMO number/i) // the page's text: only hashes
+    expect(JSON.stringify(lesson)).not.toMatch(/inspection report|Permit number/i) // the page's text: only hashes
   })
 
   it('puts a page back in a new revision; each field moves with the line next to it', async () => {
     const lesson = JSON.parse(JSON.stringify(await teach())) as Lesson
-    // Revision 2: a line added after "IMO number:" pushes the lines under it 40 pt down.
-    const revised: Line[] = [...REPORT.slice(0, 3), ['Call sign:', 50, 180], ['Master:', 50, 220], ['Date of inspection:', 50, 260]]
-    const learned = (await learnedFor([lesson], fakePdf(revised, DECK), [1, 2], 2))!
+    // Revision 2: a line added after "Permit number:" pushes the lines under it 40 pt down.
+    const revised: Line[] = [...REPORT.slice(0, 3), ['Call sign:', 50, 180], ['Manager:', 50, 220], ['Date of inspection:', 50, 260]]
+    const learned = (await learnedFor([lesson], fakePdf(revised, FLOOR), [1, 2], 2))!
     const back = learned.remembered(1, 1)
     expect(back?.map((f) => [f.label, f.type, f.source, f.confidence])).toEqual([
-      ['Ship', 'text', 'ai', REMEMBERED],
+      ['Location', 'text', 'ai', REMEMBERED],
       ['Inspected on', 'date', 'ai', REMEMBERED],
     ])
     expect(at(back)).toEqual([
-      [0.25, 0.11], // by "Vessel name:", which did not move
+      [0.25, 0.11], // by "Site name:", which did not move
       [0.35, 0.315], // by "Date of inspection:", 40 pt (0.05 of the page) lower
     ])
     expect(learned.remembered(2, 2)).toBeNull()
@@ -84,35 +84,35 @@ describe('page memory', () => {
   it('does not take the same text in another layout for the same page', async () => {
     const lesson = (await teach())!
     const stretched = REPORT.map(([t, x, y]): Line => [t, x * 1.2, y * 1.3])
-    const learned = (await learnedFor([lesson], fakePdf(stretched, DECK), [1, 2], 2))!
+    const learned = (await learnedFor([lesson], fakePdf(stretched, FLOOR), [1, 2], 2))!
     expect(learned.remembered(1, 1)).toBeNull()
   })
 
   it('does not take another page that shares part of its lines for the same page', async () => {
     const lesson = (await teach())!
     // The same header block in the same place, other questions under it.
-    const other: Line[] = [...REPORT.slice(0, 3), ['Port of call:', 50, 180], ['Agent:', 50, 220], ['Cargo:', 50, 260]]
-    const learned = (await learnedFor([lesson], fakePdf(other, DECK), [1, 2], 2))!
+    const other: Line[] = [...REPORT.slice(0, 3), ['Address:', 50, 180], ['Agent:', 50, 220], ['Contractor:', 50, 260]]
+    const learned = (await learnedFor([lesson], fakePdf(other, FLOOR), [1, 2], 2))!
     expect(learned.remembered(1, 1)).toBeNull()
   })
 
   it('does not remember a page left without fields (it may not be done yet)', async () => {
-    const lesson = await lessonFor(fakePdf(REPORT, DECK), PAGES, session([vessel], []))
+    const lesson = await lessonFor(fakePdf(REPORT, FLOOR), PAGES, session([site], []))
     expect(lesson?.pages).toEqual([])
-    expect(lesson?.labels).toEqual([{ label: 'vessel name', kept: 0, deleted: 1 }])
+    expect(lesson?.labels).toEqual([{ label: 'site name', kept: 0, deleted: 1 }])
   })
 
   it('skips a page with too little text of its own to be known again', async () => {
     const short: Line[] = [['Remarks', 50, 60], ['Signed', 50, 100]]
-    const lesson = await lessonFor(fakePdf(short), [{ source: 1 }], session([vessel], [drawn]))
+    const lesson = await lessonFor(fakePdf(short), [{ source: 1 }], session([site], [drawn]))
     expect(lesson?.pages).toEqual([])
   })
 
   it('gives a remembered group new ids, the same for all its members', async () => {
     const group = { id: 'g1', mode: 'single' as const }
     const boxes = [field('y', 'Yes', 'checkbox', 0.5, 0.11, { group }), field('n', 'No', 'checkbox', 0.6, 0.11, { group })]
-    const lesson = (await lessonFor(fakePdf(REPORT, DECK), PAGES, session([], boxes)))!
-    const back = (await learnedFor([lesson], fakePdf(REPORT, DECK), [1, 2], 2))!.remembered(1, 1)!
+    const lesson = (await lessonFor(fakePdf(REPORT, FLOOR), PAGES, session([], boxes)))!
+    const back = (await learnedFor([lesson], fakePdf(REPORT, FLOOR), [1, 2], 2))!.remembered(1, 1)!
     expect(back[0].group?.id).not.toBe('g1')
     expect(back[0].group?.id).toBe(back[1].group?.id)
   })
@@ -145,11 +145,11 @@ describe('label lessons', () => {
 
   it('follows a rename to what was learnt under the new name', async () => {
     const sig = field('a', 'Name – Signature', 'text', 0.1, 0.5)
-    const one = await lessonOf(session([sig], [{ ...sig, label: "Master's name" }]), 1)
-    const named = field('b', "Master's name", 'text', 0.1, 0.5)
+    const one = await lessonOf(session([sig], [{ ...sig, label: "Manager's name" }]), 1)
+    const named = field('b', "Manager's name", 'text', 0.1, 0.5)
     const two = await lessonOf(session([named], [{ ...named, type: 'dropdown', options: ['A. Smith', 'B. Jones'] }]), 2)
     const s = (await learn([two, one])).adjust(field('x', 'Name – Signature', 'text', 0.1, 0.5))
-    expect([s?.label, s?.type, s?.options]).toEqual(["Master's name", 'dropdown', ['A. Smith', 'B. Jones']])
+    expect([s?.label, s?.type, s?.options]).toEqual(["Manager's name", 'dropdown', ['A. Smith', 'B. Jones']])
   })
 
   it('leaves out what was deleted in the last two forms, until it is kept again', async () => {
@@ -167,11 +167,11 @@ describe('label lessons', () => {
   })
 
   it('takes a field drawn in place of a deleted suggestion as a change', async () => {
-    const rank = field('r', 'Rank', 'text', 0.1, 0.5)
-    const drawn = { ...field('m', 'Dropdown', 'dropdown', 0.1, 0.5), source: 'manual' as const, options: ['Master', 'Chief Officer'] }
-    const lesson = await lessonOf(session([rank], [drawn]))
+    const role = field('r', 'Role', 'text', 0.1, 0.5)
+    const drawn = { ...field('m', 'Dropdown', 'dropdown', 0.1, 0.5), source: 'manual' as const, options: ['Manager', 'Supervisor'] }
+    const lesson = await lessonOf(session([role], [drawn]))
     expect(lesson.labels).toEqual([
-      { label: 'rank', kept: 1, deleted: 0, change: { type: 'dropdown', options: ['Master', 'Chief Officer'] } },
+      { label: 'role', kept: 1, deleted: 0, change: { type: 'dropdown', options: ['Manager', 'Supervisor'] } },
     ])
   })
 
@@ -187,8 +187,8 @@ describe('label lessons', () => {
   })
 
   it('does not apply a change that makes no valid field', async () => {
-    const lesson: Lesson = { version: 1, id: 'x', at: 1, labels: [{ label: 'rank', kept: 1, deleted: 0, change: { type: 'dropdown' } }], pages: [] }
-    const s = field('r', 'Rank', 'text', 0.1, 0.5)
+    const lesson: Lesson = { version: 1, id: 'x', at: 1, labels: [{ label: 'role', kept: 1, deleted: 0, change: { type: 'dropdown' } }], pages: [] }
+    const s = field('r', 'Role', 'text', 0.1, 0.5)
     expect((await learn([lesson])).adjust(s)).toBe(s) // a dropdown needs options
   })
 })
@@ -210,7 +210,7 @@ describe('storing lessons', () => {
     expect(validateLesson(badChange)).toHaveLength(1)
     const badType = { ...lesson('a', 1), labels: [{ label: 'x', kept: 1, deleted: 0, change: { type: 'script' } }] }
     expect(validateLesson(badType)).toHaveLength(1)
-    const field = { settings: { type: 'dropdown', label: 'Rank' }, box: [0.1, 0.1, 0.2, 0.02] }
+    const field = { settings: { type: 'dropdown', label: 'Role' }, box: [0.1, 0.1, 0.2, 0.02] }
     const noOptions = { ...lesson('a', 1), pages: [{ text: [['abc', 0.1, 0.1]], fields: [field] }] }
     expect(validateLesson(noOptions)[0]).toMatch(/Page 1: .*option/)
     const outside = { ...lesson('a', 1), pages: [{ text: [], fields: [{ ...field, settings: { type: 'text', label: 'A' }, box: [0.9, 0.1, 0.5, 0.1] }] }] }
@@ -218,7 +218,7 @@ describe('storing lessons', () => {
   })
 
   it('detection skips a lesson that is not valid', async () => {
-    const bad = { version: 1, id: 'x', at: 1, labels: [{ label: 'rank', kept: 'yes' }], pages: [] } as unknown as Lesson
+    const bad = { version: 1, id: 'x', at: 1, labels: [{ label: 'role', kept: 'yes' }], pages: [] } as unknown as Lesson
     expect(await learnedFor([bad], fakePdf(), [], 1)).toBeNull()
   })
 })
@@ -244,7 +244,7 @@ describe('on a real PDF', () => {
     const saved = [
       ...suggested
         .filter((f) => f.label !== 'No')
-        .map((f) => (f.label === 'Vessel name' ? { ...f, type: 'dropdown' as const, options: ['MV Alpha', 'MV Beta'] } : f)),
+        .map((f) => (f.label === 'Site name' ? { ...f, type: 'dropdown' as const, options: ['Site Alpha', 'Site Beta'] } : f)),
       field('m', 'Inspector', 'text', 0.5, 0.6, { source: 'manual' }),
     ]
     const lesson = JSON.parse(JSON.stringify(await lessonFor(pdf, pages, session(suggested, saved)))) as Lesson
@@ -259,7 +259,7 @@ describe('on a real PDF', () => {
     const labelsOnly = await detectDocument(pdf as never, OPS as unknown as Ops, pages, [], undefined, undefined, [
       { ...lesson, pages: [] },
     ])
-    expect(labelsOnly.find((f) => f.label === 'Vessel name')).toMatchObject({ type: 'dropdown', options: ['MV Alpha', 'MV Beta'] })
+    expect(labelsOnly.find((f) => f.label === 'Site name')).toMatchObject({ type: 'dropdown', options: ['Site Alpha', 'Site Beta'] })
     expect(labelsOnly.some((f) => f.label === 'No')).toBe(true) // deleted once: still suggested
   })
 })

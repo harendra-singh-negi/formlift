@@ -8,9 +8,9 @@ import FieldControl from './FieldControl'
 
 const field: FieldDef = {
   id: '1',
-  key: 'vessel',
+  key: 'site',
   type: 'text',
-  label: 'Vessel',
+  label: 'Site',
   source: 'manual',
   position: { page: 1, x: 0, y: 0, width: 0.2, height: 0.02 },
 }
@@ -25,10 +25,10 @@ it('compact (phone): the box on the page opens a full-size 16 px input, and the 
   document.body.appendChild(div)
   const root = createRoot(div)
   act(() => root.render(<Host />))
-  const box = div.querySelector<HTMLButtonElement>('button[aria-label="Vessel"]')!
+  const box = div.querySelector<HTMLButtonElement>('button[aria-label="Site"]')!
   expect(div.querySelector('input')).toBeNull() // nothing to type into on the tiny box itself
   act(() => box.click())
-  const input = document.querySelector<HTMLInputElement>('input[aria-label="Vessel"]')!
+  const input = document.querySelector<HTMLInputElement>('input[aria-label="Site"]')!
   expect(input.className).toContain('text-base')
   act(() => {
     // React tracks the value setter; set it the way a keystroke does.
@@ -36,7 +36,7 @@ it('compact (phone): the box on the page opens a full-size 16 px input, and the 
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
   act(() => [...document.querySelectorAll('button')].find((b) => b.textContent === 'Done')!.click())
-  expect(document.querySelector('input[aria-label="Vessel"]')).toBeNull()
+  expect(document.querySelector('input[aria-label="Site"]')).toBeNull()
   expect(box.textContent).toBe('MT Spring Star')
   act(() => root.unmount())
 })
@@ -45,9 +45,9 @@ it('read-only multi-select opens to show every choice, with its boxes locked', a
   const el = document.createElement('div')
   document.body.appendChild(el)
   const root = createRoot(el)
-  const multi: FieldDef = { ...field, key: 'cargo', type: 'multiselect', label: 'Cargo', options: ['Oil', 'Gas', 'Coal'] }
-  act(() => root.render(<FieldControl field={multi} value={'["Oil","Gas"]'} onChange={() => {}} readOnly />))
-  const button = el.querySelector<HTMLButtonElement>('button[aria-label="Cargo"]')!
+  const multi: FieldDef = { ...field, key: 'materials', type: 'multiselect', label: 'Materials', options: ['Wood', 'Steel', 'Glass'] }
+  act(() => root.render(<FieldControl field={multi} value={'["Wood","Steel"]'} onChange={() => {}} readOnly />))
+  const button = el.querySelector<HTMLButtonElement>('button[aria-label="Materials"]')!
   expect(button.disabled).toBe(false)
   act(() => button.click())
   const boxes = [...document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type=checkbox]')]
@@ -63,7 +63,7 @@ it('read-only multi-select opens to show every choice, with its boxes locked', a
 it('a signature whose picture is not at hand shows as signed, not as a broken image', () => {
   const el = document.createElement('div')
   const root = createRoot(el)
-  const sig: FieldDef = { ...field, key: 'sign', type: 'signature', label: 'Master' }
+  const sig: FieldDef = { ...field, key: 'sign', type: 'signature', label: 'Manager' }
   act(() => root.render(<FieldControl field={sig} value="stored-file-id" onChange={() => {}} />))
   expect(el.querySelector('img')).toBeNull()
   expect(el.textContent?.trim()).toBe('Signed')

@@ -45,7 +45,7 @@ describe('auto-detect on different form styles', () => {
       'checkbox: No',
       'checkbox: Yes',
       'signature: Signature',
-      'text: Vessel name',
+      'text: Site name',
       'textarea: Remarks',
     ])
   })

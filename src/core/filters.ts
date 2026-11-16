@@ -178,7 +178,7 @@ export const tagFilters =
   (qs: Question[]): QuestionFilterDef[] =>
     [...new Set(qs.flatMap((q) => Object.keys(q.tags ?? {})))].map((k) => tagFilter(k, { section }))
 
-/** Your own filter in one line: `customFilter('deck', 'Deck', (q) => q.page <= 3 ? ['Upper'] : ['Lower'])`. */
+/** Your own filter in one line: `customFilter('floor', 'Floor', (q) => q.page <= 3 ? ['Upper'] : ['Lower'])`. */
 export const customFilter = (
   id: string,
   title: string,

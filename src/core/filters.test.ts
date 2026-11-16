@@ -20,9 +20,9 @@ const q = (id: string, label: string, extra: Partial<Question> = {}): Question =
 })
 
 it('reports a filter as unavailable when the form has nothing for it, instead of deciding to hide it', () => {
-  const plain = [q('a', 'Name'), q('b', 'Rank')]
+  const plain = [q('a', 'Name'), q('b', 'Role')]
   expect(categoryFilter().options(plain, {})).toEqual([])
-  const coded = [q('a', 'Name', { category: 'HF' }), q('b', 'Rank', { category: 'PR' })]
+  const coded = [q('a', 'Name', { category: 'HF' }), q('b', 'Role', { category: 'PR' })]
   expect(
     categoryFilter()
       .options(coded, {})
@@ -31,15 +31,15 @@ it('reports a filter as unavailable when the form has nothing for it, instead of
 })
 
 it('runs your own filters and your own part words, not built-in ones', () => {
-  const qs = [q('a', 'Finding'), q('b', 'Rank', { page: 3 })]
+  const qs = [q('a', 'Finding'), q('b', 'Role', { page: 3 })]
   const finding = partFilter({ id: 'finding', title: 'Finding', match: /finding/i })
   expect(filterQuestions(qs, { a: 'rust' }, [finding], { finding: 'filled' }).map((x) => x.id)).toEqual(['a'])
-  const deck = customFilter('deck', 'Deck', (x) => [x.page > 2 ? 'Lower' : 'Upper'])
-  expect(deck.options(qs, {})).toEqual([
+  const floor = customFilter('floor', 'Floor', (x) => [x.page > 2 ? 'Lower' : 'Upper'])
+  expect(floor.options(qs, {})).toEqual([
     { value: 'Upper', label: 'Upper', count: 1 },
     { value: 'Lower', label: 'Lower', count: 1 },
   ])
-  expect(filterQuestions(qs, {}, [deck], { deck: 'Lower' }).map((x) => x.id)).toEqual(['b'])
+  expect(filterQuestions(qs, {}, [floor], { floor: 'Lower' }).map((x) => x.id)).toEqual(['b'])
 })
 
 it('reads category codes only when asked to', () => {

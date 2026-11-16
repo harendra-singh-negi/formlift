@@ -278,7 +278,7 @@ function Block({ b, ...draw }: { b: FlowBlock } & Draw) {
         </div>
       )
     }
-    // A label and the fields after it stay together: one line each on a narrow screen ("SHIP: ___", then "GT: ___"),
+    // A label and the fields after it stay together: one line each on a narrow screen ("SITE: ___", then "ID: ___"),
     // side by side as on the page on a wide one (`contents`). A line of text only wraps like words.
     const groups: { c: FlowCell; i: number }[][] = []
     b.cells.forEach((c, i) => {

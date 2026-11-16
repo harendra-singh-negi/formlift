@@ -29,24 +29,24 @@ describe('limits', () => {
 })
 
 describe('custom validation', () => {
-  const f = { ...field(1), key: 'imo', label: 'IMO' }
+  const f = { ...field(1), key: 'permit', label: 'Permit' }
   const rules = {
-    imo: { label: 'IMO number', check: (v: unknown) => (/^\d{7}$/.test(String(v)) ? null : 'IMO must be 7 digits') },
+    permit: { label: 'Permit number', check: (v: unknown) => (/^\d{7}$/.test(String(v)) ? null : 'Permit number must be 7 digits') },
     notSame: { check: (v: unknown, _f: FieldDef, a: Record<string, unknown>) => (v === a.other ? 'Must differ' : null) },
   }
 
   it('runs named rules a field lists, with all answers', () => {
-    const withRules = { ...f, rules: ['imo', 'notSame'] }
-    expect(checkAnswer(withRules, '123', false, { rules })).toBe('IMO must be 7 digits')
-    expect(validateAnswers([withRules], { imo: '1234567', other: '1234567' }, { rules })).toEqual({ imo: 'Must differ' })
+    const withRules = { ...f, rules: ['permit', 'notSame'] }
+    expect(checkAnswer(withRules, '123', false, { rules })).toBe('Permit number must be 7 digits')
+    expect(validateAnswers([withRules], { permit: '1234567', other: '1234567' }, { rules })).toEqual({ permit: 'Must differ' })
     expect(checkAnswer(withRules, '1234567', false, { rules }, { other: 'x' })).toBeNull()
     expect(checkAnswer(withRules, '', false, { rules })).toBeNull() // empty: only "required" applies
   })
 
   it("uses the field's own messages and the app's wording", () => {
-    expect(checkAnswer({ ...f, requiredMessage: 'Enter the IMO' }, '', true)).toBe('Enter the IMO')
+    expect(checkAnswer({ ...f, requiredMessage: 'Enter the Permit' }, '', true)).toBe('Enter the Permit')
     expect(checkAnswer({ ...f, pattern: '\\d+', errorMessage: 'Digits only' }, 'x', false)).toBe('Digits only')
-    expect(checkAnswer(f, '', true, { messages: { required: (l) => `${l} ज़रूरी है` } })).toBe('IMO ज़रूरी है')
+    expect(checkAnswer(f, '', true, { messages: { required: (l) => `${l} ज़रूरी है` } })).toBe('Permit ज़रूरी है')
   })
 
   it('validate() can add an error, accept anything, or fall through', () => {
@@ -57,6 +57,6 @@ describe('custom validation', () => {
   })
 
   it('rejects malformed rule settings in a form definition', () => {
-    expect(validateFields([{ ...f, rules: 'imo' as unknown as string[] }], 1)).toEqual(['Field "IMO": rules must be a list of rule names'])
+    expect(validateFields([{ ...f, rules: 'permit' as unknown as string[] }], 1)).toEqual(['Field "Permit": rules must be a list of rule names'])
   })
 })

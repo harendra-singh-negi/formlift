@@ -36,9 +36,9 @@ async function form() {
   ])
     page.drawRectangle({ x, y: 600, width, height: 120, borderColor: rgb(0, 0, 0), borderWidth: 0.75 })
   page.drawText('Objective', { x: 60, y: 700, size: 10, font: bold })
-  const lead = font.widthOfTextAtSize('Check that the crew ', 10)
+  const lead = font.widthOfTextAtSize('Check that the team ', 10)
   page.drawRectangle({ x: 180 + lead, y: 698.5, width: bold.widthOfTextAtSize('knows', 10), height: 0.6 }) // underline
-  write([['Check that the crew ', font], ['knows', bold], [' the drill and the alarm ', font], ['urgent', font, rgb(1, 0, 0)]], 180, 700)
+  write([['Check that the team ', font], ['knows', bold], [' the drill and the alarm ', font], ['urgent', font, rgb(1, 0, 0)]], 180, 700)
   const before = font.widthOfTextAtSize('signals ', 10)
   page.drawRectangle({ x: 180 + before - 1, y: 683, width: font.widthOfTextAtSize('before', 10) + 2, height: 12, color: rgb(1, 1, 0) })
   write([['signals before the shift.', font]], 180, 686)
@@ -86,7 +86,7 @@ describe('pageFlow', () => {
     expect(flowText([{ ...row, cells: [row.cells![0]] }])).toBe('Objective')
     const text = row.cells![1].paras[0]
     expect(flowText([{ ...row, cells: [{ ...row.cells![1], paras: [text] }] }])).toBe(
-      'Check that the crew knows the drill and the alarm urgent signals before the shift.',
+      'Check that the team knows the drill and the alarm urgent signals before the shift.',
     )
     expect(run(text.parts, 'knows')).toMatchObject({ bold: true, underline: true })
     expect(run(text.parts, 'urgent')).toMatchObject({ color: '#ff0000' })
@@ -122,10 +122,10 @@ describe('lines laid out as on the page', () => {
     const blocks = pageFlow(
       read([
         word('Some text at the left margin', 50, 100, 500),
-        word('RANK', 160, 150),
+        word('ROLE', 160, 150),
         word('NAME', 300, 150),
         word('DATE', 480, 150),
-        word('MASTER', 50, 180),
+        word('MANAGER', 50, 180),
       ]),
       sheet,
       [at('r1', 140, 120, 168), at('n1', 280, 120, 168), at('d1', 460, 90, 168), at('r2', 140, 120, 200), at('n2', 280, 120, 200), at('d2', 460, 90, 200)],
@@ -133,9 +133,9 @@ describe('lines laid out as on the page', () => {
     const [text, head, one, two] = blocks
     expect(text.paras).toBeDefined()
     expect([head.line, one.line, two.line]).toEqual([true, true, true])
-    expect(what(head)).toEqual(['RANK', 'NAME', 'DATE'])
+    expect(what(head)).toEqual(['ROLE', 'NAME', 'DATE'])
     // Captioned where nothing on the line names them (shown when the line wraps on a narrow screen).
-    expect(what(one)).toEqual(['MASTER', '[r1]', '[n1*]', '[d1*]'])
+    expect(what(one)).toEqual(['MANAGER', '[r1]', '[n1*]', '[d1*]'])
     expect(what(two)).toEqual(['[r2*]', '[n2*]', '[d2*]'])
     expect(starts(one).slice(1)).toEqual(starts(two))
     expect(starts(two)).toEqual([18, 46, 82])
