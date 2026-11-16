@@ -136,10 +136,27 @@ export const DEFAULT_LABELS = {
 
   // Editor messages (notify)
   saved: 'Saved',
-  fieldsSuggested: (n: number, stoppedEarly: boolean, remembered = 0) =>
-    `${n} fields suggested${remembered ? ` (${remembered} from pages set up before)` : ''}${stoppedEarly ? ' (stopped early)' : ''}. Check the dashed ones, then Save.`,
+  fieldsSuggested: (n: number, stoppedEarly: boolean, remembered = 0, learnt = 0) =>
+    `${n} fields suggested${
+      remembered || learnt
+        ? ` (${[remembered && `${remembered} from pages set up before`, learnt && `${learnt} as you set them up in other forms`].filter(Boolean).join(', ')})`
+        : ''
+    }${stoppedEarly ? ' (stopped early)' : ''}. Check the dashed ones, then Save.`,
+  forgotten: 'Forgotten. Auto-detect will not do this again.',
   noFieldsFoundAuto: 'No fields found automatically. Drag them in from the left.',
   noNewFieldsFound: 'No new fields found',
+
+  // What auto-detect learnt (Learnt tab)
+  learntTab: 'Learnt',
+  learntHeading: 'WHAT AUTO-DETECT LEARNT',
+  learntNothing: 'Nothing yet. When you save, auto-detect learns from how you changed its suggestions.',
+  learntLeftOut: 'left out',
+  learntRenamed: (label: string) => `renamed “${label}”`,
+  learntDrawn: (forms: number) => `drawn by hand next to its line in ${forms} forms`,
+  learntPages: (n: number) => `${n} page${n === 1 ? '' : 's'} set up before come${n === 1 ? 's' : ''} back as set up.`,
+  forget: 'Forget',
+  forgetEverything: 'Forget everything',
+  confirmForgetEverything: 'Forget everything auto-detect learnt? It learns again from your next save.',
 
   // Pages panel
   blankPageAtStart: 'Blank page at the start',
@@ -156,6 +173,9 @@ export const DEFAULT_LABELS = {
   suggestedAutomatically: (sure: number | null) =>
     `Suggested automatically${sure != null ? ` (${sure}% sure)` : ''}. Check it.`,
   rememberedField: 'Set up like this on the same page before. Check it.',
+  learntField: 'Set up as you did in other forms. Check it.',
+  forgetThis: 'Forget this',
+  forgetThisHint: 'Auto-detect will not do this again',
   fieldId: (id: string) => `ID ${id}`,
   label: 'Label',
   keyAutomatic: 'Key (automatic, from the label)',

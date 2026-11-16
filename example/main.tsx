@@ -31,11 +31,13 @@ const store = {
       return undefined
     }
   },
+  /** false when it could not be kept (private mode, or full): the demo still works, it forgets on reload. */
   set(k: string, v: unknown) {
     try {
       localStorage.setItem(k, JSON.stringify(v))
+      return true
     } catch {
-      /* private mode: the demo still works, it just forgets on reload */
+      return false
     }
   },
 }
@@ -269,11 +271,14 @@ function Demo() {
               store.set(`fl-form:${docKey}`, doc)
             }}
             lessons={lessons}
-            onLesson={(lesson) => {
-              const next = addLesson(lessons, lesson, 50)
-              setLessons(next)
-              store.set('fl-lessons', next)
-            }}
+            onLesson={(lesson) =>
+              setLessons((list) => {
+                let next = addLesson(list, lesson, 50)
+                // localStorage keeps about 5 MB: when a big form's lessons do not fit, the oldest go first.
+                while (!store.set('fl-lessons', next) && next.length > 1) next = next.slice(1)
+                return next
+              })
+            }
             notify={setToast}
             toolbar={
               !isTour && (
