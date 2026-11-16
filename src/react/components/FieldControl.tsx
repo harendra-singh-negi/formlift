@@ -14,8 +14,17 @@ import { useLabels } from '../labels'
 import { Button, inputClass, Modal, ModalBody, ModalFooter, ModalHeader, SignaturePad } from '../ui/slots'
 
 // Text scales with the field's box (container query height), so it zooms with the page.
-const box =
-  'h-full w-full rounded-sm border bg-primary-soft/70 px-1 text-[clamp(8px,62cqh,15px)] text-navy outline-none focus:border-primary focus:bg-white disabled:cursor-not-allowed'
+const boxText = 'text-[clamp(8px,62cqh,15px)]'
+const boxBase =
+  'h-full w-full rounded-sm border bg-primary-soft/70 px-1 text-navy outline-none focus:border-primary focus:bg-white disabled:cursor-not-allowed'
+const box = `${boxBase} ${boxText}`
+// A date or time shows its whole format ("dd / mm / yyyy" and its calendar button) in a narrow box too: its text
+// also scales with the box's width.
+const FIT_TEXT: Partial<Record<FieldType, string>> = {
+  date: 'text-[length:clamp(8px,min(62cqh,10.5cqw),15px)]',
+  time: 'text-[length:clamp(8px,min(62cqh,14cqw),15px)]',
+  datetime: 'text-[length:clamp(8px,min(62cqh,6.5cqw),15px)]',
+}
 
 /** A PNG data URL (the signature pad's drawing) as a file to upload. */
 function pngFile(dataUrl: string, name: string) {
@@ -556,7 +565,7 @@ export default function FieldControl({
         <input
           {...common}
           type={type}
-          className={`${box} ${border}`}
+          className={`${boxBase} ${FIT_TEXT[field.type] ?? boxText} ${border}`}
           placeholder={field.placeholder}
           value={text}
           min={field.min}
