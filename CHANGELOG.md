@@ -3,6 +3,38 @@
 Written automatically by [release-please](https://github.com/googleapis/release-please) from the
 commit messages. The project uses [Semantic Versioning](https://semver.org/).
 
+## [0.5.0](https://github.com/harendra-singh-negi/formlift/compare/v0.4.0...v0.5.0) (2026-11-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **list:** <QuestionList> needs `segments` and `pdf` from useFormFiller; FormFiller passes them for you (README → Upgrading).
+
+### Features
+
+* **list:** load more as you scroll with listLoadMore="scroll" ([ab35acc](https://github.com/harendra-singh-negi/formlift/commit/ab35acc65eb2b90559cd92299c58cb522d5517c6))
+* **list:** the list fills the width; style it with listPaperClassName ([94a91dc](https://github.com/harendra-singh-negi/formlift/commit/94a91dccfd78259f24dd5eb555b86e2652514528))
+* **list:** the list view shows the whole PDF, answers in place ([6ff43a8](https://github.com/harendra-singh-negi/formlift/commit/6ff43a886eed4a775ef2306129c9b592397f92dd))
+* **list:** your own loader while the PDF is read (renderListReading) ([b06f1ed](https://github.com/harendra-singh-negi/formlift/commit/b06f1ed01230cf9d94902d972c565f8cacf5008f))
+
+
+### Bug Fixes
+
+* **demo:** ship the table-form sample PDF ([b74fa2a](https://github.com/harendra-singh-negi/formlift/commit/b74fa2aed1821b1064ddec2262f1776f64824337))
+* **deps:** upgrade pdf.js to patch CVE-2026-16633 ([#6](https://github.com/harendra-singh-negi/formlift/issues/6)) ([7aff719](https://github.com/harendra-singh-negi/formlift/commit/7aff71998f0ab53a0e7f07000514d9abbe7df6f6))
+* **detect:** "Comments" and other note boxes take text, not dates ([a2ef701](https://github.com/harendra-singh-negi/formlift/commit/a2ef70104acb026b1953943827c9ae9bbc09afbf))
+* **detect:** a label written on a dotted line gets its box after it ([1534a40](https://github.com/harendra-singh-negi/formlift/commit/1534a40f45ce1829e42dbecec180e87a782d6bb9))
+* **detect:** no answer boxes in grey bars or under list headings ([512be47](https://github.com/harendra-singh-negi/formlift/commit/512be471c17328292c760810dc4fdda76185be5d))
+* **detect:** words either side of a table's column line stay apart ([e09486d](https://github.com/harendra-singh-negi/formlift/commit/e09486dc14c8d78e0af0c59a4128f2df1a2d79fa))
+* **filler:** narrow date and time boxes show their whole format ([3ca5ebb](https://github.com/harendra-singh-negi/formlift/commit/3ca5ebb4d9a35260107011f481b03b36e5e862c4))
+* **filler:** on phones, type list and dialog answers in place ([7dd463d](https://github.com/harendra-singh-negi/formlift/commit/7dd463d51ef64ae4dd5f309d47213272814598d7))
+* **filler:** show "Signed" when a signature's picture can't be shown ([897f151](https://github.com/harendra-singh-negi/formlift/commit/897f1510750e27583a0d4cbd47304a6fab616532))
+
+
+### Documentation
+
+* **contributing:** CHANGELOG is written by release-please; rebase-merge multi-commit branches ([af3b96d](https://github.com/harendra-singh-negi/formlift/commit/af3b96da7618105d9f53a50608fa268071484a41))
+
 ## [0.4.0](https://github.com/harendra-singh-negi/formlift/compare/v0.3.0...v0.4.0) (2026-11-12)
 
 
