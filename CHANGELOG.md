@@ -3,6 +3,38 @@
 Written automatically by [release-please](https://github.com/googleapis/release-please) from the
 commit messages. The project uses [Semantic Versioning](https://semver.org/).
 
+## [0.6.0](https://github.com/harendra-singh-negi/formlift/compare/v0.5.0...v0.6.0) (2026-11-17)
+
+
+### Features
+
+* **detect:** a page set up before still gets what auto-detect finds now ([cb4948d](https://github.com/harendra-singh-negi/formlift/commit/cb4948d3633a94c35b7cb6573dcaa60f14db8ca3))
+* **detect:** auto-detect learns from the admin's corrections ([6b2b822](https://github.com/harendra-singh-negi/formlift/commit/6b2b8225288b463ea1269b1c6d63e41abf39f509))
+* **detect:** fields drawn where nothing was proposed carry over, and corrections per save ([6c02cb9](https://github.com/harendra-singh-negi/formlift/commit/6c02cb9b645b3c453058626b38ee2236de69211d))
+* **detect:** learn more from corrections, in smaller lessons ([6e72dcb](https://github.com/harendra-singh-negi/formlift/commit/6e72dcbfe5555db0342da122d8d87c7a24458478))
+* **detect:** learnt patterns carry over to forms never seen ([6dac683](https://github.com/harendra-singh-negi/formlift/commit/6dac6835d2156c327909971bde4b79596e417fad))
+* **detect:** long forms learn from the pages set up first ([ee5acf9](https://github.com/harendra-singh-negi/formlift/commit/ee5acf96197fb570640242ceb78d942248d7435b))
+* **detect:** one-line boxes, and long forms detected in a third of the time ([0deb6a4](https://github.com/harendra-singh-negi/formlift/commit/0deb6a48883b3353005488abd1f0cb1f70d11ee5))
+* **detect:** take a fillable PDF's own fields as they are ([b235226](https://github.com/harendra-singh-negi/formlift/commit/b235226f288c7d7e58459a63d9ce555dfdb00a7f))
+* **editor:** see what auto-detect learnt, and forget it ([d62dff9](https://github.com/harendra-singh-negi/formlift/commit/d62dff92551011a4913b552ec516bff017e4c69f))
+* **server:** print and remove a fillable original's own fields ([2001d3e](https://github.com/harendra-singh-negi/formlift/commit/2001d3ed6039720d502640ab6594b5ab134309c5))
+
+
+### Bug Fixes
+
+* **detect:** tables with hairline borders, as Word draws them ([d766342](https://github.com/harendra-singh-negi/formlift/commit/d7663425886f8402d3ea53d2a79e2ad817df8ace))
+
+
+### Documentation
+
+* **demo:** show auto-detect learning with Start over ([48ea701](https://github.com/harendra-singh-negi/formlift/commit/48ea701addcce6a7726950f3989a341da602e2a4))
+* llms.txt for AI search ([d43a498](https://github.com/harendra-singh-negi/formlift/commit/d43a4985aabe8e5d7c698598e213fb36358c353f))
+* **readme:** demo GIF re-recorded for the current UI ([576221b](https://github.com/harendra-singh-negi/formlift/commit/576221b21bca9af64048b26f99ee52d0546e625b))
+* **readme:** framework line, install, comparison table and demo GIF in the hero ([cb2d984](https://github.com/harendra-singh-negi/formlift/commit/cb2d984a726da9d93502c7e87c85f387d4689640))
+* **readme:** long forms, fields drawn twice, limits for big forms ([5b2389c](https://github.com/harendra-singh-negi/formlift/commit/5b2389ce179b38961c0b55c3c01ed26b2a692a0a))
+* **readme:** upgrade notes 0.4 → 0.5 ([8d63ece](https://github.com/harendra-singh-negi/formlift/commit/8d63ecebb3553c1cb90a8740ec7b47214ded3f1d))
+* **readme:** what auto-detect learns now, and how to forget it ([1278c81](https://github.com/harendra-singh-negi/formlift/commit/1278c81c7aea8d243bb5a986633d16c30ffa5bae))
+
 ## [0.5.0](https://github.com/harendra-singh-negi/formlift/compare/v0.4.0...v0.5.0) (2026-11-16)
 
 
