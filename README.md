@@ -90,8 +90,8 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 | 🔀 **Conditional logic** | `visibleWhen` / `requiredWhen` / `readOnlyWhen` with nested AND/OR groups and 10 operators. Circular rules are rejected. |
 | ☑️ **Groups, follow-ups, comments** | Boxes that allow exactly one or several ticks, follow-up dialogs ("No" → ask why), 💬 comments per field, and an `onFieldChange` hook for your own logic. [Guide](#guide-groups-follow-ups-comments-and-your-own-logic) |
 | ✅ **Validation** | Required, length, min/max, regex, email, phone, date and options. The **same code** runs in the browser and on your server. |
-| 📱 **Filler** | Fields stay pinned to the page at every zoom. The list view is the whole PDF reflowed for any screen (its text with bold, colours and highlights, its tables, its pictures) with the answers in place, plus search and filters. Includes autosave, signatures and file uploads. |
-| 📄 **Completed PDF** | Answers, signature images and embedded attachments in a new PDF. A fillable original's own fields are printed as they look and removed, so no empty field covers an answer. Runs in Node, Bun, Deno, workers or the browser. |
+| 📱 **Filler** | Fields stay pinned to the page at every zoom. The list view is the whole PDF reflowed for any screen (its text with bold, colours and highlights, its tables, its pictures) with the answers in place, plus search and filters. A long answer grows its box and pushes the rest of the page down; when that runs past the page, it breaks onto the next one right there as you type, with a margin above and below the break, exactly as it will print. Includes autosave, signatures and file uploads. |
+| 📄 **Completed PDF** | Answers, signature images and embedded attachments in a new PDF. A fillable original's own fields are printed as they look and removed, so no empty field covers an answer. A long answer is printed in full: its box grows, what is below moves down, onto added pages with a half-inch margin at each break and no line cut in two. Runs in Node, Bun, Deno, workers or the browser. |
 | 🎨 **Isolated styling** | All CSS is scoped to `.fl-root` with no global reset, so it never clashes with your app (Tailwind included). Theme it with CSS variables. |
 | 🧩 **Headless core** | Zero-dependency core you can use with any framework, or with none |
 | 🟦 **TypeScript** | Written in TypeScript. Ships ESM, CommonJS and full type definitions. |
@@ -819,6 +819,7 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 | `answerText(field, value)` | `string` | An answer as people read it ("Fire, Flood", "$12.50", "Yes") |
 | `withoutField(fields, id)` / `newFollowUpField(type, trigger, fields)` | `FieldDef[]` | Remove a field (with its follow-up questions) / add a follow-up question |
 | `defaultLayout(pageSizes)` | `Layout` | The layout of an untouched document |
+| `pageGrowth(fields, answers, page, size, widthOf, shown?)` | `{ boxes, cuts, sheets }` | How long answers grow one page: each growing box's lines and extra height, where the page is cut open, and the pages (`sheets`) it then breaks into. `FormFiller` and `completedPdf` both use it; `widthOf(text, size)` measures text in points (Helvetica) |
 | `detectDocument(pdf, OPS, pages, existing, onProgress?, signal?, lessons?)` | `Promise<FieldDef[]>` | Suggests fields for a whole document, using what the lessons taught |
 | `lessonFor(pdf, pages, session, { OPS })` | `Promise<Lesson \| null>` | What a save taught auto-detect (`null` = nothing). The editor does this for you ([Auto-detect that learns](#auto-detect-that-learns)) |
 | `addLesson(lessons, lesson, max?)` | `Lesson[]` | The lessons with `lesson` replacing the one with its `id`, keeping the newest `max` (default 1000) |
@@ -1058,7 +1059,18 @@ const fields = await detectDocument(pdf, OPS as unknown as Ops, pages, [])
 What changed for your code, per release. The full list of changes is in the
 [CHANGELOG](./CHANGELOG.md).
 
-### 0.5 → next
+### 0.6 → next
+
+Check the first row:
+
+| What | Who | What to do |
+| --- | --- | --- |
+| Text fields are a `<textarea>` | tests, scripts or CSS that select a text field's `<input>` | Select `textarea` instead. It still looks like one line and Enter does nothing; it wraps only once the answer is longer than the box. |
+| Long answers grow their box | – | A text, text-area or checklist answer that does not fit makes its box taller and moves what is below it down, on screen and in the completed PDF (before, it was cut off at the box's edge). |
+| Page breaks | – | When a grown page no longer fits, it breaks onto added pages of the same size, with a half-inch margin at the bottom of one and the top of the next, and never through a line of the answer. The filler shows the break live, as it will print. A completed PDF can now have more pages than the original. |
+| Links on a grown page | – | A page of the completed PDF rebuilt for a long answer loses the original's links and file attachments on that page. Other pages keep them. |
+
+### 0.5 → 0.6
 
 Nothing breaks. Check these:
 
@@ -1347,6 +1359,8 @@ your editor for the full list.
   can still be placed by hand.
 - **Latin fonts in the completed PDF.** It uses the standard PDF fonts (WinAnsi), so other scripts print as `?`.
 - **Rotated pages** (`/Rotate`) are not handled in the completed PDF.
+- **Page breaks for long answers** keep a fixed half-inch margin, not the original page's own. A break that
+  falls where no growing answer is cuts the original page's drawing where it falls.
 - **PDF only.** Export Word or Excel files to PDF first.
 
 ## FAQ

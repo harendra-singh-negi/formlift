@@ -9,6 +9,7 @@
 //   comments.ts    comments on fields
 //   validate.ts    checking a form's fields before it is saved
 //   layout.ts      pages shown and what the admin drew on them
+//   grow.ts        long text answers growing their box, pushing the page down (screen and PDF)
 
 export {
   FIELD_TYPES,
@@ -78,3 +79,21 @@ export {
   type LayoutElement,
   type Layout,
 } from './layout';
+export {
+  GROWING_TYPES,
+  wrapText,
+  textFit,
+  textSize,
+  pageCuts,
+  movedDown,
+  pageGrowth,
+  pageSheets,
+  sheetOf,
+  onSheets,
+  sheetPieces,
+  lineGaps,
+  BREAK_MARGIN,
+  type Cut,
+  type Sheet,
+  type WidthOf,
+} from './grow';

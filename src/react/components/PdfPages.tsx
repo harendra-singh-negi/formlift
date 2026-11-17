@@ -1,9 +1,9 @@
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { LayoutPage } from '../../core/form-logic'
+import { sheetPieces, type Cut, type LayoutPage, type Sheet } from '../../core/form-logic'
 import { toLines, type PdfTextItem, type TextLine } from '../../core/layout'
 import { loadPdfJs } from '../pdfjs'
-import { BASE_SCALE } from '../constants'
+import { BASE_SCALE, PAGE_GAP } from '../constants'
 import { useLabels } from '../labels'
 
 /** A PDF: URL, Blob / File, bytes, or a (possibly async) function returning one of those. */
@@ -39,6 +39,7 @@ export default function PdfPages({
   pages,
   overlay,
   withText,
+  grow,
   onLoaded,
   onError,
 }: {
@@ -48,6 +49,10 @@ export default function PdfPages({
   pages?: LayoutPage[] | null
   overlay?: (page: number, lines: TextLine[] | undefined) => ReactNode
   withText?: boolean
+  /** Where a page grows (long answers pushing what is below down) and the pages it then breaks into, PAGE_GAP
+   * apart (core/form-logic/grow.ts); the overlay keeps the page's own size, so what it places moves itself
+   * (FormFiller). */
+  grow?: (page: number) => { cuts: Cut[]; sheets: Sheet[] } | undefined
   /** Sizes (points) of the original pages and the open document, once the PDF is open. */
   onLoaded?: (sizes: PageSize[], pdf: PDFDocumentProxy) => void
   onError?: (err: unknown) => void
@@ -94,7 +99,7 @@ export default function PdfPages({
   const shown: LayoutPage[] = pages ?? sizes.map((s, i) => ({ source: i + 1, ...s }))
   return (
     // min-w-full + w-max: centred when narrower than the panel, fully scrollable (left edge too) when wider.
-    <div className="flex w-max min-w-full flex-col gap-4 p-4">
+    <div className="flex w-max min-w-full flex-col p-4" style={{ gap: PAGE_GAP }}>
       {shown.map((p, i) => (
         <PdfPage
           key={i}
@@ -105,6 +110,7 @@ export default function PdfPages({
           zoom={zoom}
           withText={withText}
           overlay={overlay}
+          grow={grow?.(i + 1)}
         />
       ))}
     </div>
@@ -119,6 +125,7 @@ function PdfPage({
   zoom,
   withText,
   overlay,
+  grow,
 }: {
   doc: PDFDocumentProxy
   pageNo: number
@@ -127,6 +134,7 @@ function PdfPage({
   zoom: number
   withText?: boolean
   overlay?: (page: number, lines: TextLine[] | undefined) => ReactNode
+  grow?: { cuts: Cut[]; sheets: Sheet[] }
 }) {
   const box = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -134,6 +142,14 @@ function PdfPage({
   const [lines, setLines] = useState<{ source: number; lines: TextLine[] } | null>(null)
   const width = size.width * BASE_SCALE * zoom
   const height = size.height * BASE_SCALE * zoom
+  const growKey = JSON.stringify(grow ?? null)
+  const sheets = grow?.sheets.length ?? 1
+  const grown = sheets * height + (sheets - 1) * PAGE_GAP
+  // The page as pdf.js drew it (off screen); the visible canvas is that, cut and moved down where answers grow,
+  // over as many pages as it then takes.
+  // ponytail: two bitmaps per page drawn; draw straight into the visible one when memory on long documents matters.
+  const art = useRef<HTMLCanvasElement | null>(null)
+  const [drawn, setDrawn] = useState(0)
 
   useEffect(() => {
     const el = box.current
@@ -150,23 +166,45 @@ function PdfPage({
     let task: RenderTask | null = null
     let live = true
     const el = canvas.current
+    const off = document.createElement('canvas')
     void doc.getPage(source).then((page) => {
       if (!live) return
       const ratio = window.devicePixelRatio || 1
       const viewport = page.getViewport({ scale: BASE_SCALE * zoom * ratio })
-      el.width = Math.floor(viewport.width)
-      el.height = Math.floor(viewport.height)
-      task = page.render({ canvas: el, viewport })
-      task.promise.catch(() => {}) // cancelled by a newer zoom
+      off.width = Math.floor(viewport.width)
+      off.height = Math.floor(viewport.height)
+      task = page.render({ canvas: off, viewport })
+      task.promise
+        .then(() => {
+          if (!live) return
+          art.current = off
+          setDrawn((n) => n + 1)
+        })
+        .catch(() => {}) // cancelled by a newer zoom
     })
     return () => {
       live = false
       task?.cancel()
-      // free the bitmap (a 155% page is ~10 MB); it is drawn again when the page comes back
-      el.width = 0
-      el.height = 0
+      // free the bitmaps (a 155% page is ~10 MB); drawn again when the page comes back
+      art.current = null
+      off.width = off.height = el.width = el.height = 0
     }
   }, [doc, source, visible, zoom])
+
+  useEffect(() => {
+    const src = art.current
+    const el = canvas.current
+    if (!src || !el) return
+    const g = JSON.parse(growKey) as { cuts: Cut[]; sheets: Sheet[] } | null
+    const H = size.height
+    const k = src.height / H // device px per point
+    const step = (H + PAGE_GAP / (BASE_SCALE * zoom)) * k // one sheet and the gap under it
+    el.width = src.width
+    el.height = Math.round(step * ((g?.sheets.length ?? 1) - 1) + src.height)
+    const ctx = el.getContext('2d')
+    for (const p of sheetPieces(H, g?.cuts ?? [], g?.sheets ?? [{ from: 0, to: H, at: 0 }]))
+      ctx?.drawImage(src, 0, p.from * k, src.width, (p.to - p.from) * k, 0, p.sheet * step + p.at * k, src.width, p.height * k)
+  }, [drawn, growKey, size.height, zoom])
 
   // The original's text lines, read once per page when asked for (Edit text).
   useEffect(() => {
@@ -196,11 +234,18 @@ function PdfPage({
     <div
       ref={box}
       data-page={pageNo}
-      className="relative mx-auto flex-none bg-white shadow-[0_1px_6px_rgba(15,23,42,0.18)]"
-      style={{ width, height }}
+      className="relative mx-auto flex-none"
+      style={{ width, height: grown }}
     >
+      {Array.from({ length: sheets }, (_, k) => (
+        <div
+          key={k}
+          className="absolute inset-x-0 bg-white shadow-[0_1px_6px_rgba(15,23,42,0.18)]"
+          style={{ top: k * (height + PAGE_GAP), height }}
+        />
+      ))}
       {source && visible && <canvas ref={canvas} className="absolute inset-0 h-full w-full" aria-label={`Page ${pageNo}`} />}
-      <div className="absolute inset-0 [container-type:size]">
+      <div className="absolute inset-x-0 top-0 [container-type:size]" style={{ height }}>
         {visible && overlay?.(pageNo, withText && lines?.source === source ? lines.lines : undefined)}
       </div>
     </div>

@@ -1,8 +1,19 @@
 import { ArrowLeft, Download, ListPlus, MessageSquare, Paperclip, Save, Send } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useLabels } from './labels'
 import { boxStyle } from '../core/coords'
-import { evaluate, type Answers, type FieldDef, type Layout } from '../core/form-logic'
+import {
+  evaluate,
+  movedDown,
+  onSheets,
+  pageGrowth,
+  textSize,
+  type Answers,
+  type FieldDef,
+  type Layout,
+  type WidthOf,
+} from '../core/form-logic'
+import { BASE_SCALE, PAGE_GAP } from './constants'
 import { AnswerControl } from './components/FieldControl'
 import { CommentsDialog, FieldDialog } from './components/FieldDialogs'
 import LayoutElementView from './components/LayoutElementView'
@@ -15,6 +26,65 @@ import type { QuestionFilterState, UseQuestionFilterOptions } from './hooks/useQ
 import { Button, ConfirmModal, FormliftProvider, SegmentedTabs, type FormliftComponents } from './ui/slots'
 
 export type { AnswerFileInfo }
+
+// Text widths for growing answers, Helvetica metrics like the completed PDF (Arial has the same widths).
+let measure: CanvasRenderingContext2D | null | undefined
+const widthOf: WidthOf = (text, size) => {
+  if (measure === undefined) measure = document.createElement('canvas').getContext('2d')
+  if (!measure) return text.length * size * 0.5
+  measure.font = `${size}px Helvetica, Arial, sans-serif`
+  return measure.measureText(text).width
+}
+
+/**
+ * A grown box running over a page break: one window per page, each showing its part of the same control (one
+ * copy per window, sharing the answer). When the caret leaves a window the browser scrolls it to follow; that
+ * scroll is undone and the caret carries on in the next (or previous) window's copy.
+ * ponytail: copies repeat the control's ids / names; give copies their own ids if a label or test needs them.
+ */
+function SplitBox({
+  left,
+  width,
+  height,
+  style,
+  windows,
+  children,
+}: {
+  left: string
+  width: string
+  height: number
+  style: CSSProperties
+  windows: { top: number; height: number; scroll: number }[]
+  children: ReactNode
+}) {
+  const refs = useRef<(HTMLDivElement | null)[]>([])
+  return windows.map((w, j) => (
+    <div
+      key={j}
+      ref={(el) => {
+        refs.current[j] = el
+        if (el) el.scrollTop = w.scroll
+      }}
+      className="absolute overflow-hidden"
+      style={{ left, width, top: w.top, height: w.height }}
+      onScroll={(e) => {
+        const el = e.currentTarget
+        if (Math.abs(el.scrollTop - w.scroll) < 1) return
+        const next = refs.current[j + (el.scrollTop > w.scroll ? 1 : -1)]
+        el.scrollTop = w.scroll
+        const from = el.querySelector('textarea')
+        const to = next?.querySelector('textarea')
+        if (!from || !to || document.activeElement !== from) return
+        to.focus({ preventScroll: true })
+        to.setSelectionRange(from.selectionStart, from.selectionEnd)
+      }}
+    >
+      <div className="relative [container-type:size]" style={{ ...style, height }}>
+        {children}
+      </div>
+    </div>
+  ))
+}
 
 /** Parts of the FormFiller screen that can be hidden with `hide`. */
 export type FillerPart =
@@ -124,6 +194,15 @@ export default function FormFiller({
   const pdfWidth = ff.pdfSizes.length ? Math.max(...ff.pdfSizes.map((p) => p.width)) : 595
   const { zoom, setZoom, ref: fitRef } = useFitZoom(Math.max(...(layout?.pages.map((p) => p.width) ?? [pdfWidth])), zoomSteps)
   const compact = useCompact()
+  // Each page's size (points) and how long answers grow it: the page moves down under them, as in the PDF.
+  const pageSizes = useMemo(
+    () => (layout ? layout.pages.map((p) => (p.source ? (ff.pdfSizes[p.source - 1] ?? p) : p)) : ff.pdfSizes),
+    [layout, ff.pdfSizes],
+  )
+  const growth = useMemo(
+    () => pageSizes.map((size, i) => pageGrowth(fields, answers, i + 1, size, widthOf, (f) => !!states[f.key]?.visible)),
+    [pageSizes, fields, answers, states],
+  )
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [commentsOf, setCommentsOf] = useState<FieldDef | null>(null)
   const [loadError, setLoadError] = useState('')
@@ -327,21 +406,82 @@ export default function FormFiller({
             pages={layout?.pages}
             onLoaded={ff.onPdfLoaded}
             onError={() => setLoadError(L.documentLoadError)}
-            overlay={(page) => [
-              // The admin's text / boxes / lines first, the answer controls on top.
-              ...(layout?.elements ?? [])
-                .filter((el) => el.page === page)
-                .map((el) => (
-                  <LayoutElementView key={el.id} element={el} pageHeight={layout!.pages[page - 1]?.height ?? 842} />
-                )),
-              ...fields
-                .filter((f) => f.position.page === page && !f.dialogOnly && states[f.key]?.visible)
-                .map((f) => (
-                  <div key={f.id} className="absolute [container-type:size]" style={boxStyle(f.position)}>
-                    {control(f)}
-                  </div>
-                )),
-            ]}
+            grow={(page) => growth[page - 1]}
+            overlay={(page) => {
+              const H = pageSizes[page - 1]?.height ?? 842
+              const g = growth[page - 1]
+              const px = BASE_SCALE * zoom
+              // A point of the original page (from its top) on screen: moved down by answers above it, onto the
+              // next page (past its margins and the gap) where the grown page breaks.
+              const place = (d: number) => (g?.cuts.length ? onSheets(movedDown(d, g.cuts), g.sheets, H, PAGE_GAP / px) : d)
+              const down = (y: number) => {
+                const dy = (place(y * H) - y * H) * px
+                return dy ? { transform: `translateY(${dy}px)` } : {}
+              }
+              return [
+                // The admin's text / boxes / lines first, the answer controls on top.
+                ...(layout?.elements ?? [])
+                  .filter((el) => el.page === page)
+                  .map((el) => (
+                    <LayoutElementView
+                      key={el.id}
+                      element={el}
+                      pageHeight={layout!.pages[page - 1]?.height ?? 842}
+                      style={down(el.position.y)}
+                    />
+                  )),
+                ...fields
+                  .filter((f) => f.position.page === page && !f.dialogOnly && states[f.key]?.visible)
+                  .map((f) => {
+                    const extra = growth[page - 1]?.boxes.get(f.key)?.extra ?? 0
+                    const p = f.position
+                    // A textarea's text as the PDF prints it (size, face, line height), so what fits shows here.
+                    const face = { '--fl-font': 'Helvetica, Arial, sans-serif' }
+                    const print =
+                      f.type === 'textarea'
+                        ? { ...face, '--fl-text': `${textSize(p.height * H) * px}px`, '--fl-lh': '1.2' }
+                        : f.type === 'text'
+                          ? extra > 0
+                            ? { ...face, '--fl-text': `${textSize(p.height * H, true) * px}px`, '--fl-lh': '1.2' }
+                            : { '--fl-lh': `${p.height * H * px - 2}px` } // one line, centred in its box
+                          : {}
+                    // Across a page break: a window on each page showing its part of the box.
+                    const start = g ? movedDown(p.y * H, g.cuts) : 0
+                    const end = start + p.height * H + extra
+                    const parts = extra
+                      ? g!.sheets
+                          .map((s) => [Math.max(start, s.from), Math.min(end, s.to)])
+                          .filter(([a, z]) => z > a)
+                      : []
+                    if (parts.length > 1)
+                      return (
+                        <SplitBox
+                          key={f.id}
+                          left={`${p.x * 100}%`}
+                          width={`${p.width * 100}%`}
+                          height={(end - start) * px}
+                          style={print as CSSProperties}
+                          windows={parts.map(([a, z]) => ({
+                            top: onSheets(a, g!.sheets, H, PAGE_GAP / px) * px,
+                            height: (z - a) * px,
+                            scroll: (a - start) * px,
+                          }))}
+                        >
+                          {control(f)}
+                        </SplitBox>
+                      )
+                    return (
+                      <div
+                        key={f.id}
+                        className="absolute [container-type:size]"
+                        style={{ ...boxStyle(p), height: `${(p.height + extra / H) * 100}%`, ...down(p.y), ...print }}
+                      >
+                        {control(f)}
+                      </div>
+                    )
+                  }),
+              ]
+            }}
           />
         </div>
         {ff.dialog && (
