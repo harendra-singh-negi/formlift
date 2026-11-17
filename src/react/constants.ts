@@ -28,3 +28,6 @@ export const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
 /** CSS width of a page at zoom 1 is its width in points (72 dpi) × this. */
 export const BASE_SCALE = 96 / 72
+
+/** Space (px) between pages on screen, also between the pages a grown page breaks into (PdfPages gap-4). */
+export const PAGE_GAP = 16

@@ -56,7 +56,7 @@ const input = (label: string) => el.querySelector<HTMLInputElement & HTMLSelectE
 const button = (text: string) =>
   [...document.querySelectorAll('button')].filter((b) => b.textContent?.trim() === text).at(-1)!
 function type(target: HTMLInputElement | HTMLSelectElement, value: string) {
-  const proto = target instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype
+  const proto = Object.getPrototypeOf(target) as object // input, textarea (text fields) or select
   Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(target, value)
   target.dispatchEvent(new Event(target instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }))
 }

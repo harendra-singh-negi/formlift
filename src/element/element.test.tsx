@@ -32,9 +32,9 @@ it('mounts, hands out answers as JSON, updates and unmounts without React in the
   })
   expect(el.textContent).toContain('Intake')
 
-  const input = el.querySelector('input') as HTMLInputElement
+  const input = el.querySelector('textarea') as HTMLTextAreaElement // a text field
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'Asha')
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, 'Asha')
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
   expect(onChange).toHaveBeenLastCalledWith({ name: 'Asha' })

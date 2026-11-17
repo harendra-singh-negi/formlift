@@ -434,11 +434,25 @@ export default function FieldControl({
       return (
         <textarea
           {...common}
-          className={`${box} ${border} resize-none py-0.5 text-[clamp(8px,14cqh,15px)]`}
+          className={`${box} ${border} resize-none py-0.5 text-[length:var(--fl-text,clamp(8px,14cqh,15px))] [font-family:var(--fl-font,inherit)] [line-height:var(--fl-lh,normal)]`}
           placeholder={field.placeholder}
           value={text}
           maxLength={field.maxLength}
           onChange={(e) => onChange(e.target.value)}
+        />
+      )
+    case 'text':
+      // A textarea that looks like one line: a long answer wraps and its box grows (FormFiller), as in the PDF.
+      return (
+        <textarea
+          {...common}
+          rows={1}
+          className={`${box} ${border} resize-none overflow-hidden py-0 text-[length:var(--fl-text,clamp(8px,62cqh,15px))] [font-family:var(--fl-font,inherit)] [line-height:var(--fl-lh,normal)]`}
+          placeholder={field.placeholder}
+          value={text}
+          maxLength={field.maxLength}
+          onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+          onChange={(e) => onChange(e.target.value.replace(/\r?\n/g, ' '))}
         />
       )
     case 'dropdown':

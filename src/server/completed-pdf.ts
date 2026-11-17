@@ -21,6 +21,7 @@ import {
   type Layout,
   type LayoutElement,
 } from '../core/form-logic';
+import { lineGaps, movedDown, pageCuts, pageSheets, sheetOf, sheetPieces, textFit, wrapText } from '../core/form-logic/grow';
 
 /** Options of completedPdf. */
 export interface CompletedPdfOptions {
@@ -56,29 +57,8 @@ const printable = (font: PDFFont, s: string) =>
     })
     .join('');
 
-/** `text` cut into lines no wider than `width` at this size (words kept whole where they fit). */
-function wrap(font: PDFFont, text: string, size: number, width: number): string[] {
-  const out: string[] = [];
-  for (const para of text.split('\n')) {
-    let line = '';
-    for (const word of para.split(/\s+/)) {
-      const next = line ? `${line} ${word}` : word;
-      if (font.widthOfTextAtSize(next, size) <= width || !line) line = next;
-      else {
-        out.push(line);
-        line = word;
-      }
-      while (font.widthOfTextAtSize(line, size) > width && line.length > 1) {
-        let cut = line.length - 1;
-        while (cut > 1 && font.widthOfTextAtSize(line.slice(0, cut), size) > width) cut--;
-        out.push(line.slice(0, cut));
-        line = line.slice(cut);
-      }
-    }
-    out.push(line);
-  }
-  return out;
-}
+const wrap = (font: PDFFont, text: string, size: number, width: number) =>
+  wrapText(text, width, size, (t, n) => font.widthOfTextAtSize(t, n));
 
 type Block = { heading?: string; lines: string[] };
 
@@ -214,6 +194,46 @@ function drawElement(page: PDFPage, e: LayoutElement, fonts: Fonts) {
   });
 }
 
+type Overflow = { x: number; top: number; w: number; h: number; size: number; lines: string[]; extra: number };
+
+/**
+ * Page `index` rebuilt so each overflowing text box grows (core/form-logic/grow.ts, as on screen): everything
+ * below the box moves down by what the text needs, onto added pages of the same size when it runs off the end,
+ * with BREAK_MARGIN kept at the bottom and top of each break and no line of the answer cut in two (pageSheets).
+ * ponytail: links / file annotations of a rebuilt page are dropped. Boxes side by side with different bottoms cut
+ * each other's row.
+ */
+async function pushDown(doc: PDFDocument, index: number, boxes: Overflow[], font: PDFFont) {
+  const old = doc.getPage(index);
+  old.pushOperators(); // a blank page has no Contents, which embedPage refuses
+  const b = old.getCropBox();
+  const [W, H, top] = [b.width, b.height, b.y + b.height];
+  const cuts = pageCuts(boxes.map((o) => ({ bottom: top - (o.top - o.h), extra: o.extra })));
+  const starts = boxes.map((o) => movedDown(top - o.top, cuts));
+  const ends = boxes.map((o, i) => starts[i] + o.h + o.extra);
+  const sheets = pageSheets(H, cuts, boxes.flatMap((o, i) => lineGaps(starts[i], o.size, o.lines.length, ends[i])));
+  const pages = sheets.map((_, k) => doc.insertPage(index + 1 + k, [W, H]));
+  for (const p of sheetPieces(H, cuts, sheets)) {
+    const art = await doc.embedPage(old, { left: b.x, right: b.x + W, bottom: top - p.to, top: top - p.from });
+    pages[p.sheet].drawPage(art, { x: 0, y: H - p.at - p.height, width: W, height: p.height });
+  }
+  boxes.forEach((o, i) => {
+    // The grown box cleared first: the form's own ruled / dotted lines would run through the text.
+    sheets.forEach((s, k) => {
+      const [a, z] = [Math.max(starts[i], s.from), Math.min(ends[i], s.to)];
+      if (z - a > 2)
+        pages[k].drawRectangle({ x: o.x - b.x + 1, y: H - (s.at + z - s.from) + 1, width: o.w - 2, height: z - a - 2, color: rgb(1, 1, 1) });
+    });
+    o.lines.forEach((line, n) => {
+      const base = starts[i] + o.size + 1 + n * o.size * 1.2; // baseline, from the grown page's top
+      const k = sheetOf(base - o.size * 0.8, sheets); // the sheet the line's top is on (just under its gap)
+      const s = sheets[k];
+      pages[k].drawText(line, { x: o.x - b.x + 2, y: H - (s.at + base - s.from), size: o.size, font, color: rgb(0.075, 0.306, 0.29) });
+    });
+  });
+  doc.removePage(index);
+}
+
 /** A file of the submission (upload or signature PNG), by its id = the answer's value. */
 export interface AnswerFile {
   fileName: string;
@@ -316,6 +336,7 @@ export async function completedPdf(
   const font = fonts.sans;
   const states = fieldStates(fields, answers);
   const embedded: Embedded[] = [];
+  const overflow: Overflow[][] = [];
   for (const f of fields) {
     const v = answers[f.key];
     if (f.dialogOnly || !states[f.key]?.visible || v == null || v === '' || v === false) continue;
@@ -337,6 +358,14 @@ export async function completedPdf(
     const text = f.type === 'checkbox' ? 'X' : f.type === 'file' ? (file?.fileName ?? '') : answerText(f, v);
     const multiline = f.type === 'textarea' || f.type === 'checklist';
     const size = Math.max(5, Math.min(11, h * (multiline ? 0.35 : 0.7)));
+    if (multiline || f.type === 'text') {
+      const fit = textFit(printable(font, text), w, h, (t, n) => font.widthOfTextAtSize(t, n), !multiline);
+      if (fit.extra > 0) {
+        // Too long for its box: drawn after the page makes room (pushDown), not over what is below.
+        (overflow[f.position.page - 1] ??= []).push({ x, top, w, h, ...fit });
+        continue;
+      }
+    }
     page.drawText(printable(font, text), {
       x: x + 2,
       y: multiline ? top - size - 1 : top - h / 2 - size * 0.35,
@@ -346,6 +375,7 @@ export async function completedPdf(
       ...(multiline ? { maxWidth: w - 4, lineHeight: size * 1.2 } : {}),
     });
   }
+  for (let i = overflow.length - 1; i >= 0; i--) if (overflow[i]) await pushDown(doc, i, overflow[i], font);
   // Answers asked in dialogs have no box on a page: they go on pages at the end, under the field that asked them.
   const name = (f: FieldDef) => `${f.label || f.key} (${T.page(f.position.page)})`;
   const answered = (f: FieldDef) => states[f.key]?.visible && answers[f.key] != null && answers[f.key] !== '';

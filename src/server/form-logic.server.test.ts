@@ -130,6 +130,23 @@ test('completedPdf: writes answers into a copy, original bytes unchanged', async
   assert.ok(out.length > original.length);
 });
 
+test('completedPdf: a long textarea pushes what is below it down, onto an added page when needed', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([600, 800]);
+  const original = await doc.save();
+  const note = field('note', { type: 'textarea', position: { page: 1, x: 0.1, y: 0.5, width: 0.3, height: 0.05 } });
+  const pagesFor = async (text: string) =>
+    (await PDFDocument.load(await completedPdf(original, [note], { note: text }))).getPageCount();
+  assert.equal(await pagesFor('short'), 1);
+  assert.equal(await pagesFor('word '.repeat(40)), 2); // page bottom moved onto an added page, nothing cut off
+  assert.ok((await pagesFor('word '.repeat(3000))) > 2);
+  const line = field('line', { position: { page: 1, x: 0.1, y: 0.5, width: 0.3, height: 0.02 } });
+  const linePages = async (text: string) =>
+    (await PDFDocument.load(await completedPdf(original, [line], { line: text }))).getPageCount();
+  assert.equal(await linePages('fits on one line'), 1);
+  assert.equal(await linePages('word '.repeat(40)), 2); // a text field wraps and grows too
+});
+
 test('validateLayout: page sources, sizes, element bounds, colours', () => {
   const pages = [
     { source: 2, width: 595, height: 842 },
