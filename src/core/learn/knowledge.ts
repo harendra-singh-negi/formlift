@@ -44,7 +44,8 @@ export function knowledge(lessons: Lesson[]) {
   let from = 0
   for (const [i, l] of live.entries()) if (l.forget?.patterns) from = i
   const taught = live.slice(from).flatMap((l) => (l.examples?.length ? [{ cues: l.cues ?? [], examples: l.examples }] : []))
-  return { votes, drawn, memories, taught }
+  const places = live.slice(from).flatMap((l) => (l.places?.length ? [l.places] : []))
+  return { votes, drawn, memories, taught, places, live }
 }
 
 /** What auto-detect learnt (for a "what it learnt" view): changes and deletions per label, fields it draws, pages. */
@@ -57,12 +58,17 @@ export interface Learnt {
   pages: number
   /** What boxes taught (pattern learning): how many boxes, from how many saves. */
   patterns: { boxes: number; saves: number }
+  /**
+   * What auto-detect still got wrong, save after save (oldest first, the last 20): fields saved, and the corrections
+   * they needed (suggestions deleted or changed, fields drawn by hand). Fewer and fewer: it is learning.
+   */
+  corrections: { at: number; fields: number; corrections: number }[]
 }
 
 /** What the lessons taught, after what was forgotten. */
 export function learnt(lessons: Lesson[] | undefined): Learnt {
   const unlimited = { maxFields: Infinity, maxPages: Infinity }
-  const { votes, drawn, memories, taught } = knowledge((lessons ?? []).filter((l) => !validateLesson(l, unlimited).length))
+  const { votes, drawn, memories, taught, live } = knowledge((lessons ?? []).filter((l) => !validateLesson(l, unlimited).length))
   const labels = [...votes]
     .flatMap(([h, vs]) => {
       const last = vs.slice(-2)
@@ -82,5 +88,8 @@ export function learnt(lessons: Lesson[] | undefined): Learnt {
     .sort((a, b) => b.at - a.at)
   const pages = new Set(memories.map(({ m }) => m.image ?? m.text.map((t) => t[0]).join()))
   const boxes = taught.reduce((n, t) => n + t.examples.reduce((m, e) => m + (e.n ?? 1), 0), 0)
-  return { labels, drawn: fields, pages: pages.size, patterns: { boxes, saves: taught.length } }
+  const corrections = live
+    .flatMap(({ at, score: s }) => (s ? [{ at, fields: s.fields, corrections: s.deleted + s.changed + s.drawn }] : []))
+    .slice(-20)
+  return { labels, drawn: fields, pages: pages.size, patterns: { boxes, saves: taught.length }, corrections }
 }

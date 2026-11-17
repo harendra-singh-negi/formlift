@@ -4,7 +4,8 @@
 //   blank   a blank table cell the rules found no name for
 //   space   the empty space after a short label on its row
 // Auto-detect never suggests them on its own (their prior is low): pattern learning does, once admins kept boxes
-// like them, in any form (see ../learn/patterns.ts).
+// like them, in any form (see ../learn/patterns.ts). Places where admins drew fields are the other boxes only
+// learning suggests (../learn/places.ts).
 
 import { clashes, fitInPage, overlap } from '../coords'
 import type { FieldDef, Position } from '../form-logic'

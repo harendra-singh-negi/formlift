@@ -422,16 +422,45 @@ describe('label lessons', () => {
     expect(await lessonFor(fakePdf([['x', 0, 0]]), [], session(many, []))).toBeNull()
   })
 
-  it('never learns from a box without a label', async () => {
+  it('never learns from a box without a label (only how many corrections the save needed)', async () => {
     const box = field('c', 'checkbox', 'checkbox', 0.1, 0.5) // what auto-detect calls a box it found no name for
     const row = field('n', '12', 'text', 0.1, 0.6)
-    expect(await lessonFor(fakePdf([['x', 0, 0]]), [], session([box, row], []))).toBeNull()
+    const lesson = await lessonFor(fakePdf([['x', 0, 0]]), [], session([box, row], []))
+    expect(lesson).toMatchObject({ labels: [], pages: [], score: { fields: 0, suggested: 2, deleted: 2, changed: 0, drawn: 0 } })
+    expect([lesson?.kept, lesson?.drawn, lesson?.examples]).toEqual([undefined, undefined, undefined])
   })
 
   it('does not apply a change that makes no valid field', async () => {
     const lesson: Lesson = { version: 1, id: 'x', at: 1, labels: [{ label: 'Role', kept: 1, deleted: 0, change: { type: 'dropdown' } }], pages: [] }
     const s = field('r', 'Role', 'text', 0.1, 0.5)
     expect((await learn([lesson])).adjust(s)).toBe(s) // a dropdown needs options
+  })
+})
+
+describe('corrections, save after save', () => {
+  it('counts what auto-detect still got wrong: deleted, changed, drawn by hand', async () => {
+    const a = field('a', 'Site', 'text', 0.1, 0.1)
+    const b = field('b', 'Date', 'text', 0.1, 0.2)
+    const c = field('c', 'Notes', 'text', 0.1, 0.3)
+    const d = field('d', 'Ship', 'text', 0.1, 0.4)
+    const drawn = { ...field('e', 'Remarks', 'textarea', 0.1, 0.5), source: 'manual' as const }
+    const moved = { ...d, position: { ...d.position, x: 0.5 } }
+    const first = await lessonOf(session([a, b, c, d], [a, { ...b, type: 'date' }, moved, drawn]), 1)
+    expect(first.score).toEqual({ fields: 4, suggested: 4, deleted: 1, changed: 2, drawn: 1 })
+    // Everything kept as suggested: a save with nothing to correct counts too.
+    const second = await lessonOf(session([a, b], [a, b], [], 's2'), 2)
+    expect(second.score).toEqual({ fields: 2, suggested: 2, deleted: 0, changed: 0, drawn: 0 })
+    expect(learnt([first, second]).corrections).toEqual([
+      { at: 1, fields: 4, corrections: 4 },
+      { at: 2, fields: 2, corrections: 0 },
+    ])
+  })
+
+  it('counts nothing for a save without suggestions, or one that started again', async () => {
+    const a = field('a', 'Site', 'text', 0.1, 0.1)
+    expect((await lessonOf(session([], [a], [a])))?.score).toBeUndefined()
+    const many = Array.from({ length: 12 }, (_, i) => field(`f${i}`, `Item ${i}`, 'text', 0.1, i * 0.05))
+    expect(await lessonFor(fakePdf([['x', 0, 0]]), [], session(many, []))).toBeNull()
   })
 })
 
@@ -458,7 +487,7 @@ describe('forgetting', () => {
     expect((await adjust(noRemarks, remarks))?.type).toBe('text')
     expect(await adjust(noRemarks, desc)).toBeNull()
     const nothing = [...lessons, forgetting({ all: true }, 3)]
-    expect(learnt(nothing)).toEqual({ labels: [], drawn: [], pages: 0, patterns: { boxes: 0, saves: 0 } })
+    expect(learnt(nothing)).toEqual({ labels: [], drawn: [], pages: 0, patterns: { boxes: 0, saves: 0 }, corrections: [] })
     expect(await adjust(nothing, desc)).not.toBeNull()
     // What is learnt after it counts again.
     const later = await lessonOf({ ...session([remarks], [{ ...remarks, type: 'textarea' }]), id: 'later' }, 4)
@@ -477,7 +506,8 @@ describe('forgetting', () => {
   it('leaves out of a later save what was forgotten in the session', async () => {
     const forgotten = { labels: learnt(await teach()).labels.map((l) => l.hash) }
     const again = await lessonFor(fakePdf([['x', 0, 0]]), [], session([remarks, desc], [{ ...remarks, type: 'textarea' }]), { forgotten })
-    expect(again).toBeNull()
+    expect(again).toMatchObject({ labels: [], pages: [], score: { suggested: 2, deleted: 1, changed: 1 } })
+    expect(again?.kept).toBeUndefined()
   })
 })
 
@@ -512,6 +542,12 @@ describe('storing lessons', () => {
     expect(validateLesson({ ...lesson('a', 1), drawn: [drawn] })[0]).toMatch(/Drawn field 1/)
     expect(validateLesson({ ...lesson('a', 1), forget: { pages: [[1, 'x']] } })[0]).toMatch(/forget/)
     expect(validateLesson({ ...lesson('a', 1), pages: [{ text: [], image: 'xyz', fields: [text] }] })[0]).toMatch(/Page 1/)
+    const score = { fields: 3, suggested: 4, deleted: 1, changed: 1, drawn: 0 }
+    expect(validateLesson({ ...lesson('a', 1), score, places: [['b', 0, 0.5, 0, 2.5, 7]] })).toEqual([])
+    expect(validateLesson({ ...lesson('a', 1), score: { ...score, drawn: -1 } })[0]).toMatch(/score/)
+    expect(validateLesson({ ...lesson('a', 1), score: { ...score, extra: 1 } })[0]).toMatch(/score/)
+    expect(validateLesson({ ...lesson('a', 1), places: [['left', 0, 0.5, 0, 2.5, 7]] })[0]).toMatch(/places/)
+    expect(validateLesson({ ...lesson('a', 1), places: [['r', 0, 0.5, 0, 0, 7]] })[0]).toMatch(/places/)
   })
 
   it('detection skips a lesson that is not valid', async () => {

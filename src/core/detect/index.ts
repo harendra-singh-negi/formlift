@@ -12,6 +12,7 @@ import { clashes } from '../coords'
 import { keyFor, keyMaker } from '../fields'
 import { toLines, type TextLine } from '../layout'
 import {
+  atPlaces,
   learnedFor,
   lessonFor as learnFrom,
   type Candidate,
@@ -19,6 +20,7 @@ import {
   type Forget,
   type Lesson,
   type PageView,
+  type Place,
   type Suggestion as Made,
 } from '../learn'
 import { ownFields } from './acroform'
@@ -52,13 +54,17 @@ async function proposed(
   return { ...proposals(read.shapes, lines, read.size, n, existing, read.typed.rules, prevText), own: false }
 }
 
-/** A page as learning sees it: its text, drawing, and every box proposed on it (also those only learning suggests). */
+/**
+ * A page as learning sees it: its text, drawing, and every box proposed on it (also those only learning suggests, and
+ * those at the `places` where admins drew fields).
+ */
 function viewOf(
   read: { shapes: Shapes; typed: { rules: Seg[] }; size: { width: number; height: number } },
   lines: TextLine[],
   { found, cells, own }: { found: Candidate[]; cells: PageView['cells']; own: boolean },
   n: number,
   taken: Position[],
+  places: Place[] = [],
 ): PageView {
   const view: Omit<PageView, 'candidates'> = {
     ...read.size,
@@ -74,22 +80,25 @@ function viewOf(
     rects: read.shapes.rects,
     rules: [...read.shapes.hlines.filter((l) => !l.hair), ...read.typed.rules],
   }
-  const more = own ? [] : latent(view, n, [...taken, ...found.map((c) => c.field.position)])
-  return { ...view, candidates: [...found, ...more] }
+  if (own) return { ...view, candidates: found }
+  const more = latent(view, n, [...taken, ...found.map((c) => c.field.position)])
+  const placed = atPlaces(view, places, n, taken, [...found, ...more])
+  return { ...view, candidates: [...found, ...more, ...placed] }
 }
 
 /**
  * What a save taught auto-detect (see learn.ts), or null when it taught nothing. `pdf`: the pdf.js document;
  * `pages`: the layout's pages (`source` = the page of the PDF, null = a blank page). `OPS`: pdf.js OPS, so a page
  * remembers which of its fields sit on its boxes and lines (a page whose boxes changed is then not taken for it).
- * `forgotten`: what the admin told auto-detect to forget in this session (left out). useFormEditor calls it after
- * each save (`onLesson`).
+ * `forgotten`: what the admin told auto-detect to forget in this session (left out). `lessons`: the lessons the
+ * session's detection used, so that what the admin did with the boxes they made it suggest is learnt too.
+ * useFormEditor calls it after each save (`onLesson`).
  */
 export function lessonFor(
   pdf: PdfDoc,
   pages: { source: number | null }[],
   session: EditSession,
-  { OPS, ...options }: { at?: number; OPS?: Ops; forgotten?: Forget } = {},
+  { OPS, ...options }: { at?: number; OPS?: Ops; forgotten?: Forget; lessons?: Lesson[] } = {},
 ) {
   const drawing =
     OPS &&
@@ -161,7 +170,7 @@ export async function detectDocument(
       const made = await proposed(page, read, lines, i + 1, all, prevText)
       if (!learned) suggested.push(...made.found.map((c) => c.field))
       else {
-        const view = learned.patterns ? viewOf(read, lines, made, i + 1, taken) : null
+        const view = learned.patterns ? viewOf(read, lines, made, i + 1, taken, learned.places) : null
         suggested.push(...learned.review(made.found, view, decided))
       }
       // Fields drawn by hand elsewhere: not on a page set up before (where the admin drew what they wanted).

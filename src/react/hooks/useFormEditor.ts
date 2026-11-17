@@ -489,6 +489,7 @@ export function useFormEditor({
             lessonFor(pdf, layout.pages, { ...session.current, saved: fields }, {
               OPS: lib.OPS as unknown as Ops,
               forgotten: forgotten.current,
+              lessons: lessonsRef.current,
             }),
           )
           .then((lesson) => lesson && teach(lesson, learn))

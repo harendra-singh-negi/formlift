@@ -154,6 +154,8 @@ export const DEFAULT_LABELS = {
   learntRenamed: (label: string) => `renamed “${label}”`,
   learntDrawn: (times: number) => `drawn by hand next to its line ${times} times`,
   learntPages: (n: number) => `${n} page${n === 1 ? '' : 's'} set up before come${n === 1 ? 's' : ''} back as set up.`,
+  learntCorrections: 'Corrections each save needed, oldest first',
+  learntCorrectionsOf: (corrections: number, fields: number) => `${corrections} of ${fields} fields`,
   learntPatterns: (boxes: number, saves: number) =>
     `Learnt from ${boxes} boxes in ${saves} save${saves === 1 ? '' : 's'}: boxes like the ones you kept are suggested in any form, with the type and grouping you gave them; boxes like the ones you deleted are not.`,
   forget: 'Forget',

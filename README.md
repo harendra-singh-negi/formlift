@@ -414,6 +414,7 @@ others.
 | deletes a suggestion in two forms in a row | **stops suggesting that label**, until an admin keeps it in a form again or adds a field with that label by hand. |
 | draws a field by hand next to the same line of text twice (on two pages of a long form, or in two forms), where auto-detect found nothing (after "Remarks:", say) | **draws that field next to that line in every form**, where there is room for it. |
 | keeps, deletes or draws boxes on a page, changes their type or required, or groups a row of Y / N / NA boxes | **does the same with boxes like those, in any form**, also in a form auto-detect has never seen. Answers printed in place of boxes ("Yes/No/NA"), light filled input boxes, blank cells and the space after a label are suggested once admins kept boxes like them; small squares used as bullets are left out once admins deleted them. |
+| draws fields where auto-detect proposed nothing at all, in the same place next to their labels (the blank space under "Describe the work carried out:", say) | **tries that place next to every label like those, in any form**, and suggests it where admins drew there before under labels like it: under "Give details of the incident:" in a form it has never seen. |
 
 **An example.** Your forms all ask for a **Date of joining**.
 
@@ -445,12 +446,14 @@ many fields came from pages set up before, and how many follow what you taught i
   suggestions of this session that nobody touched; fields an admin changed or saved before stay as they are.)
 - **Not learnt:** a setting that the admin set differently on suggestions with the same label, on the pages they
   changed. Conditions and follow-ups come back with the page they were set up on, not on other forms, because they
-  point at fields of that form. A field drawn by hand once comes back on its own page only; drawn next to the same
-  line twice, it is drawn in every form.
+  point at fields of that form. A field drawn by hand once comes back on its own page; drawn next to the same line
+  twice, it is drawn there in every form; drawn at the same place under or after labels like each other, it is
+  suggested at that place next to labels like them (see [Forms it has never seen](#forms-it-has-never-seen)).
 - **What a lesson stores:** hashes of some lines of each page it remembers (a small picture for a scan), the labels
   that the admin changed or deleted (kept labels only as hashes), the fields as the admin saved them, the boxes
-  of fields they removed, and the cues of the boxes on the pages they changed (structure as it is, `k=cell`,
-  `h1`; words only as hashes) with what they did with each. It stores no answers and no other text from the page.
+  of fields they removed, the cues of the boxes on the pages they changed (structure as it is, `k=cell`,
+  `h1`; words only as hashes) with what they did with each, the places of fields drawn by hand (numbers), and how
+  many corrections the save needed. It stores no answers and no other text from the page.
 
 ### Forms it has never seen
 
@@ -475,17 +478,28 @@ Remembering helps with the forms you already set up. Patterns help with the next
   as it was.
 - **Measured.** `npm run eval` sets up 8 synthetic forms one after another, then scores 6 forms that share no
   label, question or item with them: 96 corrections without lessons, 0 with them, and nothing that was right made
-  wrong. On a real bank checklist whose answers are printed "Yes/No" in a column, an admin who set up one page got a
+  wrong. With questions answered in blank space under them (nothing drawn there), 3 forms set up teach 4 forms
+  never seen: 16 fields to draw by hand without lessons, 3 with them. `npm run eval:real` scores your own forms the
+  same way (see [CONTRIBUTING](./CONTRIBUTING.md)). On a real bank checklist whose answers are printed "Yes/No" in a column, an admin who set up one page got a
   dropdown in every Yes/No cell of the other pages.
+- **Places where admins draw.** A field drawn where auto-detect proposed nothing is learnt by its place next to
+  its label: under it or after it on its row, how far, how wide and how tall, in letters and lines of that page,
+  and the shape of the label (it ends with ":", it is short, it starts its row). Detection tries each place next to
+  every label of that shape where there is room: not where a field or a rule's box already answers the label, not
+  under a table from a label in its cell, not in the page's bottom margin. Those boxes get cues like any other, so
+  the same model suggests the ones like where admins drew and leaves out the others; the labels where admins drew
+  nothing teach it where not to.
 - **Not learnt:** what admins never did. It learns from your admins, not from the world: "DOB" becomes a date once
-  an admin made a "DOB" box a date, and a box no rule or finder proposes (letters in separate little boxes, say) is
-  learnt only by the line next to it (the drawn-by-hand row above). Conditions and follow-ups come back with their
-  page, not in other forms.
+  an admin made a "DOB" box a date ("Valid till" and "Expiry date" share no word, so one does not teach the other),
+  and a place is tried only next to labels shaped like the ones admins drew at. Conditions and follow-ups come back
+  with their page, not in other forms.
 
 ### See and forget what it learnt
 
 The editor's **Learnt** tab lists what auto-detect learnt: the labels it changes or leaves out, the fields it draws
-by hand, how many pages it puts back, and how many boxes taught it patterns. Each has **Forget**, and **Forget
+by hand, how many pages it puts back, and how many boxes taught it patterns. It also shows how many corrections each
+save needed (suggestions deleted or changed, fields drawn by hand), oldest first: the bars get shorter as it learns
+(`learnt().corrections`, from each lesson's `score`). Each has **Forget**, and **Forget
 everything** starts from scratch. A
 field that auto-detect made from a lesson has **Forget this** in its properties: forget the page it came from, or
 what was learnt about its label.
@@ -496,7 +510,8 @@ learning is on (`onLesson`); `hide={['learntTab']}` leaves it out.
 
 ### Turn it on
 
-Two props. `onLesson` receives a lesson after each save that taught something. `lessons` is all the lessons you
+Two props. `onLesson` receives a lesson after each save that taught something, or that had suggestions (it then
+holds at least how many corrections they needed). `lessons` is all the lessons you
 have stored:
 
 ```tsx
@@ -514,7 +529,9 @@ have stored:
 - **Load the lessons before the editor opens.** Auto-detect runs as soon as the PDF is open.
 - **Angular / Vue / plain JS:** the same two options, in `mountEditor(el, { lessons, onLesson })`. A custom editor
   on `useFormEditor` takes the same two options, and gets `learnt` and `forget` for its own Learnt view. Without
-  the editor, `lessonFor(pdf, pages, session, { OPS })` makes a lesson and `detectDocument(…, lessons)` uses lessons.
+  the editor, `lessonFor(pdf, pages, session, { OPS, lessons })` makes a lesson (`lessons`: those the session's
+  detection used, so what the admin did with the places they made it try is learnt too) and
+  `detectDocument(…, lessons)` uses lessons.
 
 ### Where to keep lessons
 
@@ -1056,7 +1073,8 @@ Nothing breaks. Check these:
 | `fieldsSuggested` label | apps with their own `labels` | It now gets a third and a fourth argument: how many of the fields came from pages set up before, and how many follow what the admin taught it (patterns included). Your function can ignore them. |
 | Patterns that carry over | – | Lessons now also hold `cues` and `examples` (what boxes taught), so detection suggests, leaves out, types and groups boxes as admins did with boxes like them in any form. Nothing to do: store lessons as before. They are bigger for long forms (a 309-page form with every page changed: about 1.1 MB, 0.2 MB gzipped). `forgetting({ patterns: true })` forgets it; `learnt()` gives `patterns: { boxes, saves }`; `taughtBy(field)` the cues behind a suggestion. |
 | Word tables with hairline borders | – | Auto-detect now reads tables whose borders are drawn as very thin filled bars (as Word draws them, 0.48 pt): forms like that got no suggestions before. In a grid of labels and answers, a cell is named by its label alone (not "Last inspection – Yes"), and a blank cell in a table's number column is no longer suggested. |
-| New labels | apps with their own `labels` | `rememberedField`, `learntField`, `patternField`, `learntCue`, `forgetThis`, `forgetThisHint`, `forgotten`, and the Learnt tab's `learntTab`, `learntHeading`, `learntNothing`, `learntLeftOut`, `learntRenamed`, `learntDrawn`, `learntPages`, `learntPatterns`, `forget`, `forgetEverything`, `confirmForgetEverything`. Anything you leave out stays English. |
+| Places where admins draw, and corrections per save | – | Lessons can also hold `places` (where fields were drawn by hand next to their label) and `score` (how many corrections the save needed), and `onLesson` now also gets a lesson after a save with suggestions that taught nothing else. Store them as before. A custom editor that calls `lessonFor` itself should pass `lessons` too. `learnt()` gives `corrections`. |
+| New labels | apps with their own `labels` | `rememberedField`, `learntField`, `patternField`, `learntCue`, `forgetThis`, `forgetThisHint`, `forgotten`, and the Learnt tab's `learntTab`, `learntHeading`, `learntNothing`, `learntLeftOut`, `learntRenamed`, `learntDrawn`, `learntPages`, `learntPatterns`, `learntCorrections`, `learntCorrectionsOf`, `forget`, `forgetEverything`, `confirmForgetEverything`. Anything you leave out stays English. |
 
 ### 0.4 → 0.5
 

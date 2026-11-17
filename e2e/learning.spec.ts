@@ -32,6 +32,9 @@ test('auto-detect learns from a save: Start over brings the changes back', async
   await expect(page.getByText('1 page set up before comes back as set up.')).toBeVisible()
   // What the boxes taught (patterns that carry over to other forms).
   await expect(page.getByText(/^Learnt from \d+ boxes in 1 save/)).toBeVisible()
+  // What the save needed: "No" deleted, "Site name" renamed.
+  await expect(page.getByText('Corrections each save needed, oldest first')).toBeVisible()
+  await expect(page.getByText('2 of 4 fields')).toBeVisible()
   await page.getByRole('button', { name: 'Text field Location' }).click()
   await page.getByRole('button', { name: 'Forget this' }).click()
   await expect(page.locator('.toast')).toContainText('Forgotten')
