@@ -79,7 +79,8 @@ export interface FormEditorProps extends UseFormEditorOptions {
  * adds on top. Left: fields and layout tools to drag onto a page. "Edit text" makes every line of the original
  * clickable: a click covers it with an editable copy. Right: properties of the selection, the field list, pages
  * (reorder, delete, add blank) and history. Nothing changes the uploaded PDF; all of it is saved in the version.
- * Keyboard: Delete, Ctrl+Z / Ctrl+Y, Ctrl+D duplicate, arrows nudge (Shift = bigger steps).
+ * Keyboard: Delete, Ctrl+Z / Ctrl+Y, Ctrl+D duplicate, Ctrl+C / Ctrl+V copy a field and paste it where the
+ * pointer is (named after the PDF's text there), arrows nudge (Shift = bigger steps).
  * All the logic lives in useFormEditor: use that hook directly for a completely custom UI.
  */
 export default function FormEditor(props: FormEditorProps) {

@@ -85,7 +85,7 @@ export const DEFAULT_LABELS = {
   propertiesTab: 'Properties',
   fieldsTab: (n: number) => `Fields (${n})`,
   pagesTab: (n: number) => `Pages (${n})`,
-  duplicate: 'Duplicate (Ctrl+D)',
+  duplicate: 'Duplicate (Ctrl+D). To place it elsewhere: Ctrl+C, point at the spot, Ctrl+V',
   deleteSelected: 'Delete (Del)',
   fieldHeading: 'FIELD',
   propertiesHeading: 'PROPERTIES',

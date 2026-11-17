@@ -85,7 +85,7 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 | --- | --- |
 | 🔍 **Auto-detect** | A fillable PDF (made in Acrobat, Word…) gives its own fields as they are: place, type, options, required, max length, named by the text beside them. On other pages, answer lines, checkboxes, typed blanks, table cells and boxes named above or beside them come from the PDF's own vector drawing. Sizes are measured relative to the text, so it works at any font size, scale or orientation. |
 | 🧠 **Learns from your corrections** | Each save teaches auto-detect. A page you set up comes back the way you saved it, conditions included (in the next revision of the form, in any form that has the same page, even a scanned one). What you change about a label applies to that label in every form, and a field you draw by hand next to the same text twice is drawn there in every form. It also learns patterns that carry over to forms it has never seen: boxes like the ones you kept are suggested (answers printed as "Yes/No/NA" included), boxes like the ones you deleted are not, typed and grouped as you did. The editor shows what it learnt, and anything can be forgotten. No AI service: the lessons are plain JSON that you store. [How it works](#auto-detect-that-learns) |
-| 🧱 **Builder** | 20 field types (text, date & time, currency, multi-select, checklist, rating, slider, toggle, signature, file…), drag/resize/snap-to-grid, undo/redo, keyboard shortcuts, fill order, page reorder/insert/delete |
+| 🧱 **Builder** | 20 field types (text, date & time, currency, multi-select, checklist, rating, slider, toggle, signature, file…), drag/resize/snap-to-grid, undo/redo, keyboard shortcuts, fill order, page reorder/insert/delete. Copy a field (<kbd>Ctrl</kbd>+<kbd>C</kbd>) and paste it anywhere (<kbd>Ctrl</kbd>+<kbd>V</kbd>): it is named after what the PDF says there ("Gloves – Remarks" in a table cell), key included. [Copy and paste](#copy-and-paste-fields) |
 | ✏️ **Layout editing** | Add text, boxes and lines, or click any line of the original text to replace it, all without touching the file |
 | 🔀 **Conditional logic** | `visibleWhen` / `requiredWhen` / `readOnlyWhen` with nested AND/OR groups and 10 operators. Circular rules are rejected. |
 | ☑️ **Groups, rows, follow-ups, comments** | Boxes that allow exactly one or several ticks, table rows people can add more of (**+ Add row**), follow-up dialogs ("No" → ask why), 💬 comments per field, and an `onFieldChange` hook for your own logic. [Guide](#guide-groups-follow-ups-comments-and-your-own-logic) |
@@ -277,6 +277,7 @@ From no code to full control. Pick the first one that does the job:
 | Separate boxes where only one (or 2–3, or all) may be ticked | [Groups of boxes](#groups-of-boxes) | none: set in the editor |
 | More fields on the page when an answer is given | [`visibleWhen`](#data-model) | none: Conditions in the editor |
 | A table where people add as many rows as they need | [Repeatable table rows](#repeatable-table-rows) | none: set in the editor |
+| The same field again elsewhere, named after its new spot | [Copy and paste](#copy-and-paste-fields) | none: <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> in the editor |
 | A dialog asking more questions ("No" → why, by when) | [Follow-up dialogs](#follow-up-dialogs) | none: set in the editor |
 | A 💬 per field where people leave remarks | [Comments](#comments) | store `info.comments` |
 | Anything else: fill other fields, call your API, your own dialog | [`onFieldChange`](#your-own-logic-onfieldchange) | a function |
@@ -330,6 +331,23 @@ takes it out and moves the rows under it up (`removeRow(fields, answers, id, k)`
 
 The copied band is the row's fields plus 2 points under them (the row's bottom line), across the whole page width, so
 whatever else is in that band (an item name in the first column) is copied too.
+
+### Copy and paste fields
+
+Set up one field the way you want it (type, size, validation, settings), then reuse it:
+
+1. Click the field and press <kbd>Ctrl</kbd>+<kbd>C</kbd>.
+2. Point at the spot on the PDF where it should go and press <kbd>Ctrl</kbd>+<kbd>V</kbd>. The copy lands there (the
+   pointer is its top-left corner).
+3. It is named after what the PDF says there, and its key follows the name: what auto-detect would call a box at
+   that spot (a table cell: "Gloves – Remarks"), else the words on its left on the same line ("Name:"), else the
+   words right above it. When nothing names it, it keeps the copied label.
+
+The copy keeps everything else of the field, but not its group of boxes or its repeatable row (it is somewhere
+else now). Paste as often as you like; one <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes one paste. <kbd>Ctrl</kbd>+<kbd>D</kbd>
+still duplicates right under the field with the same label. In your own UI: `labelAt(pdf, OPS, source, page,
+position)` gives the name for a spot (`nameAt(position, proposed, lines)` when you already read the page), and
+`useFormEditor` has `copySelected()` and `paste()`.
 
 ### Follow-up dialogs
 
@@ -772,8 +790,10 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 | `stickyPanels` | `boolean` | `true` | Only the document scrolls; the tools and right panel stay in view. `false` scrolls the whole editor as one page |
 
 **Keyboard:** <kbd>Del</kbd> delete · <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> undo/redo ·
-<kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate · arrow keys nudge (hold <kbd>Shift</kbd> for larger steps) ·
-<kbd>Esc</kbd> deselect
+<kbd>Ctrl</kbd>+<kbd>C</kbd> copy a field · <kbd>Ctrl</kbd>+<kbd>V</kbd> paste it where the pointer is, named after the
+PDF's text there ([Copy and paste](#copy-and-paste-fields)) · <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate (a copy right under
+it, same label) · arrow keys nudge (hold <kbd>Shift</kbd> for larger steps) · <kbd>Esc</kbd> deselect. On a Mac,
+<kbd>Cmd</kbd> instead of <kbd>Ctrl</kbd>. While you type in a box, these keys are the box's own.
 
 ### `<FormFiller>`
 
@@ -820,7 +840,7 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 
 | Hook | Gives |
 | --- | --- |
-| `useFormEditor(options)` | Everything `FormEditor` does, without UI: document, undo/redo, selection, drag/resize, pages, detect, what auto-detect learnt (`learnt`, `forget`), save |
+| `useFormEditor(options)` | Everything `FormEditor` does, without UI: document, undo/redo, selection, drag/resize, copy / paste (`copySelected`, `paste`), pages, detect, what auto-detect learnt (`learnt`, `forget`), save |
 | `useFormFiller(options)` | Everything `FormFiller` does, without UI: answers, conditions, validation, autosave, uploads, questions, added table rows (`fields` with the rows, `addRow(id)`, `removeRow(id, k)`) |
 | `useQuestionFilter(questions, answers, options)` | Search and filters as data: `groups`, `inUse`, `list` |
 
@@ -846,6 +866,7 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 | `expandRows(fields, answers)` / `removeRow(fields, answers, id, k)` | `FieldDef[]` / `Answers` | The fields with the table rows the person added ([Repeatable table rows](#repeatable-table-rows)) / the answers with row `k` taken out |
 | `pageGrowth(fields, answers, page, size, widthOf, shown?)` | `{ boxes, cuts, rows, sheets, top }` | How long answers grow one page: each growing box's lines and extra height, where the page is cut open, and the pages (`sheets`) it then breaks into. `FormFiller` and `completedPdf` both use it; `widthOf(text, size)` measures text in points (Helvetica) |
 | `detectDocument(pdf, OPS, pages, existing, onProgress?, signal?, lessons?)` | `Promise<FieldDef[]>` | Suggests fields for a whole document, using what the lessons taught |
+| `labelAt(pdf, OPS, source, page, position)` / `nameAt(position, proposed, lines)` | `Promise<string>` / `string` | The name for a box at a spot: what auto-detect calls a box there, else the words on its left or above ('' = none). The editor names pasted fields with it ([Copy and paste](#copy-and-paste-fields)) |
 | `lessonFor(pdf, pages, session, { OPS })` | `Promise<Lesson \| null>` | What a save taught auto-detect (`null` = nothing). The editor does this for you ([Auto-detect that learns](#auto-detect-that-learns)) |
 | `addLesson(lessons, lesson, max?)` | `Lesson[]` | The lessons with `lesson` replacing the one with its `id`, keeping the newest `max` (default 1000) |
 | `learnt(lessons)` | `Learnt` | What the lessons taught, after what was forgotten: labels it changes or leaves out, fields it draws, pages it puts back, how many boxes taught it patterns |
@@ -1096,6 +1117,7 @@ Check the first row:
 | Long answers grow their box | – | A text, text-area or checklist answer that does not fit makes its box taller and moves what is below it down, on screen and in the completed PDF (before, it was cut off at the box's edge). |
 | Page breaks | – | When a grown page no longer fits, it breaks onto added pages of the same size, with a half-inch margin at the bottom of one and the top of the next, and never through a line of the answer. The filler shows the break live, as it will print. A completed PDF can now have more pages than the original. |
 | Repeatable table rows | – | New: fields with the same `repeat` form a table row people can add copies of ([Repeatable table rows](#repeatable-table-rows)). Forms without `repeat` work as before. |
+| Copy and paste fields | – | New in the editor: <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd>, the copy named after the PDF's text where it lands ([Copy and paste](#copy-and-paste-fields)). With `keyboard={false}` it is off, like the other shortcuts. |
 | Links on a grown page | – | A page of the completed PDF rebuilt for a long answer loses the original's links and file attachments on that page. Other pages keep them. |
 
 ### 0.5 → 0.6

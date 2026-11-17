@@ -1,7 +1,7 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { moveBy, resizeBy, snap, toPage } from '../../core/coords'
-import { detectDocument, lessonFor, type Ops } from '../../core/detect'
+import { fitInPage, moveBy, resizeBy, snap, toPage } from '../../core/coords'
+import { detectDocument, labelAt, lessonFor, type Ops } from '../../core/detect'
 import { duplicate, newField, newId, refreshed, reorder, withField, withoutField } from '../../core/fields'
 import { addLesson, forgetting, learnt, taughtBy, LEARNT, REMEMBERED, type Forget, type Lesson } from '../../core/learn'
 import { layerOpen } from '../ui/useOutsideClose'
@@ -229,6 +229,51 @@ export function useFormEditor({
       setSelection({ kind: 'element', id: copy.id })
     }
   }, [selectedField, selectedElement, fields, setFields, setElements])
+  // Copy / paste of a field (Ctrl+C, Ctrl+V): the copy lands where the pointer is and is named after what the PDF
+  // says there (labelAt: a table cell's "Row – Column", else the words on its left or above), with a key from that.
+  const clip = useRef<FieldDef | null>(null)
+  const pointer = useRef<{ page: number; x: number; y: number } | null>(null)
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      const el = (e.target as Element | null)?.closest?.('[data-page]')
+      if (!el) return void (pointer.current = null)
+      const r = el.getBoundingClientRect()
+      pointer.current = { page: Number(el.getAttribute('data-page')), x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }
+    }
+    window.addEventListener('pointermove', onMove)
+    return () => window.removeEventListener('pointermove', onMove)
+  }, [])
+  const copySelected = useCallback(() => {
+    if (selectedField) clip.current = selectedField
+  }, [selectedField])
+  const paste = useCallback(() => {
+    const src = clip.current
+    if (!src) return
+    const at = pointer.current
+    const base = duplicate(src, fields)
+    // Pasted elsewhere it starts on its own: not in the copied box's group or table row.
+    const f: FieldDef = {
+      ...base,
+      group: undefined,
+      repeat: undefined,
+      position: at ? fitInPage({ ...src.position, page: at.page, x: at.x, y: at.y }) : base.position,
+    }
+    setFields((l) => [...l, f])
+    setSelection({ kind: 'field', id: f.id })
+    const source = layout?.pages[f.position.page - 1]?.source
+    if (!pdf || !source) return
+    void loadPdfJs()
+      .then((lib) => labelAt(pdf, lib.OPS as unknown as Ops, source, f.position.page, f.position))
+      .then((label) => {
+        if (!label) return
+        // Part of the paste (no undo step of its own), unless the admin changed the field meanwhile.
+        setFields((l) => {
+          const cur = l.find((x) => x.id === f.id)
+          return cur && cur.label === f.label && cur.position === f.position ? withField(l, { ...cur, label }) : l
+        }, false)
+      })
+      .catch(() => {}) // unnamed: it keeps the copied label
+  }, [fields, layout, pdf, setFields])
   /** Moves the selection by a fraction of the page. */
   const nudge = useCallback(
     (dx: number, dy: number) => {
@@ -258,7 +303,11 @@ export function useFormEditor({
         e.preventDefault()
         history.redo()
       } else if (e.key === 'Escape' && armed) setArmed(null)
-      else if (!selection) return
+      else if (mod && e.key.toLowerCase() === 'v' && clip.current) {
+        e.preventDefault()
+        paste()
+      } else if (!selection) return
+      else if (mod && e.key.toLowerCase() === 'c' && selection.kind === 'field') copySelected()
       else if (e.key === 'Delete' || e.key === 'Backspace') removeSelected()
       else if (mod && e.key.toLowerCase() === 'd') {
         e.preventDefault()
@@ -275,7 +324,7 @@ export function useFormEditor({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [keyboard, preview, armed, selection, history, removeSelected, duplicateSelected, nudge])
+  }, [keyboard, preview, armed, selection, history, removeSelected, duplicateSelected, nudge, copySelected, paste])
 
   // Warn before leaving with unsaved changes.
   useEffect(() => {
@@ -548,6 +597,10 @@ export function useFormEditor({
     selectedElement,
     removeSelected,
     duplicateSelected,
+    /** Copies the selected field (Ctrl+C). */
+    copySelected,
+    /** Pastes the copied field where the pointer is, named after the PDF's text there (Ctrl+V). */
+    paste,
     nudge,
     startDrag,
     onDrag,
