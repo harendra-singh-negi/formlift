@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { detectDocument, lessonFor, type Ops } from '../detect'
 import { makeForm, type FormOptions, type Style } from '../fixtures/forms'
-import { benchmark, corrected, total, type Score } from '../fixtures/bench'
+import { benchmark, corrected, score, total, type Score } from '../fixtures/bench'
 import { forgetting, learnt, validateLesson, type Lesson } from '.'
 
 const forms = (n: number, from: number, words: 'train' | 'test', styles?: Style[]): FormOptions[] =>
@@ -56,6 +56,26 @@ describe('pattern learning on forms it has never seen', () => {
     expect(total(r.after).corrections).toBeLessThan(total(r.before).corrections * 0.5)
     expect(r.worse).toEqual({ dropped: 0, retyped: 0 })
   }, 60_000)
+
+  it('learns where admins draw fields that nothing was proposed for, and draws them under other questions', async () => {
+    // Questions answered in the blank space under them: nothing drawn there, so the admin draws every field.
+    const r = await benchmark(forms(3, 100, 'train', ['open', 'grid']), forms(4, 900, 'test', ['open', 'lines']))
+    const [before, after] = [total(r.before), total(r.after)]
+    if (report) {
+      console.log('Fields drawn by hand where nothing is drawn on the page, 3 forms set up, 4 never seen:')
+      r.learning.forEach((s, i) => console.log(`  form ${i + 1}: ${row(s)}  ${s.form}`))
+      console.log(`  without lessons: ${row(before)}`)
+      console.log(`  with lessons:    ${row(after)}`)
+    }
+    expect(r.lessons.some((l) => l.places?.length)).toBe(true)
+    expect(before.missed).toBeGreaterThanOrEqual(16)
+    expect(after.missed).toBeLessThanOrEqual(before.missed * 0.25)
+    expect(after.wrong).toBe(before.wrong)
+    expect(r.worse).toEqual({ dropped: 0, retyped: 0 })
+    // Forgotten with the patterns.
+    const form = await makeForm({ seed: 900, words: 'test', styles: ['open', 'lines'] })
+    expect(score(form, await detect(form.bytes, [...r.lessons, forgetting({ patterns: true }, 99)]))).toEqual(r.before[0])
+  }, 120_000)
 
   it('changes nothing in layouts it was not shown', async () => {
     const r = await benchmark(forms(4, 100, 'train', ['grid', 'lines']), forms(4, 900, 'test', ['yesNo', 'printed']))

@@ -5,7 +5,7 @@
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { detectDocument, lessonFor, type Ops } from '../detect'
 import { newId } from '../fields'
-import { OPTION_TYPES, type FieldDef } from '../form-logic'
+import { OPTION_TYPES, type FieldDef, type Layout } from '../form-logic'
 import { makeForm, type Form, type FormOptions, type TrueField } from './forms'
 import type { Lesson } from '../learn'
 
@@ -62,8 +62,9 @@ export function score(form: Form, found: FieldDef[]): Score {
     if (f && f.type !== t.type) types++
     if (t.group) rows.set(t.group, [...(rows.get(t.group) ?? []), f])
   })
-  for (const members of rows.values()) {
-    const ids = new Set(members.map((f) => f?.group?.mode === 'single' && f.group.id))
+  const modes = new Map(form.truth.flatMap((t) => (t.group ? [[t.group, t.groupMode ?? 'single'] as const] : [])))
+  for (const [g, members] of rows) {
+    const ids = new Set(members.map((f) => f?.group?.mode === modes.get(g) && f?.group?.id))
     // One group, all of them in it, and nothing else in it.
     const id = [...ids][0]
     const whole = ids.size === 1 && id && found.filter((f) => f.group?.id === id).length === members.length
@@ -90,7 +91,7 @@ export function corrected(form: Form, found: FieldDef[]): FieldDef[] {
   const group = (t: TrueField) => {
     if (!t.group) return undefined
     if (!groupIds.has(t.group)) groupIds.set(t.group, newId())
-    return { id: groupIds.get(t.group)!, mode: 'single' as const }
+    return { id: groupIds.get(t.group)!, mode: t.groupMode ?? ('single' as const) }
   }
   return form.truth.map((t, i): FieldDef => {
     const f = byTruth.get(i)
@@ -139,26 +140,57 @@ export function worse(form: Form, before: FieldDef[], after: FieldDef[]) {
   return { dropped, retyped }
 }
 
+const formOf = (o: FormOptions | Form) => ('bytes' in o ? o : makeForm(o))
+
+/**
+ * A real form with what the admin set up on it as its truth: `saved` is the form JSON the editor's onSave gives
+ * ({ fields, layout }, as the demo's step 3 shows it) or its fields. Questions asked in a dialog are not on the page.
+ * Throws for a layout that moves, removes or adds pages.
+ */
+export function savedForm(name: string, bytes: Uint8Array, saved: unknown): Form {
+  const doc = (Array.isArray(saved) ? { fields: saved, layout: null } : saved) as { fields?: FieldDef[]; layout?: Layout | null }
+  if (!Array.isArray(doc?.fields)) throw new Error(`${name}: no fields (the form JSON of the editor's onSave)`)
+  // ponytail: original pages in order only; map truth pages through layout.pages when someone needs other layouts.
+  if (doc.layout && !doc.layout.pages.every((p, i) => p.source === i + 1))
+    throw new Error(`${name}: its layout moves, removes or adds pages`)
+  const truth = doc.fields
+    .filter((f) => !f.dialogOnly)
+    .map(({ position: p, type, label, options, group, required }): TrueField => ({
+      page: p.page,
+      x: p.x,
+      y: p.y,
+      width: p.width,
+      height: p.height,
+      type,
+      label,
+      ...(options && { options }),
+      ...(group && { group: group.id, groupMode: group.mode }),
+      ...(required && { required }),
+    }))
+  return { name, bytes, truth }
+}
+
 /**
  * An admin sets up `train` forms one after another (each save a lesson), then `test` forms are scored without and
  * with what was learnt (`worse`: what learning made worse on them). The test forms are only scored, not saved.
+ * Forms are synthetic (FormOptions) or real ones with the fields an admin saved on them (Form).
  */
-export async function benchmark(train: FormOptions[], test: FormOptions[]) {
+export async function benchmark(train: (FormOptions | Form)[], test: (FormOptions | Form)[]) {
   const lessons: Lesson[] = []
   const learning: Score[] = []
   for (const [k, o] of train.entries()) {
-    const form = await makeForm(o)
+    const form = await formOf(o)
     const { found, score: s, pdf, pages } = await detectAndScore(form, lessons)
     learning.push(s)
     const session = { id: `s${k}`, before: [], suggested: found, saved: corrected(form, found) }
-    const lesson = await lessonFor(pdf as never, pages, session, { OPS: OPS as unknown as Ops, at: k + 1 })
+    const lesson = await lessonFor(pdf as never, pages, session, { OPS: OPS as unknown as Ops, at: k + 1, lessons })
     if (lesson) lessons.push(lesson)
   }
   const before: Score[] = []
   const after: Score[] = []
   const harm = { dropped: 0, retyped: 0 }
   for (const o of test) {
-    const form = await makeForm(o)
+    const form = await formOf(o)
     const [a, b] = [await detectAndScore(form, []), await detectAndScore(form, lessons)]
     before.push(a.score)
     after.push(b.score)

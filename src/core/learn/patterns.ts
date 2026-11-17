@@ -13,6 +13,7 @@ import { validateFields, type FieldDef, type FieldType, type Position } from '..
 import { cuesOf, type Candidate, type PageView } from './cues'
 import { MAX_EXAMPLES, type EditSession, type Example, type Suggestion } from './lesson'
 import { Counts, fit, logit, score, sigmoid, type Logistic, type Sample } from './model'
+import { atPlaces, placesFor, placesOf, type Place } from './places'
 import { shortHash } from './text'
 
 // How many consistent examples it takes: the L2 prior of the regression (see fit), and the odds that change a type,
@@ -71,9 +72,11 @@ const atPlace = (fields: FieldDef[], p: Position) => {
  * What a save teaches about boxes: on the pages the admin changed (`touched`, layout pages with their `views`),
  * every box auto-detect proposes there (kept, or deleted / left empty) and every field drawn where it proposes
  * nothing (`examples`, null when there is nothing to learn); and the fields in the place of a box it proposes
- * (`placed`: learnt from by their box, so not also by the line next to them).
+ * (`placed`: learnt from by their box, so not also by the line next to them). Fields drawn where nothing was proposed
+ * give `places` (places.ts): those and the places of lessons before (`earlier`) are tried next to every line of the
+ * pages, and the boxes there teach too, kept where the admin drew or kept one, not where they did not.
  */
-export function examplesOf(views: Map<number, PageView>, s: EditSession, touched: Set<number>) {
+export function examplesOf(views: Map<number, PageView>, s: EditSession, touched: Set<number>, earlier: Place[] = []) {
   // Every suggestion deleted, and many of them: the admin started again, which says nothing about each one.
   const restart = s.suggested.length >= 10 && s.suggested.every((f) => !s.saved.some((g) => g.id === f.id))
   const cues: string[] = []
@@ -96,19 +99,46 @@ export function examplesOf(views: Map<number, PageView>, s: EditSession, touched
     if (same) same.n = (same.n ?? 1) + 1
     else if (examples.size < MAX_EXAMPLES) examples.set(key, e)
   }
+  const pages = [...views].filter(([page]) => touched.has(page))
+  const savedOn = (page: number) => s.saved.filter((f) => f.position.page === page && !f.dialogOnly)
   const placed = new Set<FieldDef>()
-  for (const [page, view] of views) {
-    if (!touched.has(page)) continue
-    const saved = s.saved.filter((f) => f.position.page === page && !f.dialogOnly)
+  for (const [page, view] of pages) {
+    const saved = savedOn(page)
     for (const c of view.candidates) {
       const f = atPlace(saved, c.field.position)
       if (f) placed.add(f)
       else if (restart) continue
       add(cuesOf(c.field.position, c.kind, view, c.field.type), f, c.prior)
     }
-    for (const f of saved) if (!placed.has(f)) add(cuesOf(f.position, 'none', view), f)
   }
-  return { taught: examples.size ? { cues, examples: [...examples.values()] } : null, placed }
+  // Where the admin drew fields that nothing was proposed for.
+  const given = new Set([...s.before, ...s.suggested].map((f) => f.id))
+  const places: Place[] = []
+  for (const [page, view] of pages) {
+    const saved = savedOn(page).map((f) => ({ f, p: f.position }))
+    const drawn = saved.filter(({ f }) => !placed.has(f) && !given.has(f.id)).map(({ p }) => p)
+    places.push(...placesOf(view, drawn, saved.map(({ p }) => p)))
+  }
+  const tried = placesFor([earlier, places])
+  const atAPlace = new Set<FieldDef>()
+  for (const [page, view] of pages) {
+    const saved = savedOn(page)
+    const boxes = atPlaces(view, tried, page, [], view.candidates)
+    // The page as detection sees it with the boxes at places on it (they count each other, as in a row).
+    const seen = { ...view, candidates: [...view.candidates, ...boxes] }
+    for (const c of boxes) {
+      const f = atPlace(
+        saved.filter((g) => !placed.has(g) && !atAPlace.has(g)),
+        c.field.position,
+      )
+      if (f) atAPlace.add(f)
+      else if (restart) continue
+      add(cuesOf(c.field.position, c.kind, seen, c.field.type), f, c.prior)
+    }
+    for (const f of saved) if (!placed.has(f) && !atAPlace.has(f)) add(cuesOf(f.position, 'none', view), f)
+  }
+  const unique = [...new Map(places.map((p) => [JSON.stringify(p), p])).values()]
+  return { taught: examples.size ? { cues, examples: [...examples.values()] } : null, placed, places: unique }
 }
 
 /** What the examples of all lessons teach, ready for detection: null without examples. */

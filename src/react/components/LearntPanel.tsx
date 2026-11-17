@@ -61,6 +61,28 @@ export default function LearntPanel({ learnt, onForget }: { learnt: Learnt; onFo
         </div>
       )}
       {learnt.pages > 0 && <p className="m-0 px-3 py-2 text-muted">{L.learntPages(learnt.pages)}</p>}
+      {learnt.corrections.length > 0 && (
+        <div className="px-3 py-2">
+          <div className="text-muted">{L.learntCorrections}</div>
+          {/* One bar per save: the share of its fields auto-detect got wrong. Shorter and shorter: it is learning. */}
+          <div className="mt-1 flex h-10 items-end gap-0.5" role="img" aria-label={L.learntCorrections}>
+            {learnt.corrections.map((c) => (
+              <span
+                key={c.at}
+                className="min-w-1 flex-1 rounded-t-sm bg-primary"
+                style={{ height: `${Math.max(4, Math.min(100, (100 * c.corrections) / Math.max(1, c.fields)))}%` }}
+                title={L.learntCorrectionsOf(c.corrections, c.fields)}
+              />
+            ))}
+          </div>
+          <div className="mt-1 text-muted">
+            {learnt.corrections
+              .slice(-5)
+              .map((c) => L.learntCorrectionsOf(c.corrections, c.fields))
+              .join(' · ')}
+          </div>
+        </div>
+      )}
       {!nothing && (
         <div className="px-3 py-2">
           <Button variant="secondary" size="sm" onClick={() => setConfirm(true)}>

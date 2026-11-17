@@ -66,7 +66,7 @@ const bucket = (v: number, steps: number[]) => {
   return i
 }
 
-interface PtLine {
+export interface PtLine {
   text: string
   x0: number
   y0: number
@@ -79,8 +79,9 @@ interface Prepared {
   lineH: number
   em: number
 }
-const prepared = new WeakMap<PageView, Prepared>()
-function prepare(view: PageView): Prepared {
+const prepared = new WeakMap<object, Prepared>()
+/** A page's lines in points, and its typical line height and letter width (what sizes are told in). */
+export function prepare(view: Omit<PageView, 'candidates'>): Prepared {
   let p = prepared.get(view)
   if (p) return p
   const { width: W, height: H } = view

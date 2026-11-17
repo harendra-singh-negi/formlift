@@ -14,7 +14,9 @@ export type {
   Lesson,
   Mark,
   PageMemory,
+  Place,
   RememberedField,
+  Score,
   SettingsChange,
 } from './core/learn'
 export { toQuestions, choicesOf, pickedOf, isFilled } from './core/questions'

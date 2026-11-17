@@ -16,6 +16,7 @@ import {
   type Rule,
 } from '../form-logic'
 import { GRID } from './picture'
+import { okPlace, type Place } from './places'
 
 // What a lesson keeps of a field: its own settings, with their kinds (checked when a lesson comes in). Not its id or
 // key: those are new every time.
@@ -168,7 +169,24 @@ export interface Lesson {
   cues?: string[]
   /** What the admin did with the boxes on the pages they changed (see Example). */
   examples?: Example[]
+  /** Places of fields drawn by hand where auto-detect proposed nothing, next to a line (see places.ts). */
+  places?: Place[]
+  /** How many corrections the session's suggestions needed (see Score). */
+  score?: Score
   forget?: Forget
+}
+
+/**
+ * What a session did with auto-detect's suggestions: of `suggested`, how many were `deleted` and `changed` (type,
+ * label, required, options, grouping, or moved), and how many fields were `drawn` by hand; `fields` saved. Their sum
+ * is what auto-detect still got wrong, save after save: the editor's Learnt tab shows it.
+ */
+export interface Score {
+  fields: number
+  suggested: number
+  deleted: number
+  changed: number
+  drawn: number
 }
 
 /** One editing session: the fields it started with, the suggestions auto-detect added and the fields saved. */
@@ -345,6 +363,19 @@ export function validateLesson(lesson: unknown, limits?: Partial<Limits>): strin
         )))
   )
     errors.push('forget may only hold all, patterns (true), labels, drawn (hashes) and pages ([lesson id, index])')
+  if (l.places != null && !(Array.isArray(l.places) && l.places.length <= 1000 && l.places.every(okPlace)))
+    errors.push('places must be a list of at most 1000 places: [r or b, dx, dy, width, height, line shape]')
+  const sc = l.score as unknown as Record<string, unknown> | undefined
+  const SCORE = ['fields', 'suggested', 'deleted', 'changed', 'drawn']
+  if (
+    sc != null &&
+    !(
+      typeof sc === 'object' &&
+      Object.keys(sc).length === SCORE.length &&
+      SCORE.every((k) => Number.isInteger(sc[k]) && (sc[k] as number) >= 0 && (sc[k] as number) <= 10_000_000)
+    )
+  )
+    errors.push('score must hold fields, suggested, deleted, changed and drawn (counts)')
   const cues = l.cues
   if (cues != null && !(Array.isArray(cues) && cues.length <= MAX_CUES && cues.every((c) => typeof c === 'string' && CUE.test(c))))
     errors.push(`cues must be a list of at most ${MAX_CUES} cues`)

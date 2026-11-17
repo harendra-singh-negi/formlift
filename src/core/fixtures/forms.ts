@@ -14,8 +14,10 @@ import type { FieldType } from '../form-logic'
  * - lines:   "Label: ________" answer lines typed as text
  * - boxes:   a label over a light filled box without a border (web-style input boxes)
  * - bullets: instructions after hollow square bullets (small boxes that are not checkboxes)
+ * - open:    a question answered in the blank space under it: nothing drawn, so auto-detect proposes nothing there
+ *            and the admin draws the field (not in the default mix: STYLES)
  */
-export type Style = 'grid' | 'yesNo' | 'printed' | 'lines' | 'boxes' | 'bullets'
+export type Style = 'grid' | 'yesNo' | 'printed' | 'lines' | 'boxes' | 'bullets' | 'open'
 export const STYLES: Style[] = ['grid', 'yesNo', 'printed', 'lines', 'boxes', 'bullets']
 
 /** A field the admin wants on the form. */
@@ -31,6 +33,8 @@ export interface TrueField {
   options?: string[]
   /** Fields with the same group answer one question together (its Y / N / NA boxes). */
   group?: string
+  /** One answer (default) or any of them. */
+  groupMode?: 'single' | 'multiple'
   required?: boolean
 }
 
@@ -131,6 +135,20 @@ const ITEMS = [
   'Site visit completed',
   'Legal opinion obtained',
 ]
+const PROMPTS = [
+  'Describe the work carried out',
+  'Give details of the incident',
+  'Explain the cause of the delay',
+  'List the defects found',
+  'Summary of the findings',
+  'Actions taken on board',
+  'Reason for the change',
+  'Comments of the master',
+  'Recommendations of the inspector',
+  'Observations during the visit',
+  'Remarks of the surveyor',
+  'Corrective action proposed',
+]
 const CHOICES = ['Yes/No/NA', 'Yes/No', 'Y/N', 'Yes / No / N.A.']
 const INSTRUCTIONS = [
   'Read every question carefully and answer it in the space provided before you sign the form.',
@@ -173,6 +191,8 @@ export async function makeForm({ seed, styles, words = 'train', rows = 6, border
   }
   const named = shuffled(half(NAMED))
   const questions = shuffled(half(QUESTIONS))
+  // Not shuffled: the forms of the other layouts stay as they were (the seed's random numbers are not used up).
+  const prompts = half(PROMPTS).map((_, i, all) => all[(i + seed) % all.length])
   const items = shuffled(half(ITEMS))
   const notes = shuffled(INSTRUCTIONS)
   const take = <T,>(list: T[], i: number) => list[i % list.length]
@@ -341,6 +361,18 @@ export async function makeForm({ seed, styles, words = 'train', rows = 6, border
         page.drawRectangle({ x: margin, y: H - y - size * 0.15 - box, width: box, height: box, borderWidth: 0.7, borderColor: rgb(0, 0, 0) })
         lines.forEach((l, i) => text(l, margin + 16, y + i * size * 1.3))
         y += lines.length * size * 1.3 + 4
+      }
+    },
+    open(n) {
+      title(pick(['Description', 'Details of work', 'Report']))
+      for (let r = 0; r < Math.min(n, 4); r++) {
+        const prompt = take(prompts, r)
+        const h = rowH * (2 + Math.floor(rnd() * 2))
+        room(size * 1.6 + h + rowH)
+        text(`${prompt}:`, margin, y)
+        const top = y + size * 1.6
+        field({ type: 'textarea', label: prompt }, margin, top, W - 2 * margin, h)
+        y = top + h + rowH * 0.6
       }
     },
   }
