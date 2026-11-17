@@ -91,14 +91,17 @@ const HINTS: Record<Step, ReactNode> = {
   build: (
     <>
       <b>Step 1 · Build.</b> Fields were suggested automatically (dashed). Click one to edit it, drag new fields
-      from the left, try <b>Edit text</b> or <b>Preview</b>, then go to <b>Fill</b>. Auto-detect learns from what
-      you <b>Save</b>: press <b>Start over</b> and your changes come back.
+      from the left, try <b>Edit text</b> or <b>Preview</b>, then go to <b>Fill</b>. <b>Ctrl+C</b> a field and{' '}
+      <b>Ctrl+V</b> it on another spot: it is named after the text there. Give a table row's fields a{' '}
+      <b>Repeatable row</b> and people can add rows. Auto-detect learns from what you <b>Save</b>: press{' '}
+      <b>Start over</b> and your changes come back.
     </>
   ),
   fill: (
     <>
-      <b>Step 2 · Fill.</b> Answer on the page or switch to <b>List</b>. Answers autosave, <b>Submit</b> checks
-      the rules, <b>Completed PDF</b> downloads the PDF with your answers.
+      <b>Step 2 · Fill.</b> Answer on the page or switch to <b>List</b>. A long answer grows its box and moves the
+      page down; <b>+ Add row</b> adds a table row. Answers autosave, <b>Submit</b> checks the rules,{' '}
+      <b>Completed PDF</b> downloads the PDF with your answers.
     </>
   ),
   code: (
