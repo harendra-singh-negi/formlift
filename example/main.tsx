@@ -338,7 +338,14 @@ function Demo() {
           />
         )}
         {step === 'code' && startForm && (
-          <CodeView form={startForm} answers={answers ?? {}} comments={comments ?? {}} errors={errors} lessons={lessons} />
+          <CodeView
+            name={upload?.name ?? sample}
+            form={startForm}
+            answers={answers ?? {}}
+            comments={comments ?? {}}
+            errors={errors}
+            lessons={lessons}
+          />
         )}
       </main>
     </div>
@@ -346,12 +353,14 @@ function Demo() {
 }
 
 function CodeView({
+  name,
   form,
   answers,
   comments,
   errors,
   lessons,
 }: {
+  name: string
   form: FormDoc
   answers: Answers
   comments: Comments
@@ -359,6 +368,13 @@ function CodeView({
   lessons: Lesson[]
 }) {
   const json = (v: unknown) => JSON.stringify(v, null, 2)
+  // The form JSON as a file next to its PDF ("form.pdf" → "form.json"): what `npm run eval:real` scores against.
+  function download() {
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([json(form)], { type: 'application/json' }))
+    a.download = `${name.replace(/^.*\//, '').replace(/\.pdf$/i, '')}.json`
+    a.click()
+  }
   const usage = `import { FormEditor, FormFiller } from 'formlift/react'
 import { validateAnswers } from 'formlift'
 import 'formlift/style.css'
@@ -380,7 +396,10 @@ validateAnswers(form.fields, answers) // → ${json(errors).replace(/\n\s*/g, ' 
     <div className="code">
       <section className="card">
         <h3>
-          Form JSON <span>{form.fields.length} fields · FormEditor onSave</span>
+          Form JSON <span>{form.fields.length} fields · FormEditor onSave</span>{' '}
+          <button className="btn ghost" onClick={download}>
+            Download
+          </button>
         </h3>
         <pre>{json(form)}</pre>
       </section>

@@ -9,6 +9,9 @@ Test PDFs for `detect.fixtures.test.ts`, generated with pdf-lib so each one uses
 Add a file here (and a case in the test) when a real document shows a layout the detector gets wrong.
 
 `forms.ts` makes synthetic forms with pdf-lib, each with the fields an admin sets up on it: grids of labels, Y / N /
-NA checklists, answers printed in place of boxes, typed answer lines, filled input boxes and bullets, with words,
-sizes and borders picked by a seed. The learning tests and `npm run eval` use them to score auto-detect on forms it
-has never seen.
+NA checklists, answers printed in place of boxes, typed answer lines, filled input boxes, bullets and questions
+answered in blank space under them, with words, sizes and borders picked by a seed. The learning tests and
+`npm run eval` use them to score auto-detect on forms it has never seen (`bench.ts`).
+
+`real.test.ts` (`npm run eval:real`) scores real forms the same way, leaving one out at a time: a folder of PDFs,
+each next to the form JSON an admin saved on it, given by `FORMLIFT_CORPUS`. Never commit those files.

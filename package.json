@@ -107,6 +107,7 @@
     "dev": "npm run build && vite",
     "test": "vitest run",
     "eval": "vitest run src/core/learn/patterns.test.ts --silent=false",
+    "eval:real": "vitest run src/core/fixtures/real.test.ts --silent=false",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run typecheck && npm test",

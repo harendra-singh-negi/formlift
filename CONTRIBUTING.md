@@ -79,7 +79,11 @@ All three must pass, and CI runs them again on your PR.
   (generated with pdf-lib) and a case in `detect.fixtures.test.ts` for the layout you fixed.
 - **Measure learning changes.** `npm run eval` prints how many corrections forms auto-detect has never seen still
   need, without and with lessons, and what learning made worse. `src/core/learn/patterns.test.ts` fails when
-  learning stops carrying over or makes a right field wrong.
+  learning stops carrying over or makes a right field wrong. Synthetic forms only show so much: also run
+  `FORMLIFT_CORPUS=~/my-forms npm run eval:real` on a folder of real PDFs, each next to the form an admin set up on
+  it (`name.pdf` and `name.json`: the form JSON of `onSave`; the demo's step 3 has **Download**). Each form is
+  scored after the admin set up all the others: without lessons, with them, and with patterns only (what carries
+  over, without pages, labels and lines remembered). Keep that folder out of the repository.
 - **Keep the core dependency-free.** `src/core` must not import React, pdf.js or pdf-lib at runtime.
 - **Do not change the JSON shape** of `FieldDef`, `Layout` or `Answers` in a breaking way without an issue
   first, because stored forms depend on it.
