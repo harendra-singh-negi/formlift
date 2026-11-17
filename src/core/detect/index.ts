@@ -25,7 +25,7 @@ import {
 } from '../learn'
 import { ownFields } from './acroform'
 import { latent } from './candidates'
-import { PRINTED_CHOICES } from './labels'
+import { cleanLabel, PRINTED_CHOICES } from './labels'
 import { onDrawing, readDrawing, type PdfDoc, type PdfPage } from './page'
 import { detectFields, proposals } from './rules'
 import type { Ops, Seg, Shapes } from './shapes'
@@ -192,4 +192,44 @@ export async function detectDocument(
     onProgress?.(i + 1, pages.length)
   }
   return learned ? learned.link(found, from) : found
+}
+
+/**
+ * The label for a box placed at `at` on layout page `n` (PDF page `source`): what auto-detect would call a box
+ * there (a table cell: "Row – Column"), else the text on its left on the same line, else the text right above it.
+ * '' when nothing names it. The editor names a pasted field with it.
+ */
+export async function labelAt(pdf: PdfDoc, OPS: Ops, source: number, n: number, at: Position): Promise<string> {
+  const page = await pdf.getPage(source)
+  const read = await readDrawing(page, OPS)
+  const lines = toLines(read.typed.items, page.view, undefined, read.drawn.vlines)
+  const { found } = await proposed(page, read, lines, n, [], '')
+  return nameAt(at, found.map((c) => c.field), lines)
+}
+
+/** labelAt for a page already read: its proposed boxes and its text lines. */
+export function nameAt(at: Position, proposed: Pick<FieldDef, 'label' | 'position'>[], lines: TextLine[]): string {
+  const over = (a0: number, a1: number, b0: number, b1: number) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+  const area = Math.max(1e-9, at.width * at.height);
+  const best = proposed
+    .map((f) => {
+      const p = f.position;
+      return { f, share: (over(at.x, at.x + at.width, p.x, p.x + p.width) * over(at.y, at.y + at.height, p.y, p.y + p.height)) / area };
+    })
+    .filter((x) => x.share > 0.3 && x.f.label)
+    .sort((a, b) => b.share - a.share)[0];
+  if (best) return best.f.label;
+  // The nearest words on its left on the same line, then the nearest ones above it (within three lines).
+  const left = lines
+    .filter((l) => l.x + l.width <= at.x + 0.01 && over(l.y, l.y + l.height, at.y, at.y + at.height) > 0.4 * l.height)
+    .sort((a, b) => b.x + b.width - (a.x + a.width))[0];
+  const above = lines
+    .filter(
+      (l) =>
+        l.y + l.height <= at.y + 0.005 &&
+        at.y - (l.y + l.height) < 3 * l.height &&
+        over(l.x, l.x + l.width, at.x, at.x + at.width) > 0,
+    )
+    .sort((a, b) => b.y - a.y)[0];
+  return cleanLabel((left ?? above)?.text ?? '');
 }
