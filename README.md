@@ -90,7 +90,7 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 | 🔀 **Conditional logic** | `visibleWhen` / `requiredWhen` / `readOnlyWhen` with nested AND/OR groups and 10 operators. Circular rules are rejected. |
 | ☑️ **Groups, rows, follow-ups, comments** | Boxes that allow exactly one or several ticks, table rows people can add more of (**+ Add row**), follow-up dialogs ("No" → ask why), 💬 comments per field, and an `onFieldChange` hook for your own logic. [Guide](#guide-groups-follow-ups-comments-and-your-own-logic) |
 | ✅ **Validation** | Required, length, min/max, regex, email, phone, date and options. The **same code** runs in the browser and on your server. |
-| 📱 **Filler** | Fields stay pinned to the page at every zoom. The list view is the whole PDF reflowed for any screen (its text with bold, colours and highlights, its tables, its pictures) with the answers in place, plus search and filters. A long answer grows its box and pushes the rest of the page down; when that runs past the page, it breaks onto the next one right there as you type, with a margin above and below the break, exactly as it will print. **+ Add row** under a repeatable table row adds a copy of the row, and the page moves down for it. Includes autosave, signatures and file uploads. |
+| 📱 **Filler** | Fields stay pinned to the page at every zoom. The list view is the whole PDF reflowed for any screen (its text with bold, colours and highlights, its tables, its pictures) with the answers in place, plus search and filters. A long answer grows its box and pushes the rest of the page down; when that runs past the page, it breaks onto the next one right there as you type, with a margin above and below the break, exactly as it will print ([Long answers](#long-answers-grow-their-box)). Text fields wrap too once the answer is longer than the box. **+ Add row** under a repeatable table row adds a copy of the row, and the page moves down for it. Includes autosave, signatures and file uploads. |
 | 📄 **Completed PDF** | Answers, signature images and embedded attachments in a new PDF. A fillable original's own fields are printed as they look and removed, so no empty field covers an answer. A long answer is printed in full: its box grows, what is below moves down, onto added pages with a half-inch margin at each break and no line cut in two. Added table rows print as rows of the table. Runs in Node, Bun, Deno, workers or the browser. |
 | 🎨 **Isolated styling** | All CSS is scoped to `.fl-root` with no global reset, so it never clashes with your app (Tailwind included). Theme it with CSS variables. |
 | 🧩 **Headless core** | Zero-dependency core you can use with any framework, or with none |
@@ -348,6 +348,14 @@ else now). Paste as often as you like; one <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes o
 still duplicates right under the field with the same label. In your own UI: `labelAt(pdf, OPS, source, page,
 position)` gives the name for a spot (`nameAt(position, proposed, lines)` when you already read the page), and
 `useFormEditor` has `copySelected()` and `paste()`.
+
+### Long answers grow their box
+
+Nothing to set up. While filling, a text area, checklist or text field whose answer does not fit grows: the box gets
+taller (a text field wraps onto more lines) and everything below it on the page moves down, table lines included.
+When the page runs over, it continues on the next one with a half-inch margin above and below the break, and never
+through a line of the answer. The filler shows this live as you type, and `completedPdf` prints the same (the PDF
+can get more pages than the original). Short answers print exactly as before.
 
 ### Follow-up dialogs
 
