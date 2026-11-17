@@ -42,7 +42,8 @@ src/core/learn/       learning from the admin's saves: one module per kind of le
                       patterns), the lesson format and its check (lesson.ts), cues of a box (cues.ts), the small
                       models (model.ts); index.ts makes a lesson and applies them all
 src/core/fixtures/    PDFs and the synthetic form maker (forms.ts) for tests
-src/react/            FormEditor, FormFiller and their components; ui/ = small internal UI kit
+src/react/            FormEditor, FormFiller and their components; ui/ = small internal UI kit; editor/ = the
+                      FormEditor's parts (toolbar, tools, document, side panel) and the state they share
 src/server/           completedPdf (pdf-lib)
 src/style.css         Tailwind source, compiled and scoped to .fl-root by scripts/build-css.mjs
 example/              the live demo (deployed to GitHub Pages)
