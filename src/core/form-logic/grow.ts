@@ -3,6 +3,7 @@
 // Units are PDF points, measured from the page's top.
 import type { AnswerValue, FieldDef } from './model';
 import { answerText } from './values';
+import { rowCount } from './rows';
 
 /** Width of `text` at font `size` (points), Helvetica metrics: pdf-lib's font, or a canvas measuring Arial. */
 export type WidthOf = (text: string, size: number) => number;
@@ -101,8 +102,14 @@ export const lineGaps = (start: number, size: number, lines: number, end: number
  * A break moves up to the nearest `safe` point (lineGaps) so no line of text is cut in two.
  * ponytail: with no safe point in the lower 3/4 of the room, it cuts the original page's art where it falls.
  */
-export function pageSheets(height: number, cuts: Cut[], safe: number[] = [], margin = BREAK_MARGIN): Sheet[] {
-  const end = height + cuts.reduce((s, [, e]) => s + e, 0);
+export function pageSheets(
+  height: number,
+  cuts: Cut[],
+  safe: number[] = [],
+  margin = BREAK_MARGIN,
+  length = height,
+): Sheet[] {
+  const end = length + cuts.reduce((s, [, e]) => s + e, 0);
   const out: Sheet[] = [];
   let [from, at] = [0, 0];
   while (end - from > height - at + 1e-6) {
@@ -129,12 +136,46 @@ export function onSheets(d: number, sheets: Sheet[], height: number, gap = 0) {
 }
 
 /**
- * The grown page laid on its sheets: slices of the original page [from, to] (from its top), each drawn on sheet
- * `sheet`, `at` from its top, `height` tall (taller than the slice where it is stretched).
+ * Added table rows (expandRows): the row's band [at - tile, at] of the page copied `copies` times under it, the
+ * rest of the page moved down. The band is the row's fields plus ROW_PAD below (the row's bottom line), so the
+ * copies stack line under line.
+ * ponytail: a band runs over the row's fields only; a table row much taller than its fields copies part of it.
  */
-export function sheetPieces(height: number, cuts: Cut[], sheets: Sheet[]) {
+export type RowCut = { at: number; tile: number; copies: number };
+export const ROW_PAD = 2;
+
+/** The page with its added rows (from its top): [from, to] of the original page shown at `at`, same size. */
+function rowPieces(height: number, rows: RowCut[]) {
+  const out: { from: number; to: number; at: number }[] = [];
+  let [from, shift] = [0, 0];
+  for (const r of rows) {
+    out.push({ from, to: r.at, at: from + shift });
+    for (let j = 1; j <= r.copies; j++) out.push({ from: r.at - r.tile, to: r.at, at: r.at + shift + (j - 1) * r.tile });
+    shift += r.copies * r.tile;
+    from = r.at;
+  }
+  out.push({ from, to: height, at: from + shift });
+  return out.filter((p) => p.to > p.from);
+}
+
+/**
+ * The grown page laid on its sheets: slices of the original page [from, to] (from its top), each drawn on sheet
+ * `sheet`, `at` from its top, `height` tall (taller than the slice where it is stretched). `cuts` are on the page
+ * with its added `rows`.
+ */
+export function sheetPieces(height: number, cuts: Cut[], sheets: Sheet[], rows: RowCut[] = []) {
   const out: { from: number; to: number; sheet: number; at: number; height: number }[] = [];
-  for (const p of growPieces(height, cuts)) {
+  const base = rowPieces(height, rows);
+  const length = height + rows.reduce((s, r) => s + r.copies * r.tile, 0);
+  // Each piece of the grown page is a piece of the page with rows: back to the original page's slices.
+  const pieces = growPieces(length, cuts).flatMap((p) => {
+    const k = (p.to - p.from) / p.height;
+    return base.flatMap((b) => {
+      const [a, z] = [Math.max(p.from, b.at), Math.min(p.to, b.at + b.to - b.from)];
+      return z > a ? [{ from: b.from + a - b.at, to: b.from + z - b.at, at: p.at + (a - p.from) / k, height: (z - a) / k }] : [];
+    });
+  });
+  for (const p of pieces) {
     const k = (p.to - p.from) / p.height;
     sheets.forEach((s, sheet) => {
       const [a, z] = [Math.max(p.at, s.from), Math.min(p.at + p.height, s.to)];
@@ -144,7 +185,11 @@ export function sheetPieces(height: number, cuts: Cut[], sheets: Sheet[]) {
   return out;
 }
 
-/** The growing boxes of one page (`size` in points) for these answers, the page's cuts and its sheets. */
+/**
+ * One page (`size` in points) for these answers: its added rows, the growing boxes, the cuts they make (on the
+ * page with its rows), its sheets, and where things land before the cuts: `toRows(d)` for a point of the original
+ * page, `top(f)` for a field (a row copy sits `tile` under the row before it).
+ */
 export function pageGrowth(
   fields: FieldDef[],
   answers: Record<string, AnswerValue | undefined>,
@@ -153,24 +198,46 @@ export function pageGrowth(
   widthOf: WidthOf,
   shown: (f: FieldDef) => boolean = () => true,
 ) {
+  const { width, height } = size;
+  const here = fields.filter((f) => f.position.page === page && !f.dialogOnly && shown(f));
+  // Added rows: each row's band, from its first row's fields.
+  const rows: (RowCut & { id: string })[] = [];
+  for (const f of here) {
+    const id = f.repeat?.id;
+    if (!id || f.repeat!.row || rows.some((r) => r.id === id)) continue;
+    const copies = rowCount(fields, id, answers) - 1;
+    const row = here.filter((x) => x.repeat?.id === id && !x.repeat.row);
+    // From the fields' top (the row's top line stays the row above's) to just past the row's bottom line.
+    const top = Math.min(...row.map((x) => x.position.y)) * height;
+    const at = Math.max(...row.map((x) => x.position.y + x.position.height)) * height + ROW_PAD;
+    if (copies > 0) rows.push({ id, at, tile: at - top, copies });
+  }
+  rows.sort((a, b) => a.at - b.at);
+  const toRows = (d: number) => d + rows.reduce((s, r) => (r.at < d ? s + r.copies * r.tile : s), 0);
+  const tile = (id: string) => rows.find((r) => r.id === id)?.tile ?? 0;
+  const top = (f: FieldDef) => toRows(f.position.y * height) + ((f.repeat?.row ?? 1) - 1) * tile(f.repeat?.id ?? '');
+
   const boxes = new Map<string, ReturnType<typeof textFit>>();
   const ends: { bottom: number; extra: number }[] = [];
-  for (const f of fields) {
-    if (f.position.page !== page || f.dialogOnly || !GROWING_TYPES.includes(f.type) || !shown(f)) continue;
+  for (const f of here) {
+    if (!GROWING_TYPES.includes(f.type)) continue;
     const text = answerText(f, answers[f.key]);
     if (!text) continue;
-    const { width, height } = size;
     const fit = textFit(text, f.position.width * width, f.position.height * height, widthOf, f.type === 'text');
     boxes.set(f.key, fit);
-    ends.push({ bottom: (f.position.y + f.position.height) * height, extra: fit.extra });
+    ends.push({ bottom: top(f) + f.position.height * height, extra: fit.extra });
   }
   const cuts = pageCuts(ends);
   const safe: number[] = [];
-  for (const f of fields) {
+  for (const f of here) {
     const fit = boxes.get(f.key);
     if (!fit?.extra) continue;
-    const start = movedDown(f.position.y * size.height, cuts);
-    safe.push(...lineGaps(start, fit.size, fit.lines.length, start + f.position.height * size.height + fit.extra));
+    const start = movedDown(top(f), cuts);
+    safe.push(...lineGaps(start, fit.size, fit.lines.length, start + f.position.height * height + fit.extra));
   }
-  return { boxes, cuts, sheets: pageSheets(size.height, cuts, safe) };
+  // A page break between rows rather than through one.
+  for (const r of rows)
+    for (let j = -1; j <= r.copies; j++) safe.push(movedDown(toRows(r.at) + j * r.tile, cuts));
+  const length = toRows(height + 1e-9);
+  return { boxes, cuts, rows, top, toRows, sheets: pageSheets(height, cuts, safe, BREAK_MARGIN, length) };
 }

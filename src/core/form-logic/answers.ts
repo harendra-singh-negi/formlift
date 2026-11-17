@@ -6,6 +6,7 @@ import { groupsOf } from './groups';
 import { resolveLimits, type Limits } from './limits';
 import { BOOLEAN_TYPES, type Answers, type AnswerValue, type FieldDef, type FieldType } from './model';
 import { isEmpty, multiValue, rangeOf } from './values';
+import { expandRows, repeatIds, rowCount, rowsKey } from './rows';
 
 /** Messages people see for wrong answers. Override any of them (other language, own wording). */
 export interface AnswerMessages {
@@ -217,10 +218,11 @@ function builtinCheck(f: FieldDef, v: AnswerValue, options?: AnswerOptions): str
 
 /** Every problem with these answers, by field key. Empty = valid. Hidden fields are skipped. */
 export function validateAnswers(
-  fields: FieldDef[],
+  form: FieldDef[],
   answers: Answers,
   options?: AnswerOptions,
 ): Record<string, string> {
+  const fields = expandRows(form, answers); // added table rows too
   const states = fieldStates(fields, answers);
   const errors: Record<string, string> = {};
   for (const f of fields) {
@@ -246,9 +248,12 @@ export function validateAnswers(
 }
 
 /** Keeps only answers of known fields, with the value type each field takes. */
-export function cleanAnswers(fields: FieldDef[], answers: unknown): Answers {
+export function cleanAnswers(form: FieldDef[], answers: unknown): Answers {
   const input = (answers && typeof answers === 'object' ? answers : {}) as Record<string, unknown>;
   const out: Answers = {};
+  // How many rows each repeatable row has, then the answers of those rows too.
+  for (const id of repeatIds(form)) if (rowCount(form, id, input) > 1) out[rowsKey(id)] = String(rowCount(form, id, input));
+  const fields = expandRows(form, out);
   for (const f of fields) {
     const v = input[f.key];
     if (v == null) continue;

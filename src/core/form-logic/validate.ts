@@ -69,6 +69,12 @@ export function validateFields(fields: unknown, pageCount: number, limits?: Part
     if (f.min != null && f.max != null && f.min > f.max) errors.push(`${name}: min is greater than max`);
     if (f.minLength != null && f.maxLength != null && f.minLength > f.maxLength)
       errors.push(`${name}: min length is greater than max length`);
+    if (f.repeat != null) {
+      const r = f.repeat;
+      if (typeof r !== 'object' || typeof r.id !== 'string' || !r.id || r.row != null)
+        errors.push(`${name}: repeatable row needs an id`);
+      else if (r.max != null && !(Number.isInteger(r.max) && r.max >= 1)) errors.push(`${name}: most rows must be 1 or more`);
+    }
     if (f.group != null) {
       const g = f.group;
       if (!['checkbox', 'toggle'].includes(f.type)) errors.push(`${name}: only checkboxes and toggles can be grouped`);

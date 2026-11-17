@@ -1,6 +1,6 @@
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { sheetPieces, type Cut, type LayoutPage, type Sheet } from '../../core/form-logic'
+import { sheetPieces, type Cut, type LayoutPage, type RowCut, type Sheet } from '../../core/form-logic'
 import { toLines, type PdfTextItem, type TextLine } from '../../core/layout'
 import { loadPdfJs } from '../pdfjs'
 import { BASE_SCALE, PAGE_GAP } from '../constants'
@@ -52,7 +52,7 @@ export default function PdfPages({
   /** Where a page grows (long answers pushing what is below down) and the pages it then breaks into, PAGE_GAP
    * apart (core/form-logic/grow.ts); the overlay keeps the page's own size, so what it places moves itself
    * (FormFiller). */
-  grow?: (page: number) => { cuts: Cut[]; sheets: Sheet[] } | undefined
+  grow?: (page: number) => { cuts: Cut[]; sheets: Sheet[]; rows?: RowCut[] } | undefined
   /** Sizes (points) of the original pages and the open document, once the PDF is open. */
   onLoaded?: (sizes: PageSize[], pdf: PDFDocumentProxy) => void
   onError?: (err: unknown) => void
@@ -134,7 +134,7 @@ function PdfPage({
   zoom: number
   withText?: boolean
   overlay?: (page: number, lines: TextLine[] | undefined) => ReactNode
-  grow?: { cuts: Cut[]; sheets: Sheet[] }
+  grow?: { cuts: Cut[]; sheets: Sheet[]; rows?: RowCut[] }
 }) {
   const box = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -195,14 +195,14 @@ function PdfPage({
     const src = art.current
     const el = canvas.current
     if (!src || !el) return
-    const g = JSON.parse(growKey) as { cuts: Cut[]; sheets: Sheet[] } | null
+    const g = JSON.parse(growKey) as { cuts: Cut[]; sheets: Sheet[]; rows?: RowCut[] } | null
     const H = size.height
     const k = src.height / H // device px per point
     const step = (H + PAGE_GAP / (BASE_SCALE * zoom)) * k // one sheet and the gap under it
     el.width = src.width
     el.height = Math.round(step * ((g?.sheets.length ?? 1) - 1) + src.height)
     const ctx = el.getContext('2d')
-    for (const p of sheetPieces(H, g?.cuts ?? [], g?.sheets ?? [{ from: 0, to: H, at: 0 }]))
+    for (const p of sheetPieces(H, g?.cuts ?? [], g?.sheets ?? [{ from: 0, to: H, at: 0 }], g?.rows ?? []))
       ctx?.drawImage(src, 0, p.from * k, src.width, (p.to - p.from) * k, 0, p.sheet * step + p.at * k, src.width, p.height * k)
   }, [drawn, growKey, size.height, zoom])
 

@@ -1,4 +1,4 @@
-import { ArrowLeft, Download, ListPlus, MessageSquare, Paperclip, Save, Send } from 'lucide-react'
+import { ArrowLeft, Download, ListPlus, MessageSquare, Paperclip, Plus, Save, Send, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useLabels } from './labels'
 import { boxStyle } from '../core/coords'
@@ -188,7 +188,8 @@ export default function FormFiller({
   const shows = (p: FillerPart) => !hide.includes(p)
   const ff = useFormFiller(options)
   const L = useLabels(options.labels)
-  const { fields, readOnly = false, onSave } = options
+  const { readOnly = false, onSave } = options
+  const fields = ff.fields // with the table rows the person added
   const layout: Layout | null = options.layout ?? null
   const { answers, states, errors } = ff
   const pdfWidth = ff.pdfSizes.length ? Math.max(...ff.pdfSizes.map((p) => p.width)) : 595
@@ -239,6 +240,53 @@ export default function FormFiller({
       {badges(f)}
     </>
   )
+
+  // Repeatable table rows on a page: "+ Add row" under the last row, and an ✕ at the end of each added row.
+  function rowButtons(page: number, H: number, topOf: (f: FieldDef) => number, place: (d: number) => number, px: number) {
+    const out: ReactNode[] = []
+    const ids = [...new Set(fields.filter((f) => f.position.page === page && f.repeat && states[f.key]?.visible).map((f) => f.repeat!.id))]
+    for (const id of ids) {
+      const row = fields.filter((f) => f.repeat?.id === id && states[f.key]?.visible)
+      const first = row.filter((f) => !f.repeat!.row)
+      const left = Math.min(...first.map((f) => f.position.x)) * 100
+      const right = Math.max(...first.map((f) => f.position.x + f.position.width)) * 100
+      const n = Math.max(1, ...row.map((f) => f.repeat!.row ?? 1))
+      const max = first[0]?.repeat?.max
+      const bottomOf = (k: number) =>
+        Math.max(...row.filter((f) => (f.repeat!.row ?? 1) === k).map((f) => topOf(f) + f.position.height * H))
+      const pill =
+        'absolute z-10 flex items-center gap-0.5 rounded-full border border-primary/40 bg-white px-1.5 py-px text-[11px] text-primary shadow-sm hover:bg-primary-soft'
+      if (!max || n < max)
+        out.push(
+          <button
+            key={`add-${id}`}
+            type="button"
+            className={pill}
+            style={{ left: `${left}%`, top: place(bottomOf(n)) * px + 3 }}
+            onClick={() => ff.addRow(id)}
+          >
+            <Plus size={11} aria-hidden /> {L.addRow}
+          </button>,
+        )
+      for (let k = 2; k <= n; k++) {
+        const top = Math.min(...row.filter((f) => f.repeat!.row === k).map(topOf))
+        out.push(
+          <button
+            key={`remove-${id}-${k}`}
+            type="button"
+            aria-label={L.removeRow(k)}
+            title={L.removeRow(k)}
+            className={`${pill} !px-0.5 -translate-y-1/2`}
+            style={{ left: `calc(${right}% + 4px)`, top: place(top) * px + 6 }}
+            onClick={() => ff.removeRow(id, k)}
+          >
+            <X size={11} aria-hidden />
+          </button>,
+        )
+      }
+    }
+    return out
+  }
 
   // Next to a field: its follow-up (once open, to reopen it), its comments, your extras.
   function badges(f: FieldDef) {
@@ -411,13 +459,16 @@ export default function FormFiller({
               const H = pageSizes[page - 1]?.height ?? 842
               const g = growth[page - 1]
               const px = BASE_SCALE * zoom
-              // A point of the original page (from its top) on screen: moved down by answers above it, onto the
-              // next page (past its margins and the gap) where the grown page breaks.
-              const place = (d: number) => (g?.cuts.length ? onSheets(movedDown(d, g.cuts), g.sheets, H, PAGE_GAP / px) : d)
-              const down = (y: number) => {
-                const dy = (place(y * H) - y * H) * px
+              // A point of the page with its added rows (from its top) on screen: moved down by answers above it,
+              // onto the next page (past its margins and the gap) where the grown page breaks.
+              const grown = !!g && (g.cuts.length > 0 || g.rows.length > 0)
+              const place = (d: number) => (grown ? onSheets(movedDown(d, g.cuts), g.sheets, H, PAGE_GAP / px) : d)
+              const shift = (from: number, d: number) => {
+                const dy = (place(d) - from) * px
                 return dy ? { transform: `translateY(${dy}px)` } : {}
               }
+              const down = (y: number) => shift(y * H, g ? g.toRows(y * H) : y * H)
+              const topOf = (f: FieldDef) => (g ? g.top(f) : f.position.y * H)
               return [
                 // The admin's text / boxes / lines first, the answer controls on top.
                 ...(layout?.elements ?? [])
@@ -446,7 +497,7 @@ export default function FormFiller({
                             : { '--fl-lh': `${p.height * H * px - 2}px` } // one line, centred in its box
                           : {}
                     // Across a page break: a window on each page showing its part of the box.
-                    const start = g ? movedDown(p.y * H, g.cuts) : 0
+                    const start = g ? movedDown(topOf(f), g.cuts) : 0
                     const end = start + p.height * H + extra
                     const parts = extra
                       ? g!.sheets
@@ -474,12 +525,13 @@ export default function FormFiller({
                       <div
                         key={f.id}
                         className="absolute [container-type:size]"
-                        style={{ ...boxStyle(p), height: `${(p.height + extra / H) * 100}%`, ...down(p.y), ...print }}
+                        style={{ ...boxStyle(p), height: `${(p.height + extra / H) * 100}%`, ...shift(p.y * H, topOf(f)), ...print }}
                       >
                         {control(f)}
                       </div>
                     )
                   }),
+                ...(readOnly ? [] : rowButtons(page, H, topOf, place, px)),
               ]
             }}
           />

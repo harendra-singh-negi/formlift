@@ -3,6 +3,7 @@
 
 import type { Answers, Condition, FieldDef, Rule } from './model';
 import { isEmpty, str } from './values';
+import { expandRows } from './rows';
 
 export const isGroup = (r: Rule | Condition): r is Condition => 'rules' in r;
 
@@ -42,7 +43,8 @@ export function evaluate(cond: Condition | undefined, answers: Answers): boolean
 }
 
 /** What the conditions make of each field for these answers. A field hidden by its condition is never required. */
-export function fieldStates(fields: FieldDef[], answers: Answers) {
+export function fieldStates(form: FieldDef[], answers: Answers) {
+  const fields = expandRows(form, answers); // added table rows too
   const states: Record<string, { visible: boolean; required: boolean; readOnly: boolean }> = {};
   // A follow-up's fields count only while it is open: its field shows (itself asked, when it is a follow-up's
   // question too) and its condition holds.

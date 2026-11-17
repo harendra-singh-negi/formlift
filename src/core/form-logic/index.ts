@@ -9,6 +9,7 @@
 //   comments.ts    comments on fields
 //   validate.ts    checking a form's fields before it is saved
 //   layout.ts      pages shown and what the admin drew on them
+//   rows.ts        repeatable table rows: the copies people add (expandRows)
 //   grow.ts        long text answers growing their box, pushing the page down (screen and PDF)
 
 export {
@@ -29,6 +30,7 @@ export {
   type Comments,
   type AnswerValue,
   type Answers,
+  type RepeatRow,
 } from './model';
 export {
   DEFAULT_LIMITS,
@@ -94,6 +96,15 @@ export {
   lineGaps,
   BREAK_MARGIN,
   type Cut,
+  type RowCut,
+  ROW_PAD,
   type Sheet,
   type WidthOf,
 } from './grow';
+export {
+  rowsKey,
+  rowCount,
+  expandRows,
+  removeRow,
+  repeatIds,
+} from './rows';

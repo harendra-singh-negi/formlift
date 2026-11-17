@@ -330,6 +330,8 @@ export default function FieldProperties({
         <GroupSection field={field} fields={fields} onFieldsChange={onFieldsChange} />
       )}
 
+      {onFieldsChange && !field.dialogOnly && <RowSection field={field} fields={fields} onFieldsChange={onFieldsChange} />}
+
       {onFieldsChange && !field.dialogOnly && (
         <Section title={L.followUpSection}>
           <p className="m-0 text-[12px] text-muted">{L.followUpHint}</p>
@@ -457,6 +459,69 @@ export default function FieldProperties({
         </div>
       </Section>
     </div>
+  )
+}
+
+/** A field's repeatable table row: join or leave one, and its most rows (written to every field of the row). */
+function RowSection({
+  field,
+  fields,
+  onFieldsChange,
+}: {
+  field: FieldDef
+  fields: FieldDef[]
+  onFieldsChange: (update: (fields: FieldDef[]) => FieldDef[]) => void
+}) {
+  const L = useLabels()
+  const ids = [...new Set(fields.map((f) => f.repeat?.id).filter((x): x is string => !!x))]
+  const r = field.repeat
+  const members = r ? fields.filter((f) => f.repeat?.id === r.id) : []
+  const join = (id: string) =>
+    onFieldsChange((l) => {
+      const settings = l.find((f) => f.repeat?.id === id)?.repeat ?? { id }
+      return l.map((f) => (f.id === field.id ? { ...f, repeat: id ? settings : undefined } : f))
+    })
+  return (
+    <Section title={L.rowSection}>
+      <Select
+        className="w-full"
+        aria-label={L.rowSection}
+        value={r?.id ?? ''}
+        onChange={(e) => {
+          if (e.target.value !== '\u0000new') return join(e.target.value)
+          let n = 1
+          while (ids.includes(`row_${n}`)) n++
+          join(`row_${n}`)
+        }}
+      >
+        <option value="">{L.rowNone}</option>
+        {ids.map((id) => (
+          <option key={id} value={id}>
+            {id}
+          </option>
+        ))}
+        <option value={'\u0000new'}>{L.rowNew}</option>
+      </Select>
+      {r ? (
+        <>
+          <p className="m-0 text-[12px] text-muted">{L.rowMembers(members.length)}</p>
+          <FormField label={L.rowMax}>
+            <TextInput
+              type="number"
+              min={1}
+              value={r.max ?? ''}
+              onChange={(e) => {
+                const max = num(e.target.value)
+                const next = { id: r.id, ...(max && max >= 1 ? { max: Math.floor(max) } : {}) }
+                onFieldsChange((l) => l.map((f) => (f.repeat?.id === r.id ? { ...f, repeat: next } : f)))
+              }}
+            />
+          </FormField>
+        </>
+      ) : (
+        <p className="m-0 text-[12px] text-muted">{L.rowHelp}</p>
+      )}
+    </Section>
   )
 }
 
