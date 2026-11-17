@@ -30,17 +30,22 @@ npm run dev
 ## Project layout
 
 ```
-src/core/          framework-free logic: form model (form-logic.ts), fields, layout, list view (flow.ts), questions
-src/core/detect/   auto-detect: what a page draws (shapes, tables), the rules that suggest fields (rules.ts), a
-                   PDF's own fields (acroform.ts), boxes only learning suggests (candidates.ts); index.ts runs it all
-src/core/learn/    learning from the admin's saves: one module per kind of learning (pages, labels, drawn,
-                   patterns), the lesson format and its check (lesson.ts), cues of a box (cues.ts), the small
-                   models (model.ts); index.ts makes a lesson and applies them all
-src/core/fixtures/ PDFs and the synthetic form maker (forms.ts) for tests
-src/react/         FormEditor, FormFiller and their components; ui/ = small internal UI kit
-src/server/        completedPdf (pdf-lib)
-src/style.css      Tailwind source, compiled and scoped to .fl-root by scripts/build-css.mjs
-example/           the live demo (deployed to GitHub Pages)
+src/core/             framework-free logic: field and layout editing (fields.ts, layout.ts, coords.ts), filters
+src/core/form-logic/  the form model and its checks: fields, conditions, groups, answers, comments, layout. No
+                      imports from outside it, so the same checks run in the browser and on your server
+src/core/questions/   the form as questions for the list view: grouping, titles, sections, scales
+src/core/flow/        the document reflowed for the list view: reading a page, paragraphs, tables, segments
+src/core/detect/      auto-detect: what a page draws (shapes, tables), the rules that suggest fields (rules.ts), a
+                      PDF's own fields (acroform.ts), boxes only learning suggests (candidates.ts); index.ts runs it
+                      all
+src/core/learn/       learning from the admin's saves: one module per kind of learning (pages, labels, drawn,
+                      patterns), the lesson format and its check (lesson.ts), cues of a box (cues.ts), the small
+                      models (model.ts); index.ts makes a lesson and applies them all
+src/core/fixtures/    PDFs and the synthetic form maker (forms.ts) for tests
+src/react/            FormEditor, FormFiller and their components; ui/ = small internal UI kit
+src/server/           completedPdf (pdf-lib)
+src/style.css         Tailwind source, compiled and scoped to .fl-root by scripts/build-css.mjs
+example/              the live demo (deployed to GitHub Pages)
 ```
 
 Each module starts with a few lines on what it does and how it fits in. Read them before you change one.
