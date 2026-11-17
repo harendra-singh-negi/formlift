@@ -113,6 +113,21 @@ export interface FieldDef {
   dialogOnly?: boolean;
   /** People can leave comments on this field (a 💬 next to it). Stored apart from the answers: see Comments. */
   comments?: boolean;
+  /**
+   * A field of a repeatable table row: every field of the row carries the same `id`, and the person can add copies
+   * of the row under it ("+ Add row"), up to `max` rows. Copy k (2, 3…) of a field has the key `<key>__<k>`; how
+   * many rows there are is the answer `<id>__rows` (see expandRows). `row`: set on the copies only.
+   */
+  repeat?: RepeatRow;
+}
+
+export interface RepeatRow {
+  /** Same id on every field of the row. */
+  id: string;
+  /** Most rows (the first included). Default: no limit. */
+  max?: number;
+  /** On a copy: which row it is (2, 3…). */
+  row?: number;
 }
 
 export interface FieldGroup {

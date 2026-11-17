@@ -2,6 +2,10 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyAnswer,
+  expandRows,
+  removeRow,
+  rowCount,
+  rowsKey,
   openedFollowUps,
   type Comments,
   type FieldComment,
@@ -125,7 +129,7 @@ function download(blob: Blob, name: string) {
  * plain list of `questions`) and call `change`, `save`, `submit`.
  */
 export function useFormFiller({
-  fields,
+  fields: form,
   layout = null,
   initialAnswers,
   files: initialFiles = [],
@@ -150,7 +154,9 @@ export function useFormFiller({
   labels,
 }: UseFormFillerOptions) {
   const L = useLabels(labels)
-  const [answers, setAnswers] = useState<Answers>(() => initialAnswers ?? defaultAnswers(fields))
+  const [answers, setAnswers] = useState<Answers>(() => initialAnswers ?? defaultAnswers(form))
+  // The form's fields with the table rows the person added (expandRows).
+  const fields = useMemo(() => expandRows(form, answers), [form, answers])
   const [files, setFiles] = useState<AnswerFileInfo[]>(initialFiles)
   // Stored signature images (file id → object URL).
   const [signatures, setSignatures] = useState<Record<string, string>>({})
@@ -314,6 +320,12 @@ export function useFormFiller({
     return () => clearTimeout(t)
   }, [answers, readOnly, autosave, onSave, saveState, save])
 
+  function setAll(next: Answers) {
+    latest.current = next
+    setAnswers(next)
+    setSaveState('dirty')
+  }
+
   // Sets one answer: a 'single' group unticks its other boxes; shown errors of the field / its group are re-checked.
   function put(f: FieldDef, v: AnswerValue) {
     const before = latest.current
@@ -433,7 +445,23 @@ export function useFormFiller({
     setErrors,
     /** Fields with an error, in form order. */
     errorList: fields.filter((f) => errors[f.key]),
+    /** The fields with the table rows the person added (copies keyed `<key>__<k>`). */
+    fields,
     change,
+    /** Adds a row under the repeatable row `id` (up to its max). */
+    addRow: (id: string) => {
+      if (readOnly) return
+      const n = rowCount(form, id, latest.current)
+      const max = form.find((f) => f.repeat?.id === id)?.repeat?.max
+      if (max && n >= max) return
+      setAll({ ...latest.current, [rowsKey(id)]: String(n + 1) })
+    },
+    /** Takes out row `k` (2, 3…) of the repeatable row `id`; the rows under it move up. */
+    removeRow: (id: string, k: number) => {
+      if (readOnly) return
+      setAll(removeRow(form, latest.current, id, k))
+      setErrors({})
+    },
     /** The open dialog of more questions, or null. */
     dialog,
     closeDialog: () => setDialog(null),

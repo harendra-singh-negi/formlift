@@ -88,10 +88,10 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 | 🧱 **Builder** | 20 field types (text, date & time, currency, multi-select, checklist, rating, slider, toggle, signature, file…), drag/resize/snap-to-grid, undo/redo, keyboard shortcuts, fill order, page reorder/insert/delete |
 | ✏️ **Layout editing** | Add text, boxes and lines, or click any line of the original text to replace it, all without touching the file |
 | 🔀 **Conditional logic** | `visibleWhen` / `requiredWhen` / `readOnlyWhen` with nested AND/OR groups and 10 operators. Circular rules are rejected. |
-| ☑️ **Groups, follow-ups, comments** | Boxes that allow exactly one or several ticks, follow-up dialogs ("No" → ask why), 💬 comments per field, and an `onFieldChange` hook for your own logic. [Guide](#guide-groups-follow-ups-comments-and-your-own-logic) |
+| ☑️ **Groups, rows, follow-ups, comments** | Boxes that allow exactly one or several ticks, table rows people can add more of (**+ Add row**), follow-up dialogs ("No" → ask why), 💬 comments per field, and an `onFieldChange` hook for your own logic. [Guide](#guide-groups-follow-ups-comments-and-your-own-logic) |
 | ✅ **Validation** | Required, length, min/max, regex, email, phone, date and options. The **same code** runs in the browser and on your server. |
-| 📱 **Filler** | Fields stay pinned to the page at every zoom. The list view is the whole PDF reflowed for any screen (its text with bold, colours and highlights, its tables, its pictures) with the answers in place, plus search and filters. A long answer grows its box and pushes the rest of the page down; when that runs past the page, it breaks onto the next one right there as you type, with a margin above and below the break, exactly as it will print. Includes autosave, signatures and file uploads. |
-| 📄 **Completed PDF** | Answers, signature images and embedded attachments in a new PDF. A fillable original's own fields are printed as they look and removed, so no empty field covers an answer. A long answer is printed in full: its box grows, what is below moves down, onto added pages with a half-inch margin at each break and no line cut in two. Runs in Node, Bun, Deno, workers or the browser. |
+| 📱 **Filler** | Fields stay pinned to the page at every zoom. The list view is the whole PDF reflowed for any screen (its text with bold, colours and highlights, its tables, its pictures) with the answers in place, plus search and filters. A long answer grows its box and pushes the rest of the page down; when that runs past the page, it breaks onto the next one right there as you type, with a margin above and below the break, exactly as it will print. **+ Add row** under a repeatable table row adds a copy of the row, and the page moves down for it. Includes autosave, signatures and file uploads. |
+| 📄 **Completed PDF** | Answers, signature images and embedded attachments in a new PDF. A fillable original's own fields are printed as they look and removed, so no empty field covers an answer. A long answer is printed in full: its box grows, what is below moves down, onto added pages with a half-inch margin at each break and no line cut in two. Added table rows print as rows of the table. Runs in Node, Bun, Deno, workers or the browser. |
 | 🎨 **Isolated styling** | All CSS is scoped to `.fl-root` with no global reset, so it never clashes with your app (Tailwind included). Theme it with CSS variables. |
 | 🧩 **Headless core** | Zero-dependency core you can use with any framework, or with none |
 | 🟦 **TypeScript** | Written in TypeScript. Ships ESM, CommonJS and full type definitions. |
@@ -270,12 +270,13 @@ Options are the same as the `<FormEditor>` / `<FormFiller>` props below, except 
 
 ## Guide: groups, follow-ups, comments and your own logic
 
-Four tools, from no code to full control. Pick the first one that does the job:
+From no code to full control. Pick the first one that does the job:
 
 | You want… | Use | Code needed |
 | --- | --- | --- |
 | Separate boxes where only one (or 2–3, or all) may be ticked | [Groups of boxes](#groups-of-boxes) | none: set in the editor |
 | More fields on the page when an answer is given | [`visibleWhen`](#data-model) | none: Conditions in the editor |
+| A table where people add as many rows as they need | [Repeatable table rows](#repeatable-table-rows) | none: set in the editor |
 | A dialog asking more questions ("No" → why, by when) | [Follow-up dialogs](#follow-up-dialogs) | none: set in the editor |
 | A 💬 per field where people leave remarks | [Comments](#comments) | store `info.comments` |
 | Anything else: fill other fields, call your API, your own dialog | [`onFieldChange`](#your-own-logic-onfieldchange) | a function |
@@ -306,6 +307,29 @@ A PDF often has "☐ Yes ☐ No ☐ N/A" as separate boxes. Put them in a group:
 The error shows at the group's first visible box. Members hidden by a condition don't count. Answers stay one boolean
 per box. Groups work for `checkbox` and `toggle`. (`radio` is one-of-many already; `checklist` / `multiselect` have
 `min` / `max` built in.) Your own UI applies the rule with `applyAnswer(fields, answers, field, value)`.
+
+### Repeatable table rows
+
+A table with "add as many rows as you need": the person clicks **+ Add row** under the row and gets a copy of it
+(its lines and fields), and the rest of the page moves down, on screen and in the completed PDF.
+
+- **Editor:** select each field of one table row → *Repeatable row* → **New repeatable row…** for the first, then the
+  same row for the others. *Most rows* caps it (empty = no limit).
+- **JSON:** every field of the row carries the same `repeat`:
+
+```ts
+{ key: 'task', type: 'text', repeat: { id: 'tasks', max: 10 }, /* … */ }
+{ key: 'due',  type: 'date', repeat: { id: 'tasks', max: 10 }, /* … */ }
+```
+
+Row 2, 3… of a field are the answers `task__2`, `task__3`…, and how many rows there are is the answer
+`tasks__rows` (`'3'`; missing = 1). Every row is checked like the first (a required field is required in every row),
+and `validateAnswers`, `cleanAnswers`, `fieldStates` and `completedPdf` take the form's own fields: they add the
+rows the answers ask for themselves (`expandRows(fields, answers)` gives you that list). An ✕ next to an added row
+takes it out and moves the rows under it up (`removeRow(fields, answers, id, k)`).
+
+The copied band is the row's fields plus 2 points under them (the row's bottom line), across the whole page width, so
+whatever else is in that band (an item name in the first column) is copied too.
 
 ### Follow-up dialogs
 
@@ -797,7 +821,7 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 | Hook | Gives |
 | --- | --- |
 | `useFormEditor(options)` | Everything `FormEditor` does, without UI: document, undo/redo, selection, drag/resize, pages, detect, what auto-detect learnt (`learnt`, `forget`), save |
-| `useFormFiller(options)` | Everything `FormFiller` does, without UI: answers, conditions, validation, autosave, uploads, questions |
+| `useFormFiller(options)` | Everything `FormFiller` does, without UI: answers, conditions, validation, autosave, uploads, questions, added table rows (`fields` with the rows, `addRow(id)`, `removeRow(id, k)`) |
 | `useQuestionFilter(questions, answers, options)` | Search and filters as data: `groups`, `inUse`, `list` |
 
 ### Core functions (`formlift`)
@@ -819,7 +843,8 @@ uploads are embedded as PDF attachments. Follow-up answers and comments go on pa
 | `answerText(field, value)` | `string` | An answer as people read it ("Fire, Flood", "$12.50", "Yes") |
 | `withoutField(fields, id)` / `newFollowUpField(type, trigger, fields)` | `FieldDef[]` | Remove a field (with its follow-up questions) / add a follow-up question |
 | `defaultLayout(pageSizes)` | `Layout` | The layout of an untouched document |
-| `pageGrowth(fields, answers, page, size, widthOf, shown?)` | `{ boxes, cuts, sheets }` | How long answers grow one page: each growing box's lines and extra height, where the page is cut open, and the pages (`sheets`) it then breaks into. `FormFiller` and `completedPdf` both use it; `widthOf(text, size)` measures text in points (Helvetica) |
+| `expandRows(fields, answers)` / `removeRow(fields, answers, id, k)` | `FieldDef[]` / `Answers` | The fields with the table rows the person added ([Repeatable table rows](#repeatable-table-rows)) / the answers with row `k` taken out |
+| `pageGrowth(fields, answers, page, size, widthOf, shown?)` | `{ boxes, cuts, rows, sheets, top }` | How long answers grow one page: each growing box's lines and extra height, where the page is cut open, and the pages (`sheets`) it then breaks into. `FormFiller` and `completedPdf` both use it; `widthOf(text, size)` measures text in points (Helvetica) |
 | `detectDocument(pdf, OPS, pages, existing, onProgress?, signal?, lessons?)` | `Promise<FieldDef[]>` | Suggests fields for a whole document, using what the lessons taught |
 | `lessonFor(pdf, pages, session, { OPS })` | `Promise<Lesson \| null>` | What a save taught auto-detect (`null` = nothing). The editor does this for you ([Auto-detect that learns](#auto-detect-that-learns)) |
 | `addLesson(lessons, lesson, max?)` | `Lesson[]` | The lessons with `lesson` replacing the one with its `id`, keeping the newest `max` (default 1000) |
@@ -956,6 +981,7 @@ interface FieldDef {
   followUp?: { when: Condition; title?: string; fields: string[] } // keys of dialogOnly fields
   dialogOnly?: boolean // asked in a dialog, no box on the page
   comments?: boolean // people can comment on it
+  repeat?: { id: string; max?: number } // a field of a repeatable table row (same id on the whole row)
 }
 
 type Comments = Record<string, { id: string; text: string; by?: string; at: string }[]> // by field key
@@ -979,6 +1005,7 @@ type Answers = Record<string, string | boolean | null>
 //   (read it with multiValue(v), write it with multiAnswer([...]); "contains" conditions match an option)
 // time → 'HH:MM' · datetime → 'YYYY-MM-DDTHH:MM' · rating / slider / currency → the number as text
 // everything else → string. answerText(field, value) gives any answer as people read it ("Fire, Flood", "$12.50").
+// Added table rows: row k of a field is the answer '<key>__<k>', the number of rows is '<repeat id>__rows' ('3').
 ```
 
 Positions are stored as page fractions, so a field never moves when the zoom or screen size changes.
@@ -1068,6 +1095,7 @@ Check the first row:
 | Text fields are a `<textarea>` | tests, scripts or CSS that select a text field's `<input>` | Select `textarea` instead. It still looks like one line and Enter does nothing; it wraps only once the answer is longer than the box. |
 | Long answers grow their box | – | A text, text-area or checklist answer that does not fit makes its box taller and moves what is below it down, on screen and in the completed PDF (before, it was cut off at the box's edge). |
 | Page breaks | – | When a grown page no longer fits, it breaks onto added pages of the same size, with a half-inch margin at the bottom of one and the top of the next, and never through a line of the answer. The filler shows the break live, as it will print. A completed PDF can now have more pages than the original. |
+| Repeatable table rows | – | New: fields with the same `repeat` form a table row people can add copies of ([Repeatable table rows](#repeatable-table-rows)). Forms without `repeat` work as before. |
 | Links on a grown page | – | A page of the completed PDF rebuilt for a long answer loses the original's links and file attachments on that page. Other pages keep them. |
 
 ### 0.5 → 0.6
