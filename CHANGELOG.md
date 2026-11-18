@@ -3,6 +3,24 @@
 Written automatically by [release-please](https://github.com/googleapis/release-please) from the
 commit messages. The project uses [Semantic Versioning](https://semver.org/).
 
+## [0.7.0](https://github.com/harendra-singh-negi/formlift/compare/v0.6.0...v0.7.0) (2026-11-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* **fill:** a text field is now a <textarea> that looks like one line (Enter does nothing) and wraps once the answer is longer. Tests, scripts or CSS that select its <input> should select textarea instead.
+
+### Features
+
+* **editor:** copy a field and paste it where it is named after the PDF's text ([dfaf059](https://github.com/harendra-singh-negi/formlift/commit/dfaf059c0ec153292eff3b023e63542fcc749ea3))
+* **fill:** long answers grow their box and break onto the next page ([774a845](https://github.com/harendra-singh-negi/formlift/commit/774a8455e15abaad637ff17745b9a7a0e0a8d3b3))
+* **fill:** repeatable table rows people add with "+ Add row" ([8b0b73e](https://github.com/harendra-singh-negi/formlift/commit/8b0b73e8e7407a5bf3b6078b2b5c6eba92da45dc))
+
+
+### Documentation
+
+* long answers guide, and the demo's hints name the new features ([eac5441](https://github.com/harendra-singh-negi/formlift/commit/eac54412e85738bb9d3a71d68831e662006b0885))
+
 ## [0.6.0](https://github.com/harendra-singh-negi/formlift/compare/v0.5.0...v0.6.0) (2026-11-17)
 
 
