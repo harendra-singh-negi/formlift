@@ -1173,7 +1173,7 @@ const fields = await detectDocument(pdf, OPS as unknown as Ops, pages, [])
 What changed for your code, per release. The full list of changes is in the
 [CHANGELOG](./CHANGELOG.md).
 
-### 0.6 → next
+### 0.6 → 0.7
 
 Check the first row:
 
@@ -1472,6 +1472,8 @@ your editor for the full list.
 - pdf.js runs with `isEvalSupported: false`, so code embedded in a document is never compiled.
 - Patterns in fields (`pattern`) are compiled safely. An invalid regex is rejected, never thrown.
 - formlift never uploads anything on its own. All network traffic goes through your callbacks.
+
+Found a vulnerability? Report it privately as described in [SECURITY.md](./SECURITY.md), not in a public issue.
 
 ## Limitations
 
