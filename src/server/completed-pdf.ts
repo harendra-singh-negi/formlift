@@ -38,6 +38,12 @@ export interface CompletedPdfOptions {
    * room a growing answer makes is then not made from the text beside it. Without it that text may look smeared.
    */
   textLines?: Record<number, { y: number; height: number }[]>;
+  /**
+   * Where your app serves a file (an absolute https URL): its cell in the PDF then links there, so one click opens
+   * or downloads it in any viewer. Without it, a file is opened from the PDF itself (a double click in Firefox /
+   * Acrobat; Chrome's viewer cannot). The file is inside the PDF either way.
+   */
+  fileUrl?: (id: string, file: AnswerFile) => string | undefined;
 }
 
 const APPENDIX_TEXT = {
@@ -312,11 +318,12 @@ export interface AnswerFile {
 type Embedded = [name: string, spec: PDFRef];
 
 /**
- * An uploaded file inside the PDF under its original name: listed in the viewer's attachments panel, and a click
- * on the field's box opens / saves it (a FileAttachment annotation with an empty look, so the file name drawn in
- * the box shows). Acrobat, Firefox and most desktop readers support this; Chrome's built-in viewer does not.
+ * An uploaded file inside the PDF under its original name, listed in the viewer's attachments panel. Its cell:
+ * with `url`, a link there (one click opens / downloads it in every viewer, Chrome's too); else a FileAttachment
+ * annotation with an empty look (a double click saves it in Firefox and Acrobat; Chrome's viewer has none). No
+ * popup text: viewers would show it, dated 1970, on a single click.
  */
-function embedFile(doc: PDFDocument, page: PDFPage, box: ReturnType<typeof boxOn>, file: AnswerFile, list: Embedded[]) {
+function embedFile(doc: PDFDocument, page: PDFPage, box: ReturnType<typeof boxOn>, file: AnswerFile, list: Embedded[], url?: string) {
   const ctx = doc.context;
   const stream = ctx.register(
     ctx.flateStream(file.bytes, {
@@ -335,13 +342,18 @@ function embedFile(doc: PDFDocument, page: PDFPage, box: ReturnType<typeof boxOn
   );
   list.push([file.fileName, spec]);
   const { x, top, w, h } = box;
+  if (url) {
+    page.node.addAnnot(
+      ctx.register(ctx.obj({ Type: 'Annot', Subtype: 'Link', Rect: [x, top - h, x + w, top], Border: [0, 0, 0], F: 4, A: { S: 'URI', URI: PDFString.of(url) } })),
+    );
+    return;
+  }
   const look = ctx.register(ctx.formXObject([], { BBox: [0, 0, w, h] }));
   const annot = ctx.obj({
     Type: 'Annot',
     Subtype: 'FileAttachment',
     Rect: [x, top - h, x + w, top],
     FS: spec,
-    Contents: PDFHexString.fromText(file.fileName),
     Name: 'Paperclip',
     F: 4, // print
     AP: { N: look },
@@ -423,10 +435,11 @@ export async function completedPdf(
       return;
     }
     // Every file attached; with photosPerRow, the photos drawn side by side, each in a cell of w / photosPerRow.
-    const own = f.type === 'file' ? fileIds(v).flatMap((id) => (files[id] ? [files[id]] : [])) : [];
+    const ids = f.type === 'file' ? fileIds(v).filter((id) => files[id]) : [];
+    const own = ids.map((id) => files[id]);
     const per = perRowOf(f);
     const cell = (i: number) => ({ x: x + (w / (per || own.length)) * i, top, w: w / (per || own.length), h });
-    own.forEach((file, i) => embedFile(doc, page, cell(i), file, embedded));
+    own.forEach((file, i) => embedFile(doc, page, cell(i), file, embedded, options.fileUrl?.(ids[i], file)));
     if (own.length && per) {
       // A photo where it is one (PNG / JPEG), else a tile with the file's name: every file has its cell.
       for (const [i, file] of own.slice(0, per).entries())
