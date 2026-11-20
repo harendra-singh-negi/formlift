@@ -214,7 +214,7 @@ export const DEFAULT_LABELS = {
   keyProblem: (why: 'empty' | 'invalid' | 'taken') =>
     ({
       empty: 'A key is needed',
-      invalid: 'Use letters, digits, _ and - only',
+      invalid: 'Start with a letter; then letters, digits or _ only',
       taken: 'This key already exists',
     })[why],
   type: 'Type',

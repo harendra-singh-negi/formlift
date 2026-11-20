@@ -1,4 +1,5 @@
 import { OPTION_TYPES, type FieldDef, type FieldType } from './form-logic'
+import { KEY } from './form-logic/validate'
 import { fitInPage } from './coords'
 
 // Default box per type, in page fractions (an A4 page is ~0.6 wide in these units per 1/2 page).
@@ -38,10 +39,10 @@ function keyBase(label: string, type: FieldType) {
   return /^[a-z]/.test(slug) ? slug : `${type}${slug ? '_' + slug : ''}`
 }
 
-/** Why `key` cannot be this field's key, or null: letters, digits, _ and -, not used by another field. */
+/** Why `key` cannot be this field's key, or null: as validateFields wants it (a letter, then letters, digits, _), not used by another field. */
 export function keyProblem(key: string, id: string, fields: { id: string; key: string }[]): 'empty' | 'invalid' | 'taken' | null {
   if (!key) return 'empty'
-  if (!/^[A-Za-z0-9_-]+$/.test(key)) return 'invalid'
+  if (!KEY.test(key)) return 'invalid'
   return fields.some((f) => f.id !== id && f.key === key) ? 'taken' : null
 }
 
