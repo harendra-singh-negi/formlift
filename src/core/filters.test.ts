@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { categoryFilter, customFilter, filterQuestions, partFilter } from './filters'
+import { attachmentFilter, categoryFilter, customFilter, filterQuestions, partFilter } from './filters'
 import type { FieldDef } from './form-logic'
 import { toQuestions, type Question } from './questions'
 
@@ -54,4 +54,13 @@ it('reads category codes only when asked to', () => {
     undefined,
     undefined,
   ])
+})
+
+it('filters photos and attachments: attached / not attached, nothing offered without them', () => {
+  const photo = { ...field('p', 'Photo'), type: 'file' as const }
+  const qs = [q('a', 'Name'), q('b', 'Crack', { parts: [{ field: photo, name: '' }] })]
+  expect(attachmentFilter().options([qs[0]], {})).toEqual([])
+  const f = attachmentFilter()
+  expect(filterQuestions(qs, {}, [f], { attachments: 'empty' }).map((x) => x.id)).toEqual(['b'])
+  expect(filterQuestions(qs, { p: 'file-id' }, [f], { attachments: 'filled' }).map((x) => x.id)).toEqual(['b'])
 })

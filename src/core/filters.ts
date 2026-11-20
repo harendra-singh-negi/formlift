@@ -89,6 +89,25 @@ export function partFilter({
   }
 }
 
+/** Attached / not attached for the photo and file parts (file fields, or parts named photo, picture, attachment…). */
+export const attachmentFilter = ({
+  id = 'attachments',
+  title = 'Photos / attachments',
+  yes = 'Attached',
+  no = 'Not attached',
+  section = 'Progress',
+} = {}): QuestionFilterDef => {
+  const parts = (q: Question) =>
+    q.parts.filter((p) => p.field.type === 'file' || /photo|picture|image|attach/i.test(`${p.name} ${p.field.label}`))
+  return {
+    id,
+    title,
+    section,
+    options: (qs) => (qs.some((q) => parts(q).length) ? filledOptions(yes, no) : []),
+    test: (q, v, a) => filledTest(parts(q), v, a),
+  }
+}
+
 /** Questions that offer an answer choice ("Yes", "NA", "As Expected"): choices offered by `min`+ questions. */
 export const choiceFilter = ({
   id = 'choices',
@@ -197,6 +216,7 @@ export const builtinFilters = (labels: { type?: (t: FieldType) => string } = {})
   answeredFilter(),
   partFilter({ id: 'remarks', title: 'Remarks', match: /remark/i }),
   partFilter({ id: 'comments', title: 'Comments', match: /comment/i }),
+  attachmentFilter(),
   choiceFilter(),
   pickedFilter(),
   tagFilters(),
