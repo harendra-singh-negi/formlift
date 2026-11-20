@@ -233,6 +233,7 @@ export default function FormFiller({
         files={f.multiple ? ff.filesOf(answers[f.key]) : undefined}
         onRemoveFile={(id) => ff.removeFile(f, id)}
         signatureSrc={ff.signatureSrc(f)}
+        photos={ff.photosOf(f)}
         onFile={ff.canUpload ? (file) => void ff.attach(f, file) : undefined}
         onOpenFile={(id) => ff.openFile(id ?? String(answers[f.key]))}
       />
@@ -497,7 +498,9 @@ export default function FormFiller({
                           ? extra > 0
                             ? { ...face, '--fl-text': `${textSize(p.height * H, true) * px}px`, '--fl-lh': '1.2' }
                             : { '--fl-lh': `${p.height * H * px - 2}px` } // one line, centred in its box
-                          : {}
+                          : f.type === 'file' && f.multiple
+                            ? { '--fl-row': `${p.height * H * px}px` } // several files: a row per box height, as printed
+                            : {}
                     // Across a page break: a window on each page showing its part of the box.
                     const start = g ? movedDown(topOf(f), g.cuts) : 0
                     const end = start + p.height * H + extra

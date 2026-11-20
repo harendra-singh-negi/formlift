@@ -396,8 +396,8 @@ function Control({
       : SIZE[f.type] || f.type === 'checkbox'
         ? undefined
         : { width: `${Math.min(40, Math.max(MIN_EM[f.type] ?? 8, w)).toFixed(1)}em` }
-  // A file whose name goes over as many lines as it needs: the box grows with it.
-  const wrapName = f.type === 'file' && f.listRows === 'multiple'
+  // A file whose name goes over as many lines as it needs, or several files: the box grows with them.
+  const wrapName = f.type === 'file' && (f.listRows === 'multiple' || !!f.multiple)
   return (
     // The label over a wide control, beside a small one (going under it when the line is too short).
     <span
