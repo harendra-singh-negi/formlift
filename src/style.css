@@ -80,4 +80,9 @@
     background: none;
     padding: 0;
   }
+  /* Every button shows the hand (Tailwind v4 leaves buttons with the arrow), unless it is disabled. */
+  .fl-root button:not(:disabled),
+  .fl-root [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
 }
