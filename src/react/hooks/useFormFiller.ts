@@ -279,7 +279,7 @@ export function useFormFiller({
   }, [segments, listed])
 
   // Loads the stored pictures shown on the page (once each): signatures, and the photos of file fields with a
-  // photosPerRow (other files are not pictures and are left out).
+  // photosPerRow: PNG / JPEG only, the pictures a PDF can hold (other files show as tiles with their names).
   const loading = useRef(new Set<string>())
   useEffect(() => {
     if (!loadFile) return
@@ -292,7 +292,7 @@ export function useFormFiller({
         loading.current.add(id)
         loadFile(id)
           .then((blob) => {
-            if (f.type === 'signature' || blob.type.startsWith('image/'))
+            if (f.type === 'signature' || /^image\/(png|jpe?g)$/.test(blob.type))
               setSignatures((m) => ({ ...m, [id]: URL.createObjectURL(blob) }))
           })
           .catch(() => loading.current.delete(id))
@@ -421,7 +421,7 @@ export function useFormFiller({
       const info = await onUpload(f, file)
       const many = f.type === 'file' && f.multiple
       setFiles((list) => [...list.filter((x) => many || x.fieldKey !== f.key), info])
-      if (f.type === 'signature' || (f.photosPerRow && file.type.startsWith('image/')))
+      if (f.type === 'signature' || (f.photosPerRow && /^image\/(png|jpe?g)$/.test(file.type)))
         setSignatures((m) => ({ ...m, [info.id]: URL.createObjectURL(file) }))
       change(f, many ? multiAnswer([...fileIds(latest.current[f.key]), info.id]) : info.id)
     } catch (err) {

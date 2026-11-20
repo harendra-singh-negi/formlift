@@ -1,5 +1,5 @@
 import type { FormliftComponents } from '../ui/slots'
-import { Camera, Check, Paperclip, PenLine, Star } from 'lucide-react'
+import { Camera, Check, FileText, Paperclip, PenLine, Star } from 'lucide-react'
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import {
   answerText,
@@ -561,27 +561,43 @@ export default function FieldControl({
         </>
       )
     case 'file':
-      // Photos: a grid of photosPerRow cells a row (a row per box height), each photo whole in its cell, as the
-      // completed PDF draws them. ✕ on each takes it off; the add buttons sit in the corner.
-      if (field.photosPerRow && photos?.length) {
+      // Photos: a grid of photosPerRow cells a row (a row per box height), as the completed PDF draws it: a photo
+      // (PNG / JPEG) whole in its cell, any other file as a tile with its name. ✕ on each takes it off; the add
+      // buttons sit in the corner.
+      if (field.photosPerRow && value) {
         const per = perRowOf(field)
+        const nameOf = (id: string) => files?.find((x) => x.id === id)?.fileName ?? fileName ?? L.attachedFile
         return (
           <div
             className={`relative grid h-full w-full content-start rounded-sm border ${border} bg-white`}
             style={{ gridTemplateColumns: `repeat(${per}, minmax(0, 1fr))`, gridAutoRows: field.multiple ? 'var(--fl-row, 6rem)' : '100%' }}
           >
-            {photos.map((p) => (
-              <div key={p.id} className="flex min-h-0 min-w-0 items-center justify-center p-0.5">
-                {/* The ✕ sits on the photo's own corner (the photo keeps its shape inside the cell). */}
-                <span className="relative inline-flex max-h-full max-w-full">
-                  <button type="button" onClick={() => onOpenFile?.(field.multiple ? p.id : undefined)} className="flex max-h-full max-w-full cursor-pointer">
-                    <img src={p.src} alt={files?.find((x) => x.id === p.id)?.fileName ?? fileName ?? ''} className="max-h-(--fl-row,6rem) max-w-full object-contain" />
+            {fileIds(value).map((id) => {
+              const p = photos?.find((x) => x.id === id)
+              return (
+              <div key={id} className="flex min-h-0 min-w-0 items-center justify-center p-0.5">
+                {/* The ✕ sits on the photo's (or tile's) own corner. */}
+                <span className={`relative inline-flex max-h-full max-w-full ${p ? '' : 'h-full w-full'}`}>
+                  <button
+                    type="button"
+                    title={nameOf(id)}
+                    onClick={() => onOpenFile?.(field.multiple ? id : undefined)}
+                    className={`flex max-h-full max-w-full cursor-pointer ${p ? '' : 'h-full w-full items-center justify-center gap-1 overflow-hidden rounded border border-line bg-primary-soft/40 px-1 text-[11px] text-primary'}`}
+                  >
+                    {p ? (
+                      <img src={p.src} alt={nameOf(id)} className="max-h-(--fl-row,6rem) max-w-full object-contain" />
+                    ) : (
+                      <>
+                        <FileText size={14} className="flex-none" />
+                        <span className="line-clamp-3 min-w-0 text-left break-all">{nameOf(id)}</span>
+                      </>
+                    )}
                   </button>
                   {!readOnly && (
                     <button
                       type="button"
-                      aria-label={L.removeFile(files?.find((x) => x.id === p.id)?.fileName ?? fileName ?? L.attachedFile)}
-                      onClick={() => (field.multiple ? onRemoveFile?.(p.id) : onChange(null))}
+                      aria-label={L.removeFile(nameOf(id))}
+                      onClick={() => (field.multiple ? onRemoveFile?.(id) : onChange(null))}
                       className="absolute -top-1.5 -right-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-line bg-white text-[11px] text-ink-2 shadow hover:text-danger"
                     >
                       ✕
@@ -589,7 +605,8 @@ export default function FieldControl({
                   )}
                 </span>
               </div>
-            ))}
+              )
+            })}
             {!readOnly && (
               <span className="absolute right-0.5 bottom-0.5 inline-flex gap-1.5 rounded bg-white/90 px-1 py-0.5 text-primary shadow-sm">
                 {[fileInput, cameraInput].map((ref, i) => (
@@ -598,8 +615,7 @@ export default function FieldControl({
                     ref={ref}
                     type="file"
                     hidden
-                    accept="image/*"
-                    {...(i ? { capture: 'environment' as const } : {})}
+                    {...(i ? { accept: 'image/*', capture: 'environment' as const } : {})}
                     multiple={!i && field.multiple}
                     onChange={(e) => {
                       for (const f of e.target.files ?? []) onFile?.(f)
