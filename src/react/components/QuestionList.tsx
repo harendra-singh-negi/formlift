@@ -1,10 +1,10 @@
-import { Search, SlidersHorizontal } from 'lucide-react'
+import { Plus, Search, SlidersHorizontal, X } from 'lucide-react'
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useQuestionFilter, type QuestionFilterState, type UseQuestionFilterOptions } from '../hooks/useQuestionFilter'
 import { Button, Chip, ChipGroup, RemovableChip, EmptyText, Popover } from '../ui/slots'
 import type { Answers, FieldDef, FieldType } from '../../core/form-logic'
-import type { FlowBlock, FlowCell, FlowImage, FlowPara, FlowRun, FlowSegment } from '../../core/flow'
+import { partsOf, type FlowBlock, type FlowCell, type FlowImage, type FlowPara, type FlowRun, type FlowSegment } from '../../core/flow'
 import type { Question } from '../../core/questions'
 import { useLabels } from '../labels'
 
@@ -48,6 +48,7 @@ export default function QuestionList({
   pageSize = PAGE,
   loadMore = 'button',
   paperClassName = '',
+  rows,
 }: {
   questions: Question[]
   /** The document's flow, cut where questions end (useFormFiller's `segments`). */
@@ -72,6 +73,8 @@ export default function QuestionList({
   loadMore?: 'button' | 'scroll'
   /** Your classes on the document's paper, e.g. `max-w-5xl mx-auto` for a narrower page. Default: full width. */
   paperClassName?: string
+  /** Repeatable table rows: "+ Add row" under a row's last copy, ✕ on each added one (useFormFiller's addRow / removeRow). */
+  rows?: { add: (id: string) => void; remove: (id: string, k: number) => void; canAdd: (id: string) => boolean }
 }) {
   const L = useLabels()
   const own = useQuestionFilter(questions, answers, { filters, search })
@@ -94,6 +97,49 @@ export default function QuestionList({
     live.has(x.field.id) ? <Control x={x} inCell={inCell} fill={fill} control={control} /> : null
   const picture = (x: ImagePart) => <Picture x={x} pdf={pdf} />
   let lastPage = 0
+  // Repeatable rows: the last block showing each (its "+ Add row" goes under it), and an added row's first block
+  // (its ✕ goes there).
+  const rowFields = (b: FlowBlock) => partsOf(b).flatMap((x) => ('field' in x && x.field.repeat ? [x.field] : []))
+  const lastOf = new Map<string, FlowBlock>()
+  const firstCopy = new Map<string, FlowBlock>()
+  for (const s of segments)
+    for (const b of s.blocks)
+      for (const f of rowFields(b)) {
+        lastOf.set(f.repeat!.id, b)
+        const k = `${f.repeat!.id}:${f.repeat!.row ?? 1}`
+        if ((f.repeat!.row ?? 1) > 1 && !firstCopy.has(k)) firstCopy.set(k, b)
+      }
+  const pill =
+    'inline-flex cursor-pointer items-center gap-1 rounded-full border border-line bg-white px-2 py-0.5 text-[12px] text-primary shadow-sm hover:bg-hover'
+  // An added row's ✕ beside it, in the paper's margin (the table stays whole); "+ Add row" under the row's last.
+  const removeOf = (b: FlowBlock) => {
+    const hit = [...firstCopy].find(([, x]) => x === b)
+    if (!hit) return null
+    const k = hit[0]
+    const [id, n] = [k.slice(0, k.lastIndexOf(':')), Number(k.slice(k.lastIndexOf(':') + 1))]
+    return (
+      <button
+        type="button"
+        className="absolute top-1 -right-3 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-danger/40 bg-white text-danger shadow-sm hover:border-danger hover:bg-danger/5 sm:-right-4.5"
+        aria-label={L.removeRow(n)}
+        title={L.removeRow(n)}
+        onClick={() => rows!.remove(id, n)}
+      >
+        <X size={11} aria-hidden />
+      </button>
+    )
+  }
+  const addOf = (b: FlowBlock) =>
+    [...new Set(rowFields(b).map((f) => f.repeat!.id))]
+      .filter((id) => lastOf.get(id) === b && rows!.canAdd(id))
+      .map((id) => (
+        <div key={`add-${id}`} className="mt-1 mb-2">
+          <button type="button" className={pill} onClick={() => rows!.add(id)}>
+            <Plus size={11} aria-hidden /> {L.addRow}
+          </button>
+        </div>
+      ))
+
   const groups = fs.groups.filter((g) => g.available || !hideUnavailable)
   const bar = groups.filter((g) => g.section === 'bar')
   const menu = groups.filter((g) => g.section !== 'bar')
@@ -207,7 +253,15 @@ export default function QuestionList({
                     {mark && (
                       <div className="mt-2 mb-1 text-right text-[11px] text-faint first:mt-0">{L.pageTag(b.page)}</div>
                     )}
-                    <Block b={b} field={field} picture={picture} />
+                    {rows && removeOf(b) ? (
+                      <div className="relative">
+                        <Block b={b} field={field} picture={picture} />
+                        {removeOf(b)}
+                      </div>
+                    ) : (
+                      <Block b={b} field={field} picture={picture} />
+                    )}
+                    {rows && addOf(b)}
                   </Fragment>
                 )
               })}

@@ -458,6 +458,19 @@ export default function FormFiller({
               pageSize={listPageSize}
               loadMore={listLoadMore}
               paperClassName={listPaperClassName}
+              rows={
+                readOnly
+                  ? undefined
+                  : {
+                      add: (id) => ff.addRow(id),
+                      remove: (id, k) => ff.removeRow(id, k),
+                      canAdd: (id) => {
+                        const row = fields.filter((f) => f.repeat?.id === id)
+                        const max = row[0]?.repeat?.max
+                        return !max || Math.max(1, ...row.map((f) => f.repeat!.row ?? 1)) < max
+                      },
+                    }
+              }
             />
           </div>
         )}

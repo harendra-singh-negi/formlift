@@ -12,4 +12,4 @@
 export { type FlowBlock, type FlowCell, type FlowImage, type FlowPara, type FlowPart, type FlowRun, type FlowSegment, type PageRead } from './types'
 export { readPage } from './read'
 export { pageFlow } from './page'
-export { flowSegments, flowText } from './segments'
+export { flowSegments, flowText, partsOf } from './segments'
