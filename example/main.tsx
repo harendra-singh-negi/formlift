@@ -101,7 +101,7 @@ const HINTS: Record<Step, ReactNode> = {
   fill: (
     <>
       <b>Step 2 · Fill.</b> Answer on the page or switch to <b>List</b>. A long answer grows its box and moves the
-      page down; <b>+ Add row</b> adds a table row. On a phone a file field offers <b>Camera</b>; the list's{' '}
+      page down; <b>+ Add row</b> adds a table row. On a phone a file field offers <b>Camera</b>; <b>🔍+ / 🔍−</b> make its photos bigger or smaller; the list's{' '}
       <b>Photos / attachments</b> filter finds what is attached or still missing. Answers autosave, <b>Submit</b> checks the rules,{' '}
       <b>Completed PDF</b> downloads the PDF with your answers.
     </>

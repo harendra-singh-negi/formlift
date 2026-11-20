@@ -371,8 +371,10 @@ In the editor, a file field's **Attachment** section has:
   `removeFile(field, id)`. In the completed PDF every file is attached.
 - **Photos in the box (and the PDF)**: PNG / JPEG answers show as photos right in the field's box while filling,
   and are drawn the same way in the completed PDF: with several files, 1 to 6 side by side in a row (a row per
-  box height), each whole in its cell, with a ✕ to take it off. Other files (PDF, Word, WebP…) take a cell too, as
-  a tile with their name. Unset, the names show. Field setting: `photosPerRow`.
+  box height), each whole in its cell, with a ✕ to take it off. Other files (PDF, Word, WebP…) come after the
+  photos, on rows of their own, as tiles with their name. Unset, the names show. Field setting: `photosPerRow`.
+  Photo rows are 4:3 cells, so fewer in a row means bigger photos: the person filling sets that with the 🔍+ / 🔍−
+  buttons on the field (kept with the answers as `<key>__per`, used by the completed PDF too).
 
 Every file is also inside the completed PDF (the viewer's attachments panel; a click on its cell opens it), and an
 **Attached files** page at the end lists them by field, for viewers without that panel (Chrome's).
@@ -389,7 +391,7 @@ completedPdf(pdf, fields, answers, files, layout, { fileUrl: (id) => `https://yo
 
 With several files the box grows like a long answer: a row per box height (photosPerRow photos to a row; names
 one per row), and what is below moves down, onto the next page when needed. On screen and in the
-completed PDF alike. `fileRows(field, answer, height)` gives the rows.
+completed PDF alike. `fileRows(field, answers, width, height, isPhoto)` gives the rows and their heights.
 
 The list view's **Photos / attachments** filter (`attachmentFilter()`) shows the questions with a file attached or
 still missing one.
