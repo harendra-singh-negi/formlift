@@ -396,6 +396,8 @@ function Control({
       : SIZE[f.type] || f.type === 'checkbox'
         ? undefined
         : { width: `${Math.min(40, Math.max(MIN_EM[f.type] ?? 8, w)).toFixed(1)}em` }
+  // A file whose name goes over as many lines as it needs: the box grows with it.
+  const wrapName = f.type === 'file' && f.listRows === 'multiple'
   return (
     // The label over a wide control, beside a small one (going under it when the line is too short).
     <span
@@ -404,7 +406,7 @@ function Control({
       {caption && <span className={`text-[12px] text-muted ${inCell ? '@min-[40rem]:hidden' : ''}`}>{f.label}</span>}
       {/* As wide as on the page, narrower when the line is shorter (a box stays its size). Typed in place: 16 px text, as iOS zooms into a smaller input it focuses. */}
       <span
-        className={`relative inline-block max-w-full min-w-0 [container-type:size] [&_:is(input,textarea,select)]:text-[16px] ${size} ${wide || f.type === 'checkbox' ? 'flex-none' : 'shrink'} ${full}`}
+        className={`relative inline-block max-w-full min-w-0 [&_:is(input,textarea,select)]:text-[16px] ${wrapName ? 'fl-wrap-name' : '[container-type:size]'} ${wrapName ? 'min-h-9 w-full sm:w-72' : size} ${wide || f.type === 'checkbox' ? 'flex-none' : 'shrink'} ${full}`}
         style={style}
       >
         {control(f)}

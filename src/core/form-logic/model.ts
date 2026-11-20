@@ -111,6 +111,13 @@ export interface FieldDef {
   followUp?: FollowUp;
   /** Not on the page: asked in a follow-up dialog (or one your onFieldChange opens). `position.page` = where it belongs. */
   dialogOnly?: boolean;
+  /**
+   * file: an attached photo (PNG / JPEG) is also drawn in the completed PDF, in the box, as width:height ("4:3",
+   * "1:1"; cropped to it from the middle) or "fit" (whole, its own shape). Unset: the file is only attached.
+   */
+  photoRatio?: string;
+  /** file: in the list view, the file's name over as many lines as it needs ('multiple') or cut to one (default). */
+  listRows?: 'single' | 'multiple';
   /** People can leave comments on this field (a 💬 next to it). Stored apart from the answers: see Comments. */
   comments?: boolean;
   /**
