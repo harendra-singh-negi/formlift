@@ -117,17 +117,30 @@ export default function QuestionList({
     if (!hit) return null
     const k = hit[0]
     const [id, n] = [k.slice(0, k.lastIndexOf(':')), Number(k.slice(k.lastIndexOf(':') + 1))]
-    return (
-      <button
-        type="button"
-        className="absolute top-1 -right-3 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-danger/40 bg-white text-danger shadow-sm hover:border-danger hover:bg-danger/5 sm:-right-4.5"
-        aria-label={L.removeRow(n)}
-        title={L.removeRow(n)}
-        onClick={() => rows!.remove(id, n)}
-      >
-        <X size={11} aria-hidden />
-      </button>
-    )
+    const remove = () => rows!.remove(id, n)
+    return {
+      // Wide screen: a small ✕ in the margin beside the row, the table stays whole.
+      icon: (
+        <button
+          type="button"
+          className="absolute top-1 -right-4.5 z-10 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-danger/40 bg-white text-danger shadow-sm hover:border-danger hover:bg-danger/5 @max-[40rem]:hidden"
+          aria-label={L.removeRow(n)}
+          title={L.removeRow(n)}
+          onClick={remove}
+        >
+          <X size={11} aria-hidden />
+        </button>
+      ),
+      // Narrow screen (cells one under another): a bar over the added row naming it, with a plain Remove button.
+      bar: (
+        <div className="mt-2 flex items-center justify-between rounded-t-md border border-b-0 border-line bg-surface px-2 py-1 text-[12px] font-semibold text-ink-2 @min-[40rem]:hidden">
+          <span>{L.addedRow(n)}</span>
+          <button type="button" className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-danger/40 bg-white px-2 py-0.5 text-danger" onClick={remove}>
+            <X size={11} aria-hidden /> {L.removeRow(n)}
+          </button>
+        </div>
+      ),
+    }
   }
   const addOf = (b: FlowBlock) =>
     [...new Set(rowFields(b).map((f) => f.repeat!.id))]
@@ -255,8 +268,9 @@ export default function QuestionList({
                     )}
                     {rows && removeOf(b) ? (
                       <div className="relative">
+                        {removeOf(b)!.bar}
                         <Block b={b} field={field} picture={picture} />
-                        {removeOf(b)}
+                        {removeOf(b)!.icon}
                       </div>
                     ) : (
                       <Block b={b} field={field} picture={picture} />
