@@ -43,6 +43,7 @@ export interface CompletedPdfOptions {
 const APPENDIX_TEXT = {
   moreAnswers: 'Additional answers',
   comments: 'Comments',
+  attachedFiles: 'Attached files',
   page: (n: number) => `page ${n}`,
   yes: 'Yes',
   no: 'No',
@@ -270,6 +271,19 @@ async function pushDown(
 }
 
 
+/** A file that is not a photo, in its cell: a frame and its name over up to 3 lines (cut short after that). */
+function drawTile(page: PDFPage, { x, top, w, h }: { x: number; top: number; w: number; h: number }, name: string, font: PDFFont) {
+  const pad = Math.min(3, w / 20, h / 20);
+  page.drawRectangle({ x: x + pad, y: top - h + pad, width: w - 2 * pad, height: h - 2 * pad, borderColor: rgb(0.6, 0.7, 0.7), borderWidth: 0.5, color: rgb(0.96, 0.98, 0.98) });
+  const size = Math.max(4, Math.min(8, h / 5));
+  const text = printable(font, name);
+  let lines = wrapText(text.replace(/([._-])/g, '$1 '), w - 4 * pad - 2, size, (t, n) => font.widthOfTextAtSize(t, n)).map((l) => l.replace(/([._-]) /g, '$1'));
+  const most = Math.min(3, Math.max(1, Math.floor((h - 2 * pad) / (size * 1.2))));
+  if (lines.length > most) lines = [...lines.slice(0, most - 1), `${lines[most - 1].slice(0, -3)}...`];
+  const start = top - h / 2 + ((lines.length - 1) * size * 1.2) / 2 - size * 0.35;
+  lines.forEach((l, n) => page.drawText(l, { x: x + 2 * pad + 1, y: start - n * size * 1.2, size, font, color: rgb(0.075, 0.306, 0.29) }));
+}
+
 /** An attached photo, whole, as big as fits in its cell and centred. False when the file is not a PNG / JPEG. */
 async function drawPhoto(doc: PDFDocument, page: PDFPage, { x, top, w, h }: { x: number; top: number; w: number; h: number }, file: AnswerFile) {
   const b = file.bytes;
@@ -414,9 +428,10 @@ export async function completedPdf(
     const cell = (i: number) => ({ x: x + (w / (per || own.length)) * i, top, w: w / (per || own.length), h });
     own.forEach((file, i) => embedFile(doc, page, cell(i), file, embedded));
     if (own.length && per) {
-      const drawn = [];
-      for (const [i, file] of own.slice(0, per).entries()) drawn.push(await drawPhoto(doc, page, cell(i), file));
-      if (drawn.every(Boolean)) return;
+      // A photo where it is one (PNG / JPEG), else a tile with the file's name: every file has its cell.
+      for (const [i, file] of own.slice(0, per).entries())
+        if (!(await drawPhoto(doc, page, cell(i), file))) drawTile(page, cell(i), file.fileName, font);
+      return;
     }
     const text = f.type === 'checkbox' ? 'X' : f.type === 'file' ? own.map((x) => x.fileName).join(', ') : answerText(f, v);
     const multiline = f.type === 'textarea' || f.type === 'checklist';
@@ -467,6 +482,13 @@ export async function completedPdf(
       lines: options.comments![f.key].map((c) => `${[c.by, c.at.slice(0, 16).replace('T', ' ')].filter(Boolean).join(', ')}: ${c.text}`),
     }));
   appendPages(doc, fonts, T.comments, notes);
+
+  // Every attached file by its field, at the end: readers whose viewer shows no attachments panel see them here.
+  const attached = fields
+    .filter((f) => f.type === 'file' && answered(f))
+    .map((f) => ({ heading: name(f), lines: fileIds(answers[f.key]).flatMap((id) => (files[id] ? [files[id].fileName] : [])) }))
+    .filter((b) => b.lines.length);
+  appendPages(doc, fonts, T.attachedFiles, attached);
 
   listAttachments(doc, embedded);
   return doc.save();

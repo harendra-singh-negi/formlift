@@ -307,7 +307,7 @@ test("the original's own fillable fields are printed as they look and removed fr
   assert.ok(text.items.some((i) => 'str' in i && i.str === 'Asha Verma'));
 });
 
-test('completedPdf: an attached photo is drawn in its box at the chosen ratio, a non-photo only attached', async () => {
+test('completedPdf: an attached photo is drawn in its box, a non-photo as a tile with its name', async () => {
   const doc = await PDFDocument.create();
   doc.addPage([600, 800]);
   const original = await doc.save();
@@ -318,7 +318,7 @@ test('completedPdf: an attached photo is drawn in its box at the chosen ratio, a
   const plain = await run(undefined, 'p1');
   const drawn = await run(1, 'p1');
   assert.ok(drawn.length > plain.length); // the picture is drawn as well as attached
-  assert.equal((await PDFDocument.load(await run(1, 't1'))).getPageCount(), 1); // a text file: just attached
+  assert.equal((await PDFDocument.load(await run(1, 't1'))).getPageCount(), 2); // a text file: a tile, and the list at the end
   assert.equal(perRowOf(field('p', { type: 'file', photosPerRow: 3 })), 1); // one file: one photo
   assert.equal(perRowOf(field('p', { type: 'file', photosPerRow: 9, multiple: true })), 6);
   assert.equal(perRowOf(field('p', { type: 'file' })), 0);
@@ -353,4 +353,19 @@ test('completedPdf: many photos grow their box row by row, onto a new page when 
   const f = [field('ph', { type: 'file', multiple: true, photosPerRow: 2, position: { page: 1, x: 0.1, y: 0.5, width: 0.5, height: 0.125 } })];
   const out = await completedPdf(original, f, { ph: JSON.stringify(ids) }, files);
   assert.ok((await PDFDocument.load(out)).getPageCount() > 1);
+});
+
+test('completedPdf: photos and other files share the grid (other files as name tiles) and are listed at the end', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([600, 800]);
+  const original = await doc.save();
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const files = {
+    a: { bytes: png, fileName: 'site.png', fileType: 'image/png' },
+    b: { bytes: Buffer.from('%PDF-1.4'), fileName: 'a very long report name that wraps.pdf', fileType: 'application/pdf' },
+    c: { bytes: Buffer.from('RIFF'), fileName: 'photo.webp', fileType: 'image/webp' },
+  };
+  const f = [field('x', { type: 'file', multiple: true, photosPerRow: 3, position: { page: 1, x: 0.1, y: 0.1, width: 0.6, height: 0.1 } })];
+  const out = await PDFDocument.load(await completedPdf(original, f, { x: '["a","b","c"]' }, files));
+  assert.equal(out.getPageCount(), 2); // the page, and the "Attached files" list
 });
