@@ -604,7 +604,7 @@ export default function FieldControl({
                           type="button"
                           aria-label={L.removeFile(nameOf(id))}
                           onClick={() => onRemoveFile?.(id)}
-                          className="flex-none cursor-pointer text-muted hover:text-danger"
+                          className="flex-none cursor-pointer font-bold text-danger hover:opacity-70"
                         >
                           ✕
                         </button>
@@ -664,7 +664,7 @@ export default function FieldControl({
                       type="button"
                       aria-label={L.removeFile(nameOf(id))}
                       onClick={() => (field.multiple ? onRemoveFile?.(id) : onChange(null))}
-                      className="absolute -top-1.5 -right-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-line bg-white text-[11px] text-ink-2 shadow hover:text-danger"
+                      className="absolute -top-1.5 -right-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-danger/40 bg-white text-[11px] font-bold text-danger shadow hover:bg-danger hover:text-white"
                     >
                       ✕
                     </button>
@@ -753,7 +753,7 @@ export default function FieldControl({
                       type="button"
                       aria-label={L.removeFile(name || L.attachedFile)}
                       onClick={() => onRemoveFile(id)}
-                      className="flex-none cursor-pointer text-[clamp(8px,50cqh,13px)] text-muted hover:text-danger"
+                      className="flex-none cursor-pointer text-[clamp(8px,50cqh,13px)] font-bold text-danger hover:opacity-70"
                     >
                       ✕
                     </button>
@@ -776,7 +776,7 @@ export default function FieldControl({
               type="button"
               aria-label={L.removeFile(fileName || L.attachedFile)}
               onClick={() => onChange(null)}
-              className="flex-none cursor-pointer text-[clamp(8px,50cqh,13px)] text-muted hover:text-danger"
+              className="flex-none cursor-pointer text-[clamp(8px,50cqh,13px)] font-bold text-danger hover:opacity-70"
             >
               ✕
             </button>
