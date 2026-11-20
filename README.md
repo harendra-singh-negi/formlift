@@ -371,8 +371,11 @@ In the editor, a file field's **Attachment** section has:
   `removeFile(field, id)`. In the completed PDF every file is attached.
 - **Photos in the box (and the PDF)**: PNG / JPEG answers show as photos right in the field's box while filling,
   and are drawn the same way in the completed PDF: with several files, 1 to 6 side by side in a row (a row per
-  box height), each whole in its cell, with a ✕ to take it off. Unset, the names show and the files are only
-  attached. Other files are always only attached. Field setting: `photosPerRow`.
+  box height), each whole in its cell, with a ✕ to take it off. Other files (PDF, Word, WebP…) take a cell too, as
+  a tile with their name. Unset, the names show. Field setting: `photosPerRow`.
+
+Every file is also inside the completed PDF (the viewer's attachments panel; a click on its cell opens it), and an
+**Attached files** page at the end lists them by field, for viewers without that panel (Chrome's).
 - **Name in the list view**: one line, cut short (default), or as many lines as the name needs. Field setting:
   `listRows: 'single' | 'multiple'`.
 
@@ -1171,6 +1174,7 @@ Check the first row:
 | Copy and paste fields | – | New in the editor: <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd>, the copy named after the PDF's text where it lands ([Copy and paste](#copy-and-paste-fields)). With `keyboard={false}` it is off, like the other shortcuts. |
 | Field keys can be typed | – | The editor's **Key** box is no longer read-only. A typed key must be unique and is kept when the label changes ([Field keys](#field-keys)). |
 | Photos and attachments | code that reads a file answer as one id | New: **Camera** on phones, one or several files per field (`multiple`: the answer is then a JSON list of ids; read either shape with `fileIds(answer)`), photos shown in the box and the PDF, 1–6 in a row with a ✕ each (`photosPerRow`), the name's lines in the list view (`listRows`), and the **Photos / attachments** filter ([Photos and attachments](#photos-and-attachments)). |
+| Attached files page | – | A completed PDF with file answers ends with an **Attached files** page listing them by field. |
 | Links on a grown page | – | A page of the completed PDF rebuilt for a long answer loses the original's links and file attachments on that page. Other pages keep them. |
 
 ### 0.5 → 0.6
