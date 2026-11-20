@@ -376,6 +376,14 @@ In the editor, a file field's **Attachment** section has:
 
 Every file is also inside the completed PDF (the viewer's attachments panel; a click on its cell opens it), and an
 **Attached files** page at the end lists them by field, for viewers without that panel (Chrome's).
+
+One click to download: PDF viewers open a file kept inside a PDF on a double click (Firefox, Acrobat) or not at all
+(Chrome). Pass where your app serves each file and its cell becomes a link, opened with one click in any viewer:
+
+```ts
+completedPdf(pdf, fields, answers, files, layout, { fileUrl: (id) => `https://your.app/files/${id}` })
+```
+
 - **Name in the list view**: one line, cut short (default), or as many lines as the name needs. Field setting:
   `listRows: 'single' | 'multiple'`.
 
