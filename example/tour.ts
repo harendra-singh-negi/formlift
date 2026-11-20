@@ -56,7 +56,7 @@ const PAGES: Page[] = [
       { title: 'Yes / No toggle', help: 'A switch: a boolean answer like a checkbox.', ...one('toggle', 'pilot', 'Pilot on board') },
       { title: 'Rating', help: 'Stars; tap the chosen star again to clear.', ...one('rating', 'score', 'Score', { max: 5 }) },
       { title: 'Slider', help: 'A value from 0 to 100 in steps of 5.', ...one('slider', 'fuel', 'Fuel %', { min: 0, max: 100, step: 5 }) },
-      { title: 'File upload', help: 'Several files; Camera on a phone. Photos print 4:3 in the PDF.', ...one('file', 'photo', 'Photos', { photoRatio: '4:3', multiple: true }) },
+      { title: 'File upload', help: 'Several photos, 3 in a row; x removes one. Camera on a phone.', ...one('file', 'photo', 'Photos', { photosPerRow: 3, multiple: true }) },
       { title: 'Signature', help: 'Draw with mouse or finger.', ...one('signature', 'sign', 'Signature', {}, 36) },
     ],
   },
