@@ -391,6 +391,12 @@ When the page runs over, it continues on the next one with a half-inch margin ab
 through a line of the answer. The filler shows this live as you type, and `completedPdf` prints the same (the PDF
 can get more pages than the original). Short answers print exactly as before.
 
+Where the page grows, it is cut on a line with no text beside the growing box, so the text next to it moves down
+whole (not cut in two or smeared). The filler reads the page's text for this once something grows. For the
+completed PDF, pass the text: `completedPdf(pdf, fields, answers, files, layout, { textLines: await
+pdfTextLines(pdf) })` (`pdfTextLines` from `formlift/react`, page → lines). Without it the cut is at the box's
+bottom as before.
+
 ### Follow-up dialogs
 
 "If the answer is **No**, ask for the reason and a due date":
