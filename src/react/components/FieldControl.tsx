@@ -298,11 +298,19 @@ export default function FieldControl({
           type="button"
           {...common}
           onClick={() => setEditing(true)}
-          className={`${box} ${border} flex cursor-pointer overflow-hidden text-left leading-tight ${
-            field.type === 'textarea' ? 'items-start py-0.5 text-[clamp(8px,14cqh,15px)]' : 'items-center'
+          // The answer as on a computer and in the completed PDF: the same size, face and line height (the page's
+          // --fl-text / --fl-lh / --fl-font), wrapping at the same width; a grown box shows all of it.
+          className={`${box} ${border} flex cursor-pointer overflow-hidden text-left [font-family:var(--fl-font,inherit)] [line-height:var(--fl-lh,normal)] ${
+            field.type === 'textarea'
+              ? 'items-start py-0.5 text-[length:var(--fl-text,clamp(8px,14cqh,15px))]'
+              : field.type === 'text'
+                ? 'items-start text-[length:var(--fl-text,clamp(8px,62cqh,15px))]'
+                : 'items-center'
           }`}
         >
-          <span className={`min-w-0 ${field.type === 'textarea' ? 'line-clamp-[8] whitespace-pre-wrap' : 'truncate'}`}>
+          <span
+            className={`min-w-0 ${field.type === 'textarea' || field.type === 'text' ? 'w-full break-words whitespace-pre-wrap' : 'truncate'}`}
+          >
             {answerText(field, value) || <span className="text-faint">{field.placeholder || ''}</span>}
           </span>
         </button>
