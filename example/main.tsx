@@ -114,11 +114,13 @@ const HINTS: Record<Step, ReactNode> = {
   ),
 }
 
-// Uploads stay in this tab's memory (a real app stores them on its server through onUpload).
+// Uploads stay in this tab's memory (a real app stores them on its server through onUpload). Their bytes are read
+// now: a picked File only points at the file on disk, which may change or go before the PDF is made (Firefox then
+// refuses to read it: "The operation was aborted").
 const uploads = new Map<string, File>()
 const onUpload = async (field: { key: string }, file: File) => {
   const id = crypto.randomUUID()
-  uploads.set(id, file)
+  uploads.set(id, new File([await file.arrayBuffer()], file.name, { type: file.type }))
   return { id, fieldKey: field.key, fileName: file.name, fileSize: file.size }
 }
 const loadFile = async (id: string) => uploads.get(id) ?? Promise.reject(new Error('Not in this tab any more'))
@@ -176,8 +178,14 @@ function Demo() {
     // The files people attached (kept in this tab), so photos print; the page's text, so growing boxes do not smear it.
     const files = Object.fromEntries(
       await Promise.all(
-        [...uploads].map(async ([id, f]) => [id, { bytes: new Uint8Array(await f.arrayBuffer()), fileName: f.name, fileType: f.type }] as const),
-      ),
+        [...uploads].map(async ([id, f]) => {
+          try {
+            return [[id, { bytes: new Uint8Array(await f.arrayBuffer()), fileName: f.name, fileType: f.type }] as const]
+          } catch {
+            return [] // unreadable: the PDF is made without it
+          }
+        }),
+      ).then((l) => l.flat()),
     )
     const textLines = await pdfTextLines(bytes)
     const out = await completedPdf(bytes, startForm.fields, answers ?? {}, files, startForm.layout, { comments, textLines })
