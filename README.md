@@ -372,7 +372,7 @@ In the editor, a file field's **Attachment** section has:
 - **Photos in the box (and the PDF)**: PNG / JPEG answers show as photos right in the field's box while filling,
   and are drawn the same way in the completed PDF: with several files, 1 to 6 side by side in a row (a row per
   box height), each whole in its cell, with a ✕ to take it off. Other files (PDF, Word, WebP…) come after the
-  photos, on rows of their own, as tiles with their name. Unset, the names show. Field setting: `photosPerRow`.
+  photos, a line each with their full name, like a link. Unset, the names show. Field setting: `photosPerRow`.
   Photo rows are 4:3 cells, so fewer in a row means bigger photos: the person filling sets that with the 🔍+ / 🔍−
   buttons on the field (kept with the answers as `<key>__per`, used by the completed PDF too).
 
