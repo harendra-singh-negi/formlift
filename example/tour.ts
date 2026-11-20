@@ -56,7 +56,7 @@ const PAGES: Page[] = [
       { title: 'Yes / No toggle', help: 'A switch: a boolean answer like a checkbox.', ...one('toggle', 'pilot', 'Pilot on board') },
       { title: 'Rating', help: 'Stars; tap the chosen star again to clear.', ...one('rating', 'score', 'Score', { max: 5 }) },
       { title: 'Slider', help: 'A value from 0 to 100 in steps of 5.', ...one('slider', 'fuel', 'Fuel %', { min: 0, max: 100, step: 5 }) },
-      { title: 'File upload', help: 'Your app stores the file (onUpload).', ...one('file', 'photo', 'Photo') },
+      { title: 'File upload', help: 'Attach, or Camera on a phone. A photo prints 4:3 in the PDF.', ...one('file', 'photo', 'Photo', { photoRatio: '4:3' }) },
       { title: 'Signature', help: 'Draw with mouse or finger.', ...one('signature', 'sign', 'Signature', {}, 36) },
     ],
   },
