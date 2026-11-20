@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
 import { completedPdf } from './index';
+import { ratioOf } from './completed-pdf';
 import {
   cleanAnswers,
   type FieldDef,
@@ -303,4 +304,21 @@ test("the original's own fillable fields are printed as they look and removed fr
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const text = await (await (await getDocument({ data: out }).promise).getPage(1)).getTextContent();
   assert.ok(text.items.some((i) => 'str' in i && i.str === 'Asha Verma'));
+});
+
+test('completedPdf: an attached photo is drawn in its box at the chosen ratio, a non-photo only attached', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([600, 800]);
+  const original = await doc.save();
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const files = { p1: { bytes: png, fileName: 'site.png', fileType: 'image/png' }, t1: { bytes: Buffer.from('hi'), fileName: 'a.txt', fileType: 'text/plain' } };
+  const run = (photoRatio: string | undefined, id: string) =>
+    completedPdf(original, [field('p', { type: 'file', photoRatio })], { p: id }, files);
+  const plain = await run(undefined, 'p1');
+  const drawn = await run('4:3', 'p1');
+  assert.ok(drawn.length > plain.length); // the picture is drawn as well as attached
+  assert.equal((await PDFDocument.load(await run('4:3', 't1'))).getPageCount(), 1); // a text file: just attached
+  assert.equal(ratioOf('4:3'), 4 / 3);
+  assert.equal(ratioOf('16x9'), 16 / 9);
+  assert.equal(ratioOf('fit'), null);
 });

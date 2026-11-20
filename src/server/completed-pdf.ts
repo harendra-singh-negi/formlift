@@ -5,6 +5,11 @@ import {
   PDFHexString,
   PDFName,
   PDFString,
+  clip,
+  endPath,
+  popGraphicsState,
+  pushGraphicsState,
+  rectangle,
   rgb,
   StandardFonts,
   type PDFFont,
@@ -252,6 +257,39 @@ async function pushDown(
   doc.removePage(index);
 }
 
+/** "4:3" → 4/3; "fit" or anything else → null. */
+export function ratioOf(r: string) {
+  const m = /^(\d+(?:\.\d+)?)\s*[:x×/]\s*(\d+(?:\.\d+)?)$/.exec(r.trim());
+  return m && +m[1] > 0 && +m[2] > 0 ? +m[1] / +m[2] : null;
+}
+
+/**
+ * An attached photo drawn in its box: a frame of `ratio` (width:height) as big as fits, centred, the photo filling
+ * it (cut from the middle); "fit": the whole photo, its own shape. False when the file is not a PNG / JPEG.
+ */
+async function drawPhoto(doc: PDFDocument, page: PDFPage, { x, top, w, h }: { x: number; top: number; w: number; h: number }, file: AnswerFile, ratio: string) {
+  const b = file.bytes;
+  const png = b[0] === 0x89 && b[1] === 0x50;
+  const jpg = b[0] === 0xff && b[1] === 0xd8;
+  if (!png && !jpg) return false;
+  const img = png ? await doc.embedPng(b) : await doc.embedJpg(b);
+  const r = ratioOf(ratio) ?? img.width / img.height;
+  const fw = Math.min(w, h * r);
+  const fh = fw / r;
+  const fx = x + (w - fw) / 2;
+  const fy = top - h + (h - fh) / 2;
+  const s = Math.max(fw / img.width, fh / img.height); // covers the frame
+  page.pushOperators(pushGraphicsState(), rectangle(fx, fy, fw, fh), clip(), endPath());
+  page.drawImage(img, {
+    x: fx + (fw - img.width * s) / 2,
+    y: fy + (fh - img.height * s) / 2,
+    width: img.width * s,
+    height: img.height * s,
+  });
+  page.pushOperators(popGraphicsState());
+  return true;
+}
+
 /** A file of the submission (upload or signature PNG), by its id = the answer's value. */
 export interface AnswerFile {
   fileName: string;
@@ -372,6 +410,7 @@ export async function completedPdf(
     }
     const file = f.type === 'file' ? files[String(v)] : undefined;
     if (file) embedFile(doc, page, { x, top, w, h }, file, embedded);
+    if (file && f.photoRatio && (await drawPhoto(doc, page, { x, top, w, h }, file, f.photoRatio))) return;
     const text = f.type === 'checkbox' ? 'X' : f.type === 'file' ? (file?.fileName ?? '') : answerText(f, v);
     const multiline = f.type === 'textarea' || f.type === 'checklist';
     const size = textSize(h, !multiline);

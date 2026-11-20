@@ -222,6 +222,26 @@ export default function FieldProperties({
         </Section>
       )}
 
+      {field.type === 'file' && (
+        <Section title={L.attachmentSection}>
+          <FormField label={L.photoInPdf}>
+            <Select className="w-full" value={field.photoRatio ?? ''} onChange={(e) => set({ photoRatio: e.target.value || undefined })}>
+              {['', 'fit', '1:1', '4:3', '3:4', '16:9', '9:16', '3:2'].map((r) => (
+                <option key={r} value={r}>
+                  {r === '' ? L.photoOnlyAttached : r === 'fit' ? L.photoFit : r}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label={L.listRows}>
+            <Select className="w-full" value={field.listRows ?? 'single'} onChange={(e) => set({ listRows: e.target.value === 'multiple' ? 'multiple' : undefined })}>
+              <option value="single">{L.listRowsSingle}</option>
+              <option value="multiple">{L.listRowsMultiple}</option>
+            </Select>
+          </FormField>
+        </Section>
+      )}
+
       {(field.type === 'slider' || field.type === 'rating') && (
         <Section title={L.validationSection}>
           {field.type === 'rating' ? (

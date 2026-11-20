@@ -550,7 +550,7 @@ export default function FieldControl({
       )
     case 'file':
       return (
-        <div className={`flex h-full w-full items-center gap-1 rounded-sm border px-1 ${border} bg-primary-soft/50`}>
+        <div className={`flex h-full min-h-[inherit] w-full items-center gap-1 rounded-sm border px-1 ${border} bg-primary-soft/50 in-[.fl-wrap-name]:flex-wrap in-[.fl-wrap-name]:[&>button]:text-[13px]`}>
           {[fileInput, cameraInput].map((ref, i) => (
             <input
               key={i}
@@ -569,7 +569,8 @@ export default function FieldControl({
             <button
               type="button"
               onClick={onOpenFile}
-              className="min-w-0 flex-1 cursor-pointer truncate text-left text-[clamp(8px,50cqh,13px)] text-primary underline"
+              title={fileName}
+              className="min-w-0 flex-1 cursor-pointer truncate text-left text-[clamp(8px,50cqh,13px)] text-primary underline in-[.fl-wrap-name]:py-1 in-[.fl-wrap-name]:text-[13px] in-[.fl-wrap-name]:break-all in-[.fl-wrap-name]:whitespace-normal"
             >
               {fileName || L.attachedFile}
             </button>

@@ -211,6 +211,13 @@ export const DEFAULT_LABELS = {
   fieldId: (id: string) => `ID ${id}`,
   label: 'Label',
   key: 'Key',
+  attachmentSection: 'Attachment',
+  photoInPdf: 'Photo in the PDF (width:height)',
+  photoOnlyAttached: 'Not drawn, only attached',
+  photoFit: 'Whole photo, its own shape',
+  listRows: 'Name in the list view',
+  listRowsSingle: 'One line (cut short)',
+  listRowsMultiple: 'As many lines as it needs',
   keyProblem: (why: 'empty' | 'invalid' | 'taken') =>
     ({
       empty: 'A key is needed',
