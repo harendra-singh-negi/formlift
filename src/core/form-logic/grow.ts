@@ -2,7 +2,7 @@
 // everything below it on the page down, the same way on screen (FormFiller) and in the completed PDF.
 // Units are PDF points, measured from the page's top.
 import type { AnswerValue, FieldDef } from './model';
-import { answerText, fileIds, ratioOf } from './values';
+import { answerText, fileIds, perRowOf } from './values';
 import { rowCount } from './rows';
 
 /** Width of `text` at font `size` (points), Helvetica metrics: pdf-lib's font, or a canvas measuring Arial. */
@@ -50,14 +50,12 @@ export function textFit(text: string, w: number, h: number, widthOf: WidthOf, si
 }
 
 /**
- * A file field with several files in a `w` x `h` box: one row per `h`, as many per row as fit (photos: frames of
- * the photoRatio, "fit" taken as square; names: one per row). `lines`: each row's ids as JSON; `size` makes
- * lineGaps fall between rows.
+ * A file field with several files in a box `h` tall: one row per `h`, photosPerRow photos to a row (names: one per
+ * row). `lines`: each row's ids as JSON; `size` makes lineGaps fall between rows.
  */
-export function fileRows(f: FieldDef, v: AnswerValue | undefined, w: number, h: number) {
+export function fileRows(f: FieldDef, v: AnswerValue | undefined, h: number) {
   const ids = fileIds(v);
-  const r = f.photoRatio ? (ratioOf(f.photoRatio) ?? 1) : 0;
-  const perRow = r ? Math.max(1, Math.floor(w / (h * r) + 1e-9)) : 1;
+  const perRow = perRowOf(f) || 1;
   const lines: string[] = [];
   for (let i = 0; i < ids.length; i += perRow) lines.push(JSON.stringify(ids.slice(i, i + perRow)));
   return { size: h / 1.2, lines, perRow, extra: Math.max(0, lines.length - 1) * h };
@@ -235,7 +233,7 @@ export function pageGrowth(
   const ends: { bottom: number; extra: number }[] = [];
   for (const f of here) {
     if (f.type === 'file' && f.multiple) {
-      const fit = fileRows(f, answers[f.key], f.position.width * width, f.position.height * height);
+      const fit = fileRows(f, answers[f.key], f.position.height * height);
       if (!fit.extra) continue;
       boxes.set(f.key, fit);
       ends.push({ bottom: top(f) + f.position.height * height, extra: fit.extra });

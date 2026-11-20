@@ -112,10 +112,11 @@ export interface FieldDef {
   /** Not on the page: asked in a follow-up dialog (or one your onFieldChange opens). `position.page` = where it belongs. */
   dialogOnly?: boolean;
   /**
-   * file: an attached photo (PNG / JPEG) is also drawn in the completed PDF, in the box, as width:height ("4:3",
-   * "1:1"; cropped to it from the middle) or "fit" (whole, its own shape). Unset: the file is only attached.
+   * file: photos (PNG / JPEG) show in the box, this many side by side in a row (1–6), each whole in its cell: while
+   * filling and in the completed PDF. With `multiple`, more photos go on more rows and the box grows. Unset: the
+   * files' names show and the files are only attached.
    */
-  photoRatio?: string;
+  photosPerRow?: number;
   /** file: people may attach several files (the answer is a JSON list of file ids, like a multiselect's). */
   multiple?: boolean;
   /** file: in the list view, the file's name over as many lines as it needs ('multiple') or cut to one (default). */

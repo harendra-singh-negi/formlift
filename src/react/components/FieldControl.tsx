@@ -4,6 +4,7 @@ import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import {
   answerText,
   fileIds,
+  perRowOf,
   multiAnswer,
   multiValue,
   rangeOf,
@@ -233,7 +234,7 @@ export interface FieldControlProps {
   onFile?: (file: File) => void
   /** Opens the file; with several, the one with this id. */
   onOpenFile?: (id?: string) => void
-  /** A file field with a photoRatio: its photos, shown in the box as the completed PDF will draw them. */
+  /** A file field with photosPerRow: its photos, shown in the box as the completed PDF will draw them. */
   photos?: { id: string; src: string }[]
   /** A file field with `multiple`: takes this file off. */
   onRemoveFile?: (id: string) => void
@@ -560,31 +561,38 @@ export default function FieldControl({
         </>
       )
     case 'file':
-      // Photos with a ratio: shown in the box as the completed PDF draws them (a frame of that shape, cut from
-      // the middle; "fit" = the whole photo), side by side; the buttons stay over them.
-      if (field.photoRatio && photos?.length) {
-        const fit = !/\d\s*[:x×/]\s*\d/.test(field.photoRatio)
+      // Photos: a grid of photosPerRow cells a row (a row per box height), each photo whole in its cell, as the
+      // completed PDF draws them. ✕ on each takes it off; the add buttons sit in the corner.
+      if (field.photosPerRow && photos?.length) {
+        const per = perRowOf(field)
         return (
           <div
-            className={`relative flex h-full w-full rounded-sm border ${border} bg-white ${field.multiple ? 'flex-wrap content-start items-start' : 'items-center justify-center'}`}
+            className={`relative grid h-full w-full content-start rounded-sm border ${border} bg-white`}
+            style={{ gridTemplateColumns: `repeat(${per}, minmax(0, 1fr))`, gridAutoRows: field.multiple ? 'var(--fl-row, 6rem)' : '100%' }}
           >
             {photos.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => onOpenFile?.(field.multiple ? p.id : undefined)}
-                className={`flex min-w-0 cursor-pointer items-center justify-center ${field.multiple ? 'h-(--fl-row,2.25rem) max-w-full' : 'h-full flex-1'}`}
-              >
-                <img
-                  src={p.src}
-                  alt=""
-                  className={`max-h-full max-w-full ${fit ? 'object-contain' : 'h-full object-cover'}`}
-                  style={fit ? undefined : { aspectRatio: field.photoRatio!.replace(/\s*[:x×]\s*/, ' / ') }}
-                />
-              </button>
+              <div key={p.id} className="relative min-h-0 min-w-0 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => onOpenFile?.(field.multiple ? p.id : undefined)}
+                  className="flex h-full w-full cursor-pointer items-center justify-center"
+                >
+                  <img src={p.src} alt={files?.find((x) => x.id === p.id)?.fileName ?? fileName ?? ''} className="max-h-full max-w-full object-contain" />
+                </button>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    aria-label={L.removeFile(files?.find((x) => x.id === p.id)?.fileName ?? fileName ?? L.attachedFile)}
+                    onClick={() => (field.multiple ? onRemoveFile?.(p.id) : onChange(null))}
+                    className="absolute top-1 right-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-white/90 text-[11px] text-ink-2 shadow hover:text-danger"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             ))}
             {!readOnly && (
-              <span className="absolute right-0.5 bottom-0.5 inline-flex gap-1 rounded bg-white/90 px-1 text-[11px] text-primary shadow-sm">
+              <span className="absolute right-0.5 bottom-0.5 inline-flex gap-1.5 rounded bg-white/90 px-1 py-0.5 text-primary shadow-sm">
                 {[fileInput, cameraInput].map((ref, i) => (
                   <input
                     key={i}
@@ -601,16 +609,11 @@ export default function FieldControl({
                   />
                 ))}
                 <button type="button" {...common} className="cursor-pointer" aria-label={field.multiple ? L.attach : L.replace} onClick={() => fileInput.current?.click()}>
-                  <Paperclip size={11} />
+                  <Paperclip size={12} />
                 </button>
                 {touch && (
                   <button type="button" className="cursor-pointer" aria-label={L.takePhoto} onClick={() => cameraInput.current?.click()}>
-                    <Camera size={11} />
-                  </button>
-                )}
-                {field.multiple && onRemoveFile && (
-                  <button type="button" className="cursor-pointer hover:text-danger" aria-label={L.removeFile(L.attachedFile)} onClick={() => onRemoveFile(photos[photos.length - 1].id)}>
-                    ✕
+                    <Camera size={12} />
                   </button>
                 )}
               </span>
@@ -671,6 +674,16 @@ export default function FieldControl({
               className="min-w-0 flex-1 cursor-pointer truncate text-left text-[clamp(8px,50cqh,13px)] text-primary underline in-[.fl-wrap-name]:py-1 in-[.fl-wrap-name]:text-[13px] in-[.fl-wrap-name]:break-all in-[.fl-wrap-name]:whitespace-normal"
             >
               {fileName || L.attachedFile}
+            </button>
+          )}
+          {!field.multiple && value && !readOnly && (
+            <button
+              type="button"
+              aria-label={L.removeFile(fileName || L.attachedFile)}
+              onClick={() => onChange(null)}
+              className="flex-none cursor-pointer text-[clamp(8px,50cqh,13px)] text-muted hover:text-danger"
+            >
+              ✕
             </button>
           )}
           {/* Several files: the buttons (icons) sit in the corner, the rows stay as printed. On a phone: Camera too. */}

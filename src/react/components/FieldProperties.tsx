@@ -230,11 +230,16 @@ export default function FieldProperties({
               <option value="many">{L.manyFiles}</option>
             </Select>
           </FormField>
-          <FormField label={L.photoInPdf}>
-            <Select className="w-full" value={field.photoRatio ?? ''} onChange={(e) => set({ photoRatio: e.target.value || undefined })}>
-              {['', 'fit', '1:1', '4:3', '3:4', '16:9', '9:16', '3:2'].map((r) => (
-                <option key={r} value={r}>
-                  {r === '' ? L.photoOnlyAttached : r === 'fit' ? L.photoFit : r}
+          <FormField label={L.photosPerRow}>
+            <Select
+              className="w-full"
+              value={field.photosPerRow ?? ''}
+              onChange={(e) => set({ photosPerRow: Number(e.target.value) || undefined })}
+            >
+              <option value="">{L.photosNone}</option>
+              {(field.multiple ? [1, 2, 3, 4, 5, 6] : [1]).map((n) => (
+                <option key={n} value={n}>
+                  {field.multiple ? L.photosInRow(n) : L.photoShown}
                 </option>
               ))}
             </Select>

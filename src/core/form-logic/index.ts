@@ -45,7 +45,7 @@ export {
   multiValue,
   multiAnswer,
   fileIds,
-  ratioOf,
+  perRowOf,
   rangeOf,
   answerText,
 } from './values';

@@ -19,11 +19,12 @@ export const multiAnswer = (chosen: string[]): AnswerValue => (chosen.length ? J
 export const fileIds = (v: AnswerValue | undefined): string[] =>
   typeof v === 'string' && v ? (v.startsWith('[') ? multiValue(v) : [v]) : [];
 
-/** "4:3" → 4/3 (also 4x3, 4/3); "fit" or anything else → null. */
-export function ratioOf(r: string) {
-  const m = /^(\d+(?:\.\d+)?)\s*[:x×/]\s*(\d+(?:\.\d+)?)$/.exec(r.trim());
-  return m && +m[1] > 0 && +m[2] > 0 ? +m[1] / +m[2] : null;
-}
+/**
+ * How many photos a file field shows side by side in a row: photosPerRow (1–6) with `multiple`, 1 for one file;
+ * 0 = no photos, names only.
+ */
+export const perRowOf = (f: FieldDef) =>
+  !f.photosPerRow ? 0 : f.multiple ? Math.min(6, Math.max(1, Math.round(f.photosPerRow))) : 1;
 
 /** A slider's range and step, and a rating's number of stars. */
 export const rangeOf = (f: FieldDef) =>
