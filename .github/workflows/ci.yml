@@ -37,6 +37,7 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run demo:build
+        env: { GA_ID: '${{ secrets.GA_ID }}' }
       - uses: actions/upload-pages-artifact@v5
         with: { path: public }
       - id: deploy
