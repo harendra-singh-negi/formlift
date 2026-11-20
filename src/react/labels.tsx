@@ -320,6 +320,8 @@ export const DEFAULT_LABELS = {
   submitted: 'Submitted',
   addRow: 'Add row',
   removeRow: (n: number) => `Remove row ${n}`,
+  /** An added table row's name over it on a narrow screen. */
+  addedRow: (n: number) => `Row ${n}`,
   answersNeedAttention: 'Some answers need attention',
   fileOpenError: 'Unable to open the file',
 
