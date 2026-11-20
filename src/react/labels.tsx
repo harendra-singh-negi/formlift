@@ -320,6 +320,7 @@ export const DEFAULT_LABELS = {
   attachedFile: 'Attached file',
   attach: 'Attach',
   replace: 'Replace',
+  takePhoto: 'Camera',
   signatureArea: 'Signature drawing area',
   clear: 'Clear',
   useSignature: 'Use signature',

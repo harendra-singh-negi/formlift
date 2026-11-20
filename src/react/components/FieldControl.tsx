@@ -1,5 +1,5 @@
 import type { FormliftComponents } from '../ui/slots'
-import { Check, Paperclip, PenLine, Star } from 'lucide-react'
+import { Camera, Check, Paperclip, PenLine, Star } from 'lucide-react'
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import {
   answerText,
@@ -25,6 +25,9 @@ const FIT_TEXT: Partial<Record<FieldType, string>> = {
   time: 'text-[length:clamp(8px,min(62cqh,14cqw),15px)]',
   datetime: 'text-[length:clamp(8px,min(62cqh,6.5cqw),15px)]',
 }
+
+/** A phone or tablet: file fields also offer the camera. */
+const touch = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches
 
 /** A PNG data URL (the signature pad's drawing) as a file to upload. */
 function pngFile(dataUrl: string, name: string) {
@@ -252,6 +255,7 @@ export default function FieldControl({
   const [signing, setSigning] = useState(false)
   const [editing, setEditing] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
+  const cameraInput = useRef<HTMLInputElement>(null)
   // radio names are per document: a field drawn twice (page + a dialog) must not share one
   const radioName = useId()
   const border = error ? 'border-danger' : 'border-primary/40'
@@ -547,16 +551,20 @@ export default function FieldControl({
     case 'file':
       return (
         <div className={`flex h-full w-full items-center gap-1 rounded-sm border px-1 ${border} bg-primary-soft/50`}>
-          <input
-            ref={fileInput}
-            type="file"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) onFile?.(f)
-              e.target.value = ''
-            }}
-          />
+          {[fileInput, cameraInput].map((ref, i) => (
+            <input
+              key={i}
+              ref={ref}
+              type="file"
+              hidden
+              {...(i ? { accept: 'image/*', capture: 'environment' as const } : {})}
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) onFile?.(f)
+                e.target.value = ''
+              }}
+            />
+          ))}
           {value && (
             <button
               type="button"
@@ -574,6 +582,16 @@ export default function FieldControl({
               className="inline-flex flex-none cursor-pointer items-center gap-1 text-[clamp(8px,50cqh,13px)] text-primary"
             >
               <Paperclip size={12} /> {value ? L.replace : L.attach}
+            </button>
+          )}
+          {/* On a phone: pick a file (above) or take a photo with the camera. */}
+          {!readOnly && touch && (
+            <button
+              type="button"
+              onClick={() => cameraInput.current?.click()}
+              className="inline-flex flex-none cursor-pointer items-center gap-1 text-[clamp(8px,50cqh,13px)] text-primary"
+            >
+              <Camera size={12} /> {L.takePhoto}
             </button>
           )}
         </div>
