@@ -90,6 +90,8 @@ export {
   fileRows,
   textSize,
   pageCuts,
+  cleanCut,
+  type TextBand,
   movedDown,
   pageGrowth,
   pageSheets,

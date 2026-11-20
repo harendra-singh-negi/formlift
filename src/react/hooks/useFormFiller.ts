@@ -230,6 +230,13 @@ export function useFormFiller({
     .filter((f) => states[f.key]?.visible)
     .map((f) => f.key)
     .join(',')
+  const pageLines = useCallback(
+    (page: number): TextLine[] | undefined => {
+      const source = layout ? layout.pages[page - 1]?.source : page
+      return source ? pages?.[source]?.lines : undefined
+    },
+    [layout, pages],
+  )
   const listed = useMemo(() => {
     const keys = new Set(visibleKeys.split(','))
     const textOf = (page: number) => {
@@ -525,6 +532,8 @@ export function useFormFiller({
     reading: wantText && pdf && !pages ? { done: reading, total: pdf.numPages } : null,
     /** Reads the PDF so `questions` get real titles and `segments` the document's text (call when you first show them). */
     loadPageText: () => setWantText(true),
+    /** A page's text lines once read (loadPageText); undefined before. Layout pages map to their source page. */
+    pageLines,
     pdf,
     pdfSizes,
     /** Pass to PdfPages' onLoaded. */
