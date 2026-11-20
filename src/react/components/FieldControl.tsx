@@ -582,7 +582,35 @@ export default function FieldControl({
         const groups = field.multiple ? [ids.filter(photo), ids.filter((id) => !photo(id))].filter((g) => g.length) : [ids]
         return (
           <div className={`relative flex h-full w-full flex-col rounded-sm border ${border} bg-white`}>
-            {groups.map((group, g) => (
+            {groups.map((group, g) =>
+              field.multiple && !photo(group[0]) ? (
+                // Other files: a line each, the full name like a link (fileRows' FILE_LINE), ✕ after it.
+                <ul key={g} className="m-0 list-none p-0 px-1">
+                  {group.map((id) => (
+                    <li key={id} className="flex min-h-(--fl-file-line,1.5rem) items-center gap-1 text-[clamp(8px,calc(var(--fl-file-line,1.5rem)*0.7),13px)]">
+                      <Paperclip size={11} className="flex-none text-muted" />
+                      <button
+                        type="button"
+                        title={nameOf(id)}
+                        onClick={() => onOpenFile?.(id)}
+                        className="min-w-0 cursor-pointer text-left break-all text-primary underline"
+                      >
+                        {nameOf(id)}
+                      </button>
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          aria-label={L.removeFile(nameOf(id))}
+                          onClick={() => onRemoveFile?.(id)}
+                          className="flex-none cursor-pointer text-muted hover:text-danger"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
             <div
               key={g}
               className="grid content-start"
@@ -633,7 +661,8 @@ export default function FieldControl({
               )
             })}
             </div>
-            ))}
+              ),
+            )}
             {!readOnly && (
               <span className="absolute right-0.5 bottom-0.5 inline-flex gap-1.5 rounded bg-white/90 px-1 py-0.5 text-primary shadow-sm">
                 {[fileInput, cameraInput].map((ref, i) => (
@@ -697,12 +726,12 @@ export default function FieldControl({
             fileIds(value).map((id) => {
               const name = files?.find((x) => x.id === id)?.fileName
               return (
-                <span key={id} className="inline-flex h-(--fl-row,auto) max-w-full min-w-0 basis-full items-center gap-0.5">
+                <span key={id} className="inline-flex min-h-(--fl-file-line,auto) max-w-full min-w-0 basis-full items-center gap-0.5">
                   <button
                     type="button"
                     onClick={() => onOpenFile?.(id)}
                     title={name}
-                    className="min-w-0 cursor-pointer truncate text-left text-[clamp(8px,50cqh,13px)] text-primary underline in-[.fl-wrap-name]:text-[13px] in-[.fl-wrap-name]:break-all in-[.fl-wrap-name]:whitespace-normal"
+                    className="min-w-0 cursor-pointer text-left text-[clamp(8px,calc(var(--fl-file-line,1.5rem)*0.7),13px)] break-all text-primary underline"
                   >
                     {name || L.attachedFile}
                   </button>
