@@ -7,7 +7,7 @@ import { completedPdf } from './index';
 import {
   cleanAnswers,
   fileIds,
-  ratioOf,
+  perRowOf,
   type FieldDef,
   fieldStates,
   validateAnswers,
@@ -313,15 +313,15 @@ test('completedPdf: an attached photo is drawn in its box at the chosen ratio, a
   const original = await doc.save();
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
   const files = { p1: { bytes: png, fileName: 'site.png', fileType: 'image/png' }, t1: { bytes: Buffer.from('hi'), fileName: 'a.txt', fileType: 'text/plain' } };
-  const run = (photoRatio: string | undefined, id: string) =>
-    completedPdf(original, [field('p', { type: 'file', photoRatio })], { p: id }, files);
+  const run = (photosPerRow: number | undefined, id: string) =>
+    completedPdf(original, [field('p', { type: 'file', photosPerRow })], { p: id }, files);
   const plain = await run(undefined, 'p1');
-  const drawn = await run('4:3', 'p1');
+  const drawn = await run(1, 'p1');
   assert.ok(drawn.length > plain.length); // the picture is drawn as well as attached
-  assert.equal((await PDFDocument.load(await run('4:3', 't1'))).getPageCount(), 1); // a text file: just attached
-  assert.equal(ratioOf('4:3'), 4 / 3);
-  assert.equal(ratioOf('16x9'), 16 / 9);
-  assert.equal(ratioOf('fit'), null);
+  assert.equal((await PDFDocument.load(await run(1, 't1'))).getPageCount(), 1); // a text file: just attached
+  assert.equal(perRowOf(field('p', { type: 'file', photosPerRow: 3 })), 1); // one file: one photo
+  assert.equal(perRowOf(field('p', { type: 'file', photosPerRow: 9, multiple: true })), 6);
+  assert.equal(perRowOf(field('p', { type: 'file' })), 0);
 });
 
 test('completedPdf: a field with several files attaches each and prints their names', async () => {
@@ -349,8 +349,8 @@ test('completedPdf: many photos grow their box row by row, onto a new page when 
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
   const ids = Array.from({ length: 20 }, (_, i) => `p${i}`);
   const files = Object.fromEntries(ids.map((id) => [id, { bytes: png, fileName: `${id}.png`, fileType: 'image/png' }]));
-  // a box 1/2 page wide, 1/8 tall (100pt): 4:3 frames 133pt wide, 2 per row → 10 rows of 100pt
-  const f = [field('ph', { type: 'file', multiple: true, photoRatio: '4:3', position: { page: 1, x: 0.1, y: 0.5, width: 0.5, height: 0.125 } })];
+  // a box 1/8 page tall (100pt), 2 photos a row → 10 rows of 100pt
+  const f = [field('ph', { type: 'file', multiple: true, photosPerRow: 2, position: { page: 1, x: 0.1, y: 0.5, width: 0.5, height: 0.125 } })];
   const out = await completedPdf(original, f, { ph: JSON.stringify(ids) }, files);
   assert.ok((await PDFDocument.load(out)).getPageCount() > 1);
 });

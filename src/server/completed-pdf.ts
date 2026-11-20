@@ -5,11 +5,6 @@ import {
   PDFHexString,
   PDFName,
   PDFString,
-  clip,
-  endPath,
-  popGraphicsState,
-  pushGraphicsState,
-  rectangle,
   rgb,
   StandardFonts,
   type PDFFont,
@@ -20,7 +15,7 @@ import {
   answerText,
   defaultLayout,
   fileIds,
-  ratioOf,
+  perRowOf,
   fieldStates,
   type Answers,
   type AnswerValue,
@@ -249,8 +244,7 @@ async function pushDown(
         const at = start + n * h;
         const k = sheetOf(at + 0.5, sheets);
         const s = sheets[k];
-        const ids = JSON.parse(row) as string[];
-        await draw(pages[k], f, row, { x, top: H - (s.at + at - s.from), w: (w / (fit.perRow ?? 1)) * ids.length, h });
+        await draw(pages[k], f, row, { x, top: H - (s.at + at - s.from), w, h });
       }
       continue;
     }
@@ -271,30 +265,21 @@ async function pushDown(
 }
 
 
-/**
- * An attached photo drawn in its box: a frame of `ratio` (width:height) as big as fits, centred, the photo filling
- * it (cut from the middle); "fit": the whole photo, its own shape. False when the file is not a PNG / JPEG.
- */
-async function drawPhoto(doc: PDFDocument, page: PDFPage, { x, top, w, h }: { x: number; top: number; w: number; h: number }, file: AnswerFile, ratio: string) {
+/** An attached photo, whole, as big as fits in its cell and centred. False when the file is not a PNG / JPEG. */
+async function drawPhoto(doc: PDFDocument, page: PDFPage, { x, top, w, h }: { x: number; top: number; w: number; h: number }, file: AnswerFile) {
   const b = file.bytes;
   const png = b[0] === 0x89 && b[1] === 0x50;
   const jpg = b[0] === 0xff && b[1] === 0xd8;
   if (!png && !jpg) return false;
   const img = png ? await doc.embedPng(b) : await doc.embedJpg(b);
-  const r = ratioOf(ratio) ?? img.width / img.height;
-  const fw = Math.min(w, h * r);
-  const fh = fw / r;
-  const fx = x + (w - fw) / 2;
-  const fy = top - h + (h - fh) / 2;
-  const s = Math.max(fw / img.width, fh / img.height); // covers the frame
-  page.pushOperators(pushGraphicsState(), rectangle(fx, fy, fw, fh), clip(), endPath());
+  const pad = Math.min(2, w / 20, h / 20);
+  const s = Math.min((w - 2 * pad) / img.width, (h - 2 * pad) / img.height);
   page.drawImage(img, {
-    x: fx + (fw - img.width * s) / 2,
-    y: fy + (fh - img.height * s) / 2,
+    x: x + (w - img.width * s) / 2,
+    y: top - h + (h - img.height * s) / 2,
     width: img.width * s,
     height: img.height * s,
   });
-  page.pushOperators(popGraphicsState());
   return true;
 }
 
@@ -416,13 +401,14 @@ export async function completedPdf(
       page.drawImage(img, { x, y: top - h + (h - img.height * s) / 2, width: img.width * s, height: img.height * s });
       return;
     }
-    // Every file attached; with a ratio, the photos drawn side by side in the box (each in an equal share of it).
+    // Every file attached; with photosPerRow, the photos drawn side by side, each in a cell of w / photosPerRow.
     const own = f.type === 'file' ? fileIds(v).flatMap((id) => (files[id] ? [files[id]] : [])) : [];
-    own.forEach((file, i) => embedFile(doc, page, { x: x + (w / own.length) * i, top, w: w / own.length, h }, file, embedded));
-    if (own.length && f.photoRatio) {
-      const drawn = await Promise.all(
-        own.map((file, i) => drawPhoto(doc, page, { x: x + (w / own.length) * i, top, w: w / own.length, h }, file, f.photoRatio!)),
-      );
+    const per = perRowOf(f);
+    const cell = (i: number) => ({ x: x + (w / (per || own.length)) * i, top, w: w / (per || own.length), h });
+    own.forEach((file, i) => embedFile(doc, page, cell(i), file, embedded));
+    if (own.length && per) {
+      const drawn = [];
+      for (const [i, file] of own.slice(0, per).entries()) drawn.push(await drawPhoto(doc, page, cell(i), file));
       if (drawn.every(Boolean)) return;
     }
     const text = f.type === 'checkbox' ? 'X' : f.type === 'file' ? own.map((x) => x.fileName).join(', ') : answerText(f, v);

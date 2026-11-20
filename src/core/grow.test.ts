@@ -15,15 +15,15 @@ test('pageSheets: a grown page breaks between lines, with a margin at the bottom
 })
 
 test('several files grow their box a row at a time, as many per row as fit', () => {
-  const f = { id: 'p', key: 'p', type: 'file', label: 'Photos', source: 'manual', multiple: true, photoRatio: '4:3', position: { page: 1, x: 0.1, y: 0.1, width: 0.5, height: 0.1 } } as FieldDef
+  const f = { id: 'p', key: 'p', type: 'file', label: 'Photos', source: 'manual', multiple: true, photosPerRow: 2, position: { page: 1, x: 0.1, y: 0.1, width: 0.5, height: 0.1 } } as FieldDef
   const v = JSON.stringify(['a', 'b', 'c', 'd', 'e'])
-  // a 300 x 80 box: 4:3 frames 80 tall are 106.7 wide, 2 per row → 3 rows
-  const r = fileRows(f, v, 300, 80)
+  // 2 photos a row, a row per box height (80) → 3 rows
+  const r = fileRows(f, v, 80)
   expect(r.perRow).toBe(2)
   expect(r.lines.map((l) => JSON.parse(l))).toEqual([['a', 'b'], ['c', 'd'], ['e']])
   expect(r.extra).toBe(160)
-  expect(fileRows({ ...f, photoRatio: undefined }, v, 300, 80).lines).toHaveLength(5) // names: one per row
-  expect(fileRows(f, JSON.stringify(['a']), 300, 80).extra).toBe(0)
+  expect(fileRows({ ...f, photosPerRow: undefined }, v, 80).lines).toHaveLength(5) // names: one per row
+  expect(fileRows(f, JSON.stringify(['a']), 80).extra).toBe(0)
   const g = pageGrowth([f], { p: v }, 1, { width: 600, height: 800 }, () => 1)
   expect(g.boxes.get('p')?.extra).toBe(160)
   expect(g.cuts.length).toBe(1)
