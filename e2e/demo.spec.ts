@@ -83,7 +83,7 @@ test('Basic: a file can be attached and opened again (the demo keeps it in memor
   await page.goto('/')
   await page.getByRole('tab', { name: /Fill/ }).click()
   const doc = page.locator('[data-page="1"]')
-  await doc.locator('input[type=file]').setInputFiles({ name: 'staff-list.txt', mimeType: 'text/plain', buffer: Buffer.from('hi') })
-  await expect(doc.getByRole('button', { name: 'staff-list.txt' })).toBeVisible()
+  await doc.locator('input[type=file]:not([capture])').setInputFiles({ name: 'staff-list.txt', mimeType: 'text/plain', buffer: Buffer.from('hi') })
+  await expect(doc.getByRole('button', { name: 'staff-list.txt', exact: true })).toBeVisible()
   await expect(page.locator('button[title="Download staff-list.txt"]')).toBeVisible() // attachments bar
 })
