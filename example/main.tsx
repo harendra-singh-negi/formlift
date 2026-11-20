@@ -4,7 +4,7 @@
 import { StrictMode, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { addLesson, validateAnswers, type Answers, type Comments, type Lesson } from 'formlift'
-import { FormEditor, FormFiller, setPdfWorker, type FormDoc } from 'formlift/react'
+import { FormEditor, FormFiller, pdfTextLines, setPdfWorker, type FormDoc } from 'formlift/react'
 import { completedPdf } from 'formlift/server'
 import 'formlift/style.css'
 import './demo.css'
@@ -173,7 +173,14 @@ function Demo() {
   async function downloadCompleted() {
     if (!startForm || !pdf) return
     const bytes = typeof pdf === 'string' ? await (await fetch(pdf)).arrayBuffer() : await pdf.arrayBuffer()
-    const out = await completedPdf(bytes, startForm.fields, answers ?? {}, {}, startForm.layout, { comments })
+    // The files people attached (kept in this tab), so photos print; the page's text, so growing boxes do not smear it.
+    const files = Object.fromEntries(
+      await Promise.all(
+        [...uploads].map(async ([id, f]) => [id, { bytes: new Uint8Array(await f.arrayBuffer()), fileName: f.name, fileType: f.type }] as const),
+      ),
+    )
+    const textLines = await pdfTextLines(bytes)
+    const out = await completedPdf(bytes, startForm.fields, answers ?? {}, files, startForm.layout, { comments, textLines })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([out as BlobPart], { type: 'application/pdf' }))
     a.download = 'completed.pdf'
