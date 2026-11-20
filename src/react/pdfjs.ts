@@ -46,3 +46,22 @@ export const loadPdfJs = () =>
       )
     return lib
   }))
+
+/**
+ * Each page's text lines (page fractions), page number → lines: pass them to completedPdf (`text`) so the room a
+ * growing answer makes is not made from the text beside it.
+ */
+export async function pdfTextLines(data: ArrayBuffer | Uint8Array) {
+  const [lib, { toLines }] = await Promise.all([loadPdfJs(), import('../core/layout')])
+  const task = lib.getDocument({ data: new Uint8Array(data.slice(0)), ...({ isEvalSupported: false } as object) })
+  const doc = await task.promise
+  const out: Record<number, { y: number; height: number }[]> = {}
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i)
+    const items = (await page.getTextContent()).items as Parameters<typeof toLines>[0]
+    out[i] = toLines(items, page.view).map(({ y, height }) => ({ y, height }))
+    page.cleanup()
+  }
+  await task.destroy()
+  return out
+}

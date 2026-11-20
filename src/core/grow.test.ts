@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { BREAK_MARGIN, fileRows, lineGaps, onSheets, pageGrowth, pageSheets, type FieldDef } from './form-logic'
+import { BREAK_MARGIN, cleanCut, fileRows, lineGaps, onSheets, pageGrowth, pageSheets, type FieldDef } from './form-logic'
 
 test('pageSheets: a grown page breaks between lines, with a margin at the bottom and the next top', () => {
   const start = 600 // a box 600pt down an 800pt page, 40 lines of 10pt grown by 300pt
@@ -27,4 +27,13 @@ test('several files grow their box a row at a time, as many per row as fit', () 
   const g = pageGrowth([f], { p: v }, 1, { width: 600, height: 800 }, () => 1)
   expect(g.boxes.get('p')?.extra).toBe(160)
   expect(g.cuts.length).toBe(1)
+})
+
+test('cleanCut: a page grows from a line with no text beside the growing box', () => {
+  // the box runs 100..200; text lines at 150..170 and 185..205 beside it
+  expect(cleanCut(200, 100, [])).toBe(200)
+  const y = cleanCut(200, 100, [[150, 170], [185, 205]])
+  expect(y).toBeLessThanOrEqual(185)
+  expect(y).toBeGreaterThan(171.75)
+  expect(cleanCut(200, 190, [[100, 210]])).toBe(200) // no clean line: at the box's bottom, as before
 })

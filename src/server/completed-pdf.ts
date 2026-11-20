@@ -33,6 +33,11 @@ export interface CompletedPdfOptions {
   comments?: Comments;
   /** Headings and words of the added pages (any language). */
   text?: Partial<typeof APPENDIX_TEXT>;
+  /**
+   * The original PDF's text lines per page (page fractions; `pdfTextLines` from formlift/react reads them): the
+   * room a growing answer makes is then not made from the text beside it. Without it that text may look smeared.
+   */
+  textLines?: Record<number, { y: number; height: number }[]>;
 }
 
 const APPENDIX_TEXT = {
@@ -389,7 +394,9 @@ export async function completedPdf(
   const widthOf: WidthOf = (t, n) => font.widthOfTextAtSize(printable(font, t), n);
   const growth = pages.map((p, i) => {
     const { width, height } = p.getCropBox();
-    return pageGrowth(fields, answers, i + 1, { width, height }, widthOf, (f) => !!states[f.key]?.visible);
+    const source = layout ? layout.pages[i]?.source : i + 1;
+    const text = source ? (options.textLines?.[source] ?? []) : [];
+    return pageGrowth(fields, answers, i + 1, { width, height }, widthOf, (f) => !!states[f.key]?.visible, text);
   });
   const draw: DrawAnswer = async (page, f, v, { x, top, w, h }) => {
     if (f.type === 'signature' && typeof v === 'string') {

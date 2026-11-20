@@ -64,15 +64,36 @@ export function fileRows(f: FieldDef, v: AnswerValue | undefined, h: number) {
 /** Where a page grows: [cut (distance from the top), by how much], sorted. */
 export type Cut = [at: number, by: number];
 
+/** A band of the page's text, from the top (points): a slice there would smear it. */
+export type TextBand = [top: number, bottom: number];
+
+/**
+ * Where to cut a page under a box growing from `top` to `cut`: at its bottom, or higher up beside the box where no
+ * line of text lies, so the text next to the box moves down whole instead of being cut in two or smeared by the
+ * slice stretched into the room (table borders, which run the whole height, still carry on). The box covers the
+ * page under it, so cutting inside its height does not show.
+ */
+export function cleanCut(cut: number, top: number, text: TextBand[]) {
+  const busy = (y: number) => text.some(([a, z]) => y - 1.75 < z && y + 0.25 > a);
+  for (let y = cut; y >= Math.max(2, top + 2); y -= 0.5) if (!busy(y)) return y;
+  return cut;
+}
+
 /** Boxes ending on the same line share one cut (the larger push). */
-export function pageCuts(boxes: { bottom: number; extra: number }[]): Cut[] {
-  const cuts = new Map<number, number>();
+export function pageCuts(boxes: { bottom: number; extra: number; top?: number }[], text: TextBand[] = []): Cut[] {
+  const cuts = new Map<number, [number, number]>();
   for (const b of boxes) {
     if (b.extra <= 0) continue;
     const c = Math.round(b.bottom * 2) / 2;
-    cuts.set(c, Math.max(cuts.get(c) ?? 0, b.extra));
+    const [e, t] = cuts.get(c) ?? [0, c];
+    cuts.set(c, [Math.max(e, b.extra), Math.min(t, b.top ?? c)]);
   }
-  return [...cuts].sort((a, b) => a[0] - b[0]);
+  const out = new Map<number, number>();
+  for (const [c, [e, t]] of cuts) {
+    const at = text.length ? cleanCut(c, t, text) : c;
+    out.set(at, Math.max(out.get(at) ?? 0, e));
+  }
+  return [...out].sort((a, b) => a[0] - b[0]);
 }
 
 /** Where a point `d` from the top of the page lands once the page has grown. */
@@ -81,7 +102,7 @@ export const movedDown = (d: number, cuts: Cut[]) => d + cuts.reduce((s, [c, e])
 /**
  * The grown page as pieces of the original: [from, to] (from the top) drawn at `at`, `height` tall. Between pieces,
  * the gap is a thin slice just above the cut stretched down, so a table's vertical borders carry on.
- * ponytail: that slice also smears anything horizontal lying in it (0.5pt high, rare).
+ * With the page's text known, cuts sit on a line with no text (cleanCut), so the slice smears none.
  */
 function growPieces(height: number, cuts: Cut[]) {
   const pieces: { from: number; to: number; at: number; height: number }[] = [];
@@ -209,6 +230,8 @@ export function pageGrowth(
   size: { width: number; height: number },
   widthOf: WidthOf,
   shown: (f: FieldDef) => boolean = () => true,
+  /** The page's text lines (page fractions, as TextLine): the room under a growing box is not made from them. */
+  text: { y: number; height: number }[] = [],
 ) {
   const { width, height } = size;
   const here = fields.filter((f) => f.position.page === page && !f.dialogOnly && shown(f));
@@ -230,13 +253,13 @@ export function pageGrowth(
   const top = (f: FieldDef) => toRows(f.position.y * height) + ((f.repeat?.row ?? 1) - 1) * tile(f.repeat?.id ?? '');
 
   const boxes = new Map<string, ReturnType<typeof textFit> & { perRow?: number }>();
-  const ends: { bottom: number; extra: number }[] = [];
+  const ends: { top: number; bottom: number; extra: number }[] = [];
   for (const f of here) {
     if (f.type === 'file' && f.multiple) {
       const fit = fileRows(f, answers[f.key], f.position.height * height);
       if (!fit.extra) continue;
       boxes.set(f.key, fit);
-      ends.push({ bottom: top(f) + f.position.height * height, extra: fit.extra });
+      ends.push({ top: top(f), bottom: top(f) + f.position.height * height, extra: fit.extra });
       continue;
     }
     if (!GROWING_TYPES.includes(f.type)) continue;
@@ -244,9 +267,10 @@ export function pageGrowth(
     if (!text) continue;
     const fit = textFit(text, f.position.width * width, f.position.height * height, widthOf, f.type === 'text');
     boxes.set(f.key, fit);
-    ends.push({ bottom: top(f) + f.position.height * height, extra: fit.extra });
+    ends.push({ top: top(f), bottom: top(f) + f.position.height * height, extra: fit.extra });
   }
-  const cuts = pageCuts(ends);
+  // Text bands where the page's rows put them (a line in an added row is at its copies too: rare, left out).
+  const cuts = pageCuts(ends, text.map((l): TextBand => [toRows(l.y * height), toRows((l.y + l.height) * height)]));
   const safe: number[] = [];
   for (const f of here) {
     const fit = boxes.get(f.key);

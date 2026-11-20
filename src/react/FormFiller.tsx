@@ -200,10 +200,20 @@ export default function FormFiller({
     () => (layout ? layout.pages.map((p) => (p.source ? (ff.pdfSizes[p.source - 1] ?? p) : p)) : ff.pdfSizes),
     [layout, ff.pdfSizes],
   )
+  // With the page's text (read once something grows), the room under a growing box is made from a line with no
+  // text beside the box, so that text is not smeared.
+  const { pageLines } = ff
   const growth = useMemo(
-    () => pageSizes.map((size, i) => pageGrowth(fields, answers, i + 1, size, widthOf, (f) => !!states[f.key]?.visible)),
-    [pageSizes, fields, answers, states],
+    () =>
+      pageSizes.map((size, i) =>
+        pageGrowth(fields, answers, i + 1, size, widthOf, (f) => !!states[f.key]?.visible, pageLines(i + 1) ?? []),
+      ),
+    [pageSizes, fields, answers, states, pageLines],
   )
+  const grows = growth.some((g) => g.cuts.length)
+  useEffect(() => {
+    if (grows) ff.loadPageText()
+  }, [grows, ff.loadPageText])
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [commentsOf, setCommentsOf] = useState<FieldDef | null>(null)
   const [loadError, setLoadError] = useState('')
