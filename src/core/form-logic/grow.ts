@@ -299,11 +299,13 @@ export function pageGrowth(
   // Text bands where the page's rows put them (a line in an added row is at its copies too: rare, left out).
   const bands = text.map((l): TextBand => [toRows(l.y * height), toRows((l.y + l.height) * height)]);
   const cuts = pageCuts(ends, bands);
-  // A page break just above a line of the page's text, so the line goes to the next page whole.
-  const safe: number[] = bands.map(([a]) => movedDown(a - 1, cuts));
-  // …and never through one (a growing box's row gaps beside a line of text are not safe there).
-  const moved = bands.map(([a, z]) => [movedDown(a, cuts), movedDown(z, cuts)]);
-  const clear = (ys: number[]) => ys.filter((y) => !moved.some(([a, z]) => y > a + 0.5 && y < z - 0.5));
+  // A page break just above a line of the page's text or a box that does not grow, so it goes to the next page
+  // whole with what is beside it (a label and its box stay together)…
+  const still = here.filter((f) => !boxes.get(f.key)?.extra).map((f): TextBand => [top(f), top(f) + f.position.height * height]);
+  const safe: number[] = [...bands, ...still].map(([a]) => movedDown(a - 1, cuts));
+  // …and never through one (a growing box's row gaps beside a line of text or a box are not safe there).
+  const moved = [...bands, ...still].map(([a, z]) => [movedDown(a, cuts), movedDown(z, cuts)]);
+  const clear = (ys: number[]) => ys.filter((y) => !moved.some(([a, z]) => y > a && y < z));
   for (const f of here) {
     const fit = boxes.get(f.key);
     if (!fit?.extra) continue;
