@@ -79,6 +79,8 @@ export const DEFAULT_LABELS = {
   // Editor tools, document, panel
   fieldsHeading: 'FIELDS',
   layoutHeading: 'LAYOUT',
+  searchTools: 'Search fields',
+  noTools: 'Nothing matches',
   dragHint: 'Drag onto the document, or tap one, then the page',
   editLine: (text: string) => `Edit: ${text}`,
   fieldOnPage: (type: string, name: string) => `${type} field ${name}`,
