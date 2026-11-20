@@ -15,6 +15,10 @@ export function multiValue(v: AnswerValue | undefined): string[] {
 /** A multiselect / checklist answer from its chosen options (null when none: an empty answer). */
 export const multiAnswer = (chosen: string[]): AnswerValue => (chosen.length ? JSON.stringify(chosen) : null);
 
+/** The file ids of a file answer: one id, or a JSON list of them (a field with `multiple`). */
+export const fileIds = (v: AnswerValue | undefined): string[] =>
+  typeof v === 'string' && v ? (v.startsWith('[') ? multiValue(v) : [v]) : [];
+
 /** A slider's range and step, and a rating's number of stars. */
 export const rangeOf = (f: FieldDef) =>
   f.type === 'rating'

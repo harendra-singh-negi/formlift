@@ -7,6 +7,7 @@ import { completedPdf } from './index';
 import { ratioOf } from './completed-pdf';
 import {
   cleanAnswers,
+  fileIds,
   type FieldDef,
   fieldStates,
   validateAnswers,
@@ -321,4 +322,22 @@ test('completedPdf: an attached photo is drawn in its box at the chosen ratio, a
   assert.equal(ratioOf('4:3'), 4 / 3);
   assert.equal(ratioOf('16x9'), 16 / 9);
   assert.equal(ratioOf('fit'), null);
+});
+
+test('completedPdf: a field with several files attaches each and prints their names', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([600, 800]);
+  const original = await doc.save();
+  const files = {
+    a: { bytes: Buffer.from('one'), fileName: 'a.txt', fileType: 'text/plain' },
+    b: { bytes: Buffer.from('two'), fileName: 'b.txt', fileType: 'text/plain' },
+  };
+  const f = [field('docs', { type: 'file', multiple: true })];
+  const one = await completedPdf(original, f, { docs: '["a"]' }, files);
+  const two = await completedPdf(original, f, { docs: '["a","b"]' }, files);
+  assert.ok(two.length > one.length);
+  assert.deepEqual(fileIds('["a","b"]'), ['a', 'b']);
+  assert.deepEqual(fileIds('a'), ['a']);
+  assert.deepEqual(fileIds(null), []);
+  assert.deepEqual(validateAnswers(f, { docs: '["a","b"]' }), {});
 });

@@ -19,6 +19,7 @@ import {
 import {
   answerText,
   defaultLayout,
+  fileIds,
   fieldStates,
   type Answers,
   type AnswerValue,
@@ -408,10 +409,16 @@ export async function completedPdf(
       page.drawImage(img, { x, y: top - h + (h - img.height * s) / 2, width: img.width * s, height: img.height * s });
       return;
     }
-    const file = f.type === 'file' ? files[String(v)] : undefined;
-    if (file) embedFile(doc, page, { x, top, w, h }, file, embedded);
-    if (file && f.photoRatio && (await drawPhoto(doc, page, { x, top, w, h }, file, f.photoRatio))) return;
-    const text = f.type === 'checkbox' ? 'X' : f.type === 'file' ? (file?.fileName ?? '') : answerText(f, v);
+    // Every file attached; with a ratio, the photos drawn side by side in the box (each in an equal share of it).
+    const own = f.type === 'file' ? fileIds(v).flatMap((id) => (files[id] ? [files[id]] : [])) : [];
+    own.forEach((file, i) => embedFile(doc, page, { x: x + (w / own.length) * i, top, w: w / own.length, h }, file, embedded));
+    if (own.length && f.photoRatio) {
+      const drawn = await Promise.all(
+        own.map((file, i) => drawPhoto(doc, page, { x: x + (w / own.length) * i, top, w: w / own.length, h }, file, f.photoRatio!)),
+      );
+      if (drawn.every(Boolean)) return;
+    }
+    const text = f.type === 'checkbox' ? 'X' : f.type === 'file' ? own.map((x) => x.fileName).join(', ') : answerText(f, v);
     const multiline = f.type === 'textarea' || f.type === 'checklist';
     const size = textSize(h, !multiline);
     page.drawText(printable(font, text), {
@@ -439,7 +446,7 @@ export async function completedPdf(
   const name = (f: FieldDef) => `${f.label || f.key} (${T.page(f.position.page)})`;
   const answered = (f: FieldDef) => states[f.key]?.visible && answers[f.key] != null && answers[f.key] !== '';
   const said = (f: FieldDef) =>
-    `${f.label || f.key}: ${f.type === 'file' ? (files[String(answers[f.key])]?.fileName ?? '') : answerText(f, answers[f.key], T.yes, T.no)}`;
+    `${f.label || f.key}: ${f.type === 'file' ? fileIds(answers[f.key]).map((id) => files[id]?.fileName ?? '').filter(Boolean).join(', ') : answerText(f, answers[f.key], T.yes, T.no)}`;
   const asked = new Set<string>();
   const blocks: Block[] = [];
   for (const t of fields) {
