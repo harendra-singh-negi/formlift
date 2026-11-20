@@ -12,7 +12,7 @@ import {
   type FieldType,
 } from '../../core/form-logic'
 import { fitInPage } from '../../core/coords'
-import { newFollowUpField } from '../../core/fields'
+import { keyProblem, newFollowUpField } from '../../core/fields'
 import { LEARNT, REMEMBERED } from '../../core/learn'
 import { typeName, useLabels } from '../labels'
 import ConditionBuilder from './ConditionBuilder'
@@ -66,6 +66,14 @@ export default function FieldProperties({
   const optionsKey = (field.options ?? []).join('\n')
   const typed = [...new Set(optionsText.split('\n').map((x) => x.trim()).filter(Boolean))].join('\n')
   if (typed !== optionsKey && optionsText !== optionsKey) setOptionsText(optionsKey)
+  // The typed key; saved only while it is valid and unique, so a clash shows here and never reaches the form.
+  const [keyText, setKeyText] = useState(field.key)
+  const [shownKey, setShownKey] = useState(field.key)
+  if (field.key !== shownKey) {
+    setShownKey(field.key) // the key changed elsewhere (a new label, undo)
+    setKeyText(field.key)
+  }
+  const keyError = keyProblem(keyText, field.id, fields)
   const hasOptions = OPTION_TYPES.includes(field.type)
   const isBool = BOOLEAN_TYPES.includes(field.type)
   // typed answers: placeholder, length, regex
@@ -118,9 +126,19 @@ export default function FieldProperties({
         <FormField label={L.label}>
           <TextInput value={field.label} onChange={(e) => set({ label: e.target.value })} />
         </FormField>
-        {/* Made from the label (unique, kept in step by conditions), never typed: no clashes. */}
-        <FormField label={L.keyAutomatic}>
-          <TextInput value={field.key} readOnly className="text-faint" />
+        {/* Made from the label until typed; conditions follow it either way. */}
+        <FormField label={L.key} error={keyError ? L.keyProblem(keyError) : undefined}>
+          <TextInput
+            value={keyText}
+            aria-invalid={!!keyError}
+            className="font-mono"
+            onChange={(e) => {
+              const k = e.target.value.trim()
+              setKeyText(k)
+              if (!keyProblem(k, field.id, fields)) set({ key: k })
+            }}
+            onBlur={() => setKeyText(field.key)}
+          />
         </FormField>
         <FormField label={L.type}>
           <Select className="w-full" value={field.type} onChange={(e) => set({ type: e.target.value as FieldType })}>

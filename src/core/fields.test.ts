@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { validateFields } from './form-logic'
-import { duplicate, keyFor, keyMaker, newField, refreshed, reorder, uniqueKey, withField } from './fields'
+import { duplicate, keyFor, keyProblem, keyMaker, newField, refreshed, reorder, uniqueKey, withField } from './fields'
 
 describe('field helpers', () => {
   it('new fields get unique keys and a box inside the page', () => {
@@ -75,6 +75,22 @@ describe('field helpers', () => {
     const c = newField('text', 1, 0.5, 0.3, [a, b])
     const f = withField([a, b, c], { ...a, label: 'Site Name' })
     expect([f[1] === b, f[2] === c]).toEqual([false, true])
+  })
+})
+
+describe('typed keys', () => {
+  it('a typed key is kept through label edits, and conditions follow it', () => {
+    const a = newField('text', 1, 0.5, 0.1, [])
+    const b = { ...newField('text', 1, 0.5, 0.2, [a]), visibleWhen: { logic: 'and' as const, rules: [{ fieldKey: a.key, op: 'isNotEmpty' as const }] } }
+    let f = withField([a, b], { ...a, key: 'site' })
+    expect(f[0].key).toBe('site')
+    expect(f[1].visibleWhen?.rules[0]).toMatchObject({ fieldKey: 'site' })
+    f = withField(f, { ...f[0], label: 'Site Name' })
+    expect(f[0].key).toBe('site')
+    expect(keyProblem('site', f[1].id, f)).toBe('taken')
+    expect(keyProblem('site', f[0].id, f)).toBe(null)
+    expect(keyProblem('a b', f[0].id, f)).toBe('invalid')
+    expect(keyProblem('', f[0].id, f)).toBe('empty')
   })
 })
 

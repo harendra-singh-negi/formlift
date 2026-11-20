@@ -210,7 +210,13 @@ export const DEFAULT_LABELS = {
   forgetThisHint: 'Auto-detect will not do this again',
   fieldId: (id: string) => `ID ${id}`,
   label: 'Label',
-  keyAutomatic: 'Key (automatic, from the label)',
+  key: 'Key',
+  keyProblem: (why: 'empty' | 'invalid' | 'taken') =>
+    ({
+      empty: 'A key is needed',
+      invalid: 'Use letters, digits, _ and - only',
+      taken: 'This key already exists',
+    })[why],
   type: 'Type',
   placeholder: 'Placeholder',
   checkedByDefault: 'Checked by default',
