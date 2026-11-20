@@ -46,6 +46,8 @@ export {
   multiAnswer,
   fileIds,
   perRowOf,
+  perRowKey,
+  isPhotoName,
   rangeOf,
   answerText,
 } from './values';
@@ -88,6 +90,7 @@ export {
   wrapText,
   textFit,
   fileRows,
+  PHOTO_SHAPE,
   textSize,
   pageCuts,
   cleanCut,

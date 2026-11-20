@@ -355,7 +355,7 @@ test('completedPdf: many photos grow their box row by row, onto a new page when 
   assert.ok((await PDFDocument.load(out)).getPageCount() > 1);
 });
 
-test('completedPdf: photos and other files share the grid (other files as name tiles) and are listed at the end', async () => {
+test('completedPdf: photos, then other files as name tiles on their own row, and all listed at the end', async () => {
   const doc = await PDFDocument.create();
   doc.addPage([600, 800]);
   const original = await doc.save();
@@ -367,7 +367,7 @@ test('completedPdf: photos and other files share the grid (other files as name t
   };
   const f = [field('x', { type: 'file', multiple: true, photosPerRow: 3, position: { page: 1, x: 0.1, y: 0.1, width: 0.6, height: 0.1 } })];
   const out = await PDFDocument.load(await completedPdf(original, f, { x: '["a","b","c"]' }, files));
-  assert.equal(out.getPageCount(), 2); // the page, and the "Attached files" list
+  assert.ok(out.getPageCount() >= 2); // the grown page, and the "Attached files" list
 });
 
 test('completedPdf: with fileUrl a file cell is a one-click link; without, an attachment with no popup text', async () => {

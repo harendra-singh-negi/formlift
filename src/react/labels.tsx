@@ -335,6 +335,8 @@ export const DEFAULT_LABELS = {
   replace: 'Replace',
   takePhoto: 'Camera',
   removeFile: (name: string) => `Remove ${name}`,
+  photosBigger: 'Bigger photos (fewer in a row)',
+  photosSmaller: 'Smaller photos (more in a row)',
   signatureArea: 'Signature drawing area',
   clear: 'Clear',
   useSignature: 'Use signature',

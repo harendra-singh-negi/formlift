@@ -1,10 +1,11 @@
 import type { FormliftComponents } from '../ui/slots'
-import { Camera, Check, FileText, Paperclip, PenLine, Star } from 'lucide-react'
+import { Camera, Check, FileText, Paperclip, PenLine, Star, ZoomIn, ZoomOut } from 'lucide-react'
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import {
   answerText,
   fileIds,
   perRowOf,
+  PHOTO_SHAPE,
   multiAnswer,
   multiValue,
   rangeOf,
@@ -236,6 +237,11 @@ export interface FieldControlProps {
   onOpenFile?: (id?: string) => void
   /** A file field with photosPerRow: its photos, shown in the box as the completed PDF will draw them. */
   photos?: { id: string; src: string }[]
+  /** Whether a file is a photo: photos and other files sit on rows of their own. */
+  isPhoto?: (id: string) => boolean
+  /** Photos per row now (the person's choice, else the field's), and how the person changes it. */
+  photosPerRow?: number
+  onPhotosPerRow?: (n: number) => void
   /** A file field with `multiple`: takes this file off. */
   onRemoveFile?: (id: string) => void
   /** Image of a stored signature (the answer is its file id); signatures from before are data URLs. */
@@ -260,6 +266,9 @@ export default function FieldControl({
   onOpenFile,
   onRemoveFile,
   photos,
+  isPhoto,
+  photosPerRow,
+  onPhotosPerRow,
   signatureSrc,
   compact,
 }: FieldControlProps) {
@@ -565,17 +574,33 @@ export default function FieldControl({
       // (PNG / JPEG) whole in its cell, any other file as a tile with its name. ✕ on each takes it off; the add
       // buttons sit in the corner.
       if (field.photosPerRow && value) {
-        const per = perRowOf(field)
+        const per = photosPerRow || perRowOf(field)
         const nameOf = (id: string) => files?.find((x) => x.id === id)?.fileName ?? fileName ?? L.attachedFile
+        // Photos together first, then the other files on rows of their own (as fileRows lays them out).
+        const ids = fileIds(value)
+        const photo = isPhoto ?? ((id: string) => !!photos?.some((x) => x.id === id))
+        const groups = field.multiple ? [ids.filter(photo), ids.filter((id) => !photo(id))].filter((g) => g.length) : [ids]
         return (
-          <div
-            className={`relative grid h-full w-full content-start rounded-sm border ${border} bg-white`}
-            style={{ gridTemplateColumns: `repeat(${per}, minmax(0, 1fr))`, gridAutoRows: field.multiple ? 'var(--fl-row, 6rem)' : '100%' }}
-          >
-            {fileIds(value).map((id) => {
+          <div className={`relative flex h-full w-full flex-col rounded-sm border ${border} bg-white`}>
+            {groups.map((group, g) => (
+            <div
+              key={g}
+              className="grid content-start"
+              style={{
+                gridTemplateColumns: `repeat(${per}, minmax(0, 1fr))`,
+                // photos: 4:3 cells (fileRows' PHOTO_SHAPE), bigger when fewer in a row; files: a row per box height
+                gridAutoRows: !field.multiple ? '100%' : photo(group[0]) ? 'auto' : 'var(--fl-row, 6rem)',
+                ...(field.multiple ? {} : { height: '100%' }),
+              }}
+            >
+            {group.map((id) => {
               const p = photos?.find((x) => x.id === id)
               return (
-              <div key={id} className="flex min-h-0 min-w-0 items-center justify-center p-0.5">
+              <div
+                key={id}
+                className="flex min-h-0 min-w-0 items-center justify-center p-0.5"
+                style={field.multiple && photo(id) ? { aspectRatio: `1 / ${PHOTO_SHAPE}` } : undefined}
+              >
                 {/* The ✕ sits on the photo's (or tile's) own corner. */}
                 <span className={`relative inline-flex max-h-full max-w-full ${p ? '' : 'h-full w-full'}`}>
                   <button
@@ -585,7 +610,7 @@ export default function FieldControl({
                     className={`flex max-h-full max-w-full cursor-pointer ${p ? '' : 'h-full w-full items-center justify-center gap-1 overflow-hidden rounded border border-line bg-primary-soft/40 px-1 text-[11px] text-primary'}`}
                   >
                     {p ? (
-                      <img src={p.src} alt={nameOf(id)} className="max-h-(--fl-row,6rem) max-w-full object-contain" />
+                      <img src={p.src} alt={nameOf(id)} className={`max-w-full object-contain ${field.multiple ? 'max-h-full' : 'max-h-(--fl-row,6rem)'}`} />
                     ) : (
                       <>
                         <FileText size={14} className="flex-none" />
@@ -607,6 +632,8 @@ export default function FieldControl({
               </div>
               )
             })}
+            </div>
+            ))}
             {!readOnly && (
               <span className="absolute right-0.5 bottom-0.5 inline-flex gap-1.5 rounded bg-white/90 px-1 py-0.5 text-primary shadow-sm">
                 {[fileInput, cameraInput].map((ref, i) => (
@@ -623,6 +650,17 @@ export default function FieldControl({
                     }}
                   />
                 ))}
+                {/* Photo size: bigger = fewer in a row. */}
+                {field.multiple && onPhotosPerRow && photos?.length ? (
+                  <>
+                    <button type="button" className="cursor-pointer disabled:opacity-30" aria-label={L.photosBigger} title={L.photosBigger} disabled={per <= 1} onClick={() => onPhotosPerRow(per - 1)}>
+                      <ZoomIn size={12} />
+                    </button>
+                    <button type="button" className="cursor-pointer disabled:opacity-30" aria-label={L.photosSmaller} title={L.photosSmaller} disabled={per >= 6} onClick={() => onPhotosPerRow(per + 1)}>
+                      <ZoomOut size={12} />
+                    </button>
+                  </>
+                ) : null}
                 <button type="button" {...common} className="cursor-pointer" aria-label={field.multiple ? L.attach : L.replace} onClick={() => fileInput.current?.click()}>
                   <Paperclip size={12} />
                 </button>

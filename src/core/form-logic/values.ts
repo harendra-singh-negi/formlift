@@ -19,12 +19,21 @@ export const multiAnswer = (chosen: string[]): AnswerValue => (chosen.length ? J
 export const fileIds = (v: AnswerValue | undefined): string[] =>
   typeof v === 'string' && v ? (v.startsWith('[') ? multiValue(v) : [v]) : [];
 
+/** Where the person's own photo size is kept: photos per row of a file field, as the answer `<key>__per`. */
+export const perRowKey = (key: string) => `${key}__per`;
+
+/** A photos-per-row number kept to 1–6 (0 when not a number). */
+const perRange = (n: unknown) => (Number(n) >= 1 ? Math.min(6, Math.round(Number(n))) : 0);
+
 /**
- * How many photos a file field shows side by side in a row: photosPerRow (1–6) with `multiple`, 1 for one file;
- * 0 = no photos, names only.
+ * How many photos a file field shows side by side in a row: the person's choice (answers, `<key>__per`), else
+ * photosPerRow (1–6), with `multiple`; 1 for one file; 0 = no photos, names only.
  */
-export const perRowOf = (f: FieldDef) =>
-  !f.photosPerRow ? 0 : f.multiple ? Math.min(6, Math.max(1, Math.round(f.photosPerRow))) : 1;
+export const perRowOf = (f: FieldDef, answers?: Record<string, AnswerValue | undefined>) =>
+  !f.photosPerRow ? 0 : f.multiple ? perRange(answers?.[perRowKey(f.key)]) || perRange(f.photosPerRow) || 1 : 1;
+
+/** A file's name says it is a photo a PDF can show (PNG / JPEG). */
+export const isPhotoName = (name: string) => /\.(png|jpe?g)$/i.test(name);
 
 /** A slider's range and step, and a rating's number of stars. */
 export const rangeOf = (f: FieldDef) =>
