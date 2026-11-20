@@ -273,7 +273,7 @@ export default function FormFiller({
       const bottomOf = (k: number) =>
         Math.max(...row.filter((f) => (f.repeat!.row ?? 1) === k).map((f) => topOf(f) + f.position.height * H))
       const pill =
-        'absolute z-10 flex items-center gap-0.5 rounded-full border border-primary/40 bg-white px-1.5 py-px text-[11px] text-primary shadow-sm hover:bg-primary-soft'
+        'absolute z-10 flex cursor-pointer items-center gap-0.5 rounded-full border border-primary/40 bg-white px-1.5 py-px text-[11px] text-primary shadow-sm hover:bg-primary-soft'
       if (!max || n < max)
         out.push(
           <button
@@ -294,7 +294,7 @@ export default function FormFiller({
             type="button"
             aria-label={L.removeRow(k)}
             title={L.removeRow(k)}
-            className={`${pill} !px-0.5 -translate-y-1/2`}
+            className={`${pill} !px-0.5 -translate-y-1/2 !border-danger/40 !text-danger hover:!border-danger hover:!bg-danger/5`}
             style={{ left: `calc(${right}% + 4px)`, top: place(top) * px + 6 }}
             onClick={() => ff.removeRow(id, k)}
           >
