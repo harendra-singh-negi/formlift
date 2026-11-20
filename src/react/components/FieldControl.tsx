@@ -571,24 +571,23 @@ export default function FieldControl({
             style={{ gridTemplateColumns: `repeat(${per}, minmax(0, 1fr))`, gridAutoRows: field.multiple ? 'var(--fl-row, 6rem)' : '100%' }}
           >
             {photos.map((p) => (
-              <div key={p.id} className="relative min-h-0 min-w-0 p-0.5">
-                <button
-                  type="button"
-                  onClick={() => onOpenFile?.(field.multiple ? p.id : undefined)}
-                  className="flex h-full w-full cursor-pointer items-center justify-center"
-                >
-                  <img src={p.src} alt={files?.find((x) => x.id === p.id)?.fileName ?? fileName ?? ''} className="max-h-full max-w-full object-contain" />
-                </button>
-                {!readOnly && (
-                  <button
-                    type="button"
-                    aria-label={L.removeFile(files?.find((x) => x.id === p.id)?.fileName ?? fileName ?? L.attachedFile)}
-                    onClick={() => (field.multiple ? onRemoveFile?.(p.id) : onChange(null))}
-                    className="absolute top-1 right-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-white/90 text-[11px] text-ink-2 shadow hover:text-danger"
-                  >
-                    ✕
+              <div key={p.id} className="flex min-h-0 min-w-0 items-center justify-center p-0.5">
+                {/* The ✕ sits on the photo's own corner (the photo keeps its shape inside the cell). */}
+                <span className="relative inline-flex max-h-full max-w-full">
+                  <button type="button" onClick={() => onOpenFile?.(field.multiple ? p.id : undefined)} className="flex max-h-full max-w-full cursor-pointer">
+                    <img src={p.src} alt={files?.find((x) => x.id === p.id)?.fileName ?? fileName ?? ''} className="max-h-(--fl-row,6rem) max-w-full object-contain" />
                   </button>
-                )}
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      aria-label={L.removeFile(files?.find((x) => x.id === p.id)?.fileName ?? fileName ?? L.attachedFile)}
+                      onClick={() => (field.multiple ? onRemoveFile?.(p.id) : onChange(null))}
+                      className="absolute -top-1.5 -right-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-line bg-white text-[11px] text-ink-2 shadow hover:text-danger"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </span>
               </div>
             ))}
             {!readOnly && (
