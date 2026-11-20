@@ -94,7 +94,7 @@ const HINTS: Record<Step, ReactNode> = {
       from the left, try <b>Edit text</b> or <b>Preview</b>, then go to <b>Fill</b>. <b>Ctrl+C</b> a field and{' '}
       <b>Ctrl+V</b> it on another spot: it is named after the text there. Give a table row's fields a{' '}
       <b>Repeatable row</b> and people can add rows. A field's <b>Key</b> can be typed (it must be unique). A
-      file field chooses one file or <b>several</b>, and how a photo prints in the PDF (<b>4:3</b>, <b>1:1</b>…). Auto-detect learns from what you <b>Save</b>: press{' '}
+      file field chooses one file or <b>several</b>, and how many <b>photos in a row</b> show in the box and the PDF. Auto-detect learns from what you <b>Save</b>: press{' '}
       <b>Start over</b> and your changes come back.
     </>
   ),
