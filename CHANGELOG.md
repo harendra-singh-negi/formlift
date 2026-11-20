@@ -3,6 +3,60 @@
 Written automatically by [release-please](https://github.com/googleapis/release-please) from the
 commit messages. The project uses [Semantic Versioning](https://semver.org/).
 
+## [0.7.1](https://github.com/harendra-singh-negi/formlift/compare/v0.7.0...v0.7.1) (2026-11-20)
+
+
+### Features
+
+* **editor:** field keys can be typed, unique across the form, with an error when taken ([f1b01cc](https://github.com/harendra-singh-negi/formlift/commit/f1b01cc6c8792d9f93464ebddf8345ed2e5d3303))
+* **editor:** search the field and layout tools ([6cb7e96](https://github.com/harendra-singh-negi/formlift/commit/6cb7e966ee2e389185fa50aff42aaea8ae9c5e22))
+* **fill:** + Add row and a remove ✕ for table rows in the list view too ([05929e4](https://github.com/harendra-singh-negi/formlift/commit/05929e41604124bb5254b9792f0ae74beb50bcbf))
+* **fill:** a photo drawn in the completed PDF at a chosen ratio, and file names on one line or wrapped in the list view ([7f0ac94](https://github.com/harendra-singh-negi/formlift/commit/7f0ac9419fe9c83dee7228da55fabc1baedd4f91))
+* **fill:** file fields on a phone offer the camera beside choosing a file ([e7e08bc](https://github.com/harendra-singh-negi/formlift/commit/e7e08bcd633cffbded9a520ab142dc07063fc7bf))
+* **fill:** file fields take one file or several, chosen in the builder ([4cfce64](https://github.com/harendra-singh-negi/formlift/commit/4cfce6449184d70f2d7e0439c324c5ccd5d02d31))
+* **fill:** photos first and other files after them, and the person sets how big the photos show ([7f754b7](https://github.com/harendra-singh-negi/formlift/commit/7f754b78b1719da62be915fcbf91b332168edb30))
+* **fill:** photos preview in their box at the PDF's ratio, and several files grow the box like a long answer ([452be83](https://github.com/harendra-singh-negi/formlift/commit/452be83ba3efb3cdf98e5adfdc96bf62538d5ec3))
+* **fill:** photos shown in a grid of 1-6 a row instead of a ratio, each with a remove button ([7f53540](https://github.com/harendra-singh-negi/formlift/commit/7f53540fac163e02a04d1ca509762afe39115a74))
+* **filters:** photos / attachments filter, attached or not attached ([ef83bac](https://github.com/harendra-singh-negi/formlift/commit/ef83bacdc3c49a246612608a951b7b654cd37b73))
+* **pdf:** fileUrl makes a file's cell a one-click link; attachments lose their empty popup ([d6abf81](https://github.com/harendra-singh-negi/formlift/commit/d6abf815efe2712f414df05c62c7ed758fee4df4))
+
+
+### Bug Fixes
+
+* **editor:** a typed key follows the same rule validateFields checks; keyProblem exported ([8f28cc9](https://github.com/harendra-singh-negi/formlift/commit/8f28cc99f620aaacebe6daa9314d2db60899c3ab))
+* **fill:** a growing box cuts the page on a line with no text, so the text beside it moves down whole ([8c0b58c](https://github.com/harendra-singh-negi/formlift/commit/8c0b58c65d0eecd90e98e4b78615b8be45707f98))
+* **fill:** a page break never comes between a box and the label beside it ([62840e3](https://github.com/harendra-singh-negi/formlift/commit/62840e374bfed2ac2d788e552c3db7d57412ce73))
+* **fill:** a photo's remove button sits on its corner whatever its shape, and the size buttons stay in view at the top ([40e5b04](https://github.com/harendra-singh-negi/formlift/commit/40e5b041f387b03d62ad716468cfc2c97b7b2a18))
+* **fill:** a photo's remove button sits on the photo's corner ([911c3fc](https://github.com/harendra-singh-negi/formlift/commit/911c3fc209e4b914633b6113cf42b325303afe48))
+* **fill:** added table rows show as rows of the table in the list view, and with crisp rules on the page ([4dd3d4c](https://github.com/harendra-singh-negi/formlift/commit/4dd3d4cdbac55512aa3fcec9fc4b1c833c2f440a))
+* **fill:** attached files show as a list of their full names, not boxes, on screen and in the PDF ([85ae11b](https://github.com/harendra-singh-negi/formlift/commit/85ae11bc4208cc9649b77d4de1d8ff3adcdf6867))
+* **fill:** files that are not photos take a grid cell as a name tile, and the PDF ends with an Attached files page ([e9c5e8e](https://github.com/harendra-singh-negi/formlift/commit/e9c5e8e1eb0043747fe2722afa7b77f9ff4e84b0))
+* **fill:** no duplicate React keys in the list when table rows are added ([d302e25](https://github.com/harendra-singh-negi/formlift/commit/d302e25b3dd6cb2432a5871bd15439360c13b847))
+* **fill:** on a phone a line of the form with answer boxes is a card: its name on top, each box on its own line with its column's name ([05e9bf4](https://github.com/harendra-singh-negi/formlift/commit/05e9bf40e6ceb348abc2d34428c8040136f400ff))
+* **fill:** on a phone a text answer shows on the page as on a computer and in the PDF: same size, face and wrapping ([7eae177](https://github.com/harendra-singh-negi/formlift/commit/7eae1777a0926cadc7967f4a324b0ef92fc68e5f))
+* **fill:** on a phone an added table row in the list has a bar naming it, with a Remove row button that works ([6c51ce8](https://github.com/harendra-singh-negi/formlift/commit/6c51ce81e6c4d6be39b94570e2162b8a0bf7ea56))
+* **fill:** the photo's ✕ stays red on hover ([f75d933](https://github.com/harendra-singh-negi/formlift/commit/f75d933dc58681a196fa89b0938fe080c0fbd703))
+* **fill:** the remove ✕ of attached files is red ([cc9c91a](https://github.com/harendra-singh-negi/formlift/commit/cc9c91ad393ffc517ab9106c9e3ac2acb6554c7d))
+* **ui:** every button shows the hand pointer; the page's remove-row ✕ is red ([88b73dd](https://github.com/harendra-singh-negi/formlift/commit/88b73dd796f79fd253bdb7b9cf0bfed4425c3ecb))
+
+
+### Documentation
+
+* adding table rows in the list view ([66e81dc](https://github.com/harendra-singh-negi/formlift/commit/66e81dc835f29819baecb36da8ee3d256e58de41))
+* builder and filler screenshots of the current UI ([0d85875](https://github.com/harendra-singh-negi/formlift/commit/0d85875915f716db5e186323c8b23dc6b08514cf))
+* builder screenshot in the README beside the filler's ([a3c7c91](https://github.com/harendra-singh-negi/formlift/commit/a3c7c9137379040f0a6920542db0d9b6a3d6f334))
+* field keys, photos and attachments in the README and the demo ([fa7de12](https://github.com/harendra-singh-negi/formlift/commit/fa7de1266efcfa2f23a9b65eb5ba70941402a775))
+* file tiles in the photo grid and the Attached files page ([f36fe91](https://github.com/harendra-singh-negi/formlift/commit/f36fe912b884fefd25e602eeb70179b442d920b5))
+* files listed by their full names ([b7265a7](https://github.com/harendra-singh-negi/formlift/commit/b7265a77968b4866d572b556dff6d7f4dff86fb5))
+* growing boxes cut on a line with no text; textLines for the completed PDF ([e35fa3b](https://github.com/harendra-singh-negi/formlift/commit/e35fa3b5bde0012e423a06d92bf8f3af3bc6dacd))
+* one-click file links in the completed PDF ([679b5ff](https://github.com/harendra-singh-negi/formlift/commit/679b5ff643a7981cf6ac98ad4d7851d4371e3b2d))
+* photo preview and growing file boxes ([b1b942c](https://github.com/harendra-singh-negi/formlift/commit/b1b942caeb318ad00f3dd37b2f3ddb58c747c7e8))
+* photos before files, and the photo size buttons ([2e468c3](https://github.com/harendra-singh-negi/formlift/commit/2e468c33a65886f9f8908b55a31dbfb5defd0040))
+* photos in a row, and the demo's tour field shows three ([5494009](https://github.com/harendra-singh-negi/formlift/commit/5494009ff1cc2034694866c37fc433b4caa91871))
+* security policy, and the 0.7 upgrade notes named after their release ([08052a4](https://github.com/harendra-singh-negi/formlift/commit/08052a41a34f7b978e868d575329bd4de4bf8390))
+* several files per field in the README and the demo ([ef01046](https://github.com/harendra-singh-negi/formlift/commit/ef01046592e0731662929b01f7e6b79b33ceea58))
+* today's features under 0.7 → next, in the feature table and in the demo's hints ([b0b5c15](https://github.com/harendra-singh-negi/formlift/commit/b0b5c157b6ce9001c4e4389308eea6e3018832d7))
+
 ## [0.7.0](https://github.com/harendra-singh-negi/formlift/compare/v0.6.0...v0.7.0) (2026-11-18)
 
 
