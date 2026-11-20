@@ -255,6 +255,9 @@ export function cleanAnswers(form: FieldDef[], answers: unknown): Answers {
   for (const id of repeatIds(form)) if (rowCount(form, id, input) > 1) out[rowsKey(id)] = String(rowCount(form, id, input));
   const fields = expandRows(form, out);
   for (const f of fields) {
+    // The person's photo size for a file field with several photos (perRowOf), 1–6.
+    const per = Number(input[`${f.key}__per`]);
+    if (f.type === 'file' && f.multiple && f.photosPerRow && per >= 1 && per <= 6) out[`${f.key}__per`] = String(Math.round(per));
     const v = input[f.key];
     if (v == null) continue;
     if (BOOLEAN_TYPES.includes(f.type)) out[f.key] = v === true;

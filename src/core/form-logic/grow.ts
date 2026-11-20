@@ -49,16 +49,35 @@ export function textFit(text: string, w: number, h: number, widthOf: WidthOf, si
   return { size, lines, extra: single && lines.length < 2 ? 0 : Math.max(0, need - h) };
 }
 
+/** A photo row's height: its cells are 4:3, so fewer photos in a row (wider cells) are bigger photos. */
+export const PHOTO_SHAPE = 0.75;
+
 /**
- * A file field with several files in a box `h` tall: one row per `h`, photosPerRow photos to a row (names: one per
- * row). `lines`: each row's ids as JSON; `size` makes lineGaps fall between rows.
+ * A file field with several files in a box `w` x `h`: perRowOf photos to a row, rows of 4:3 cells (PHOTO_SHAPE),
+ * the photos first and the other files (`isPhoto` false) after them on rows `h` tall (names only: one per row,
+ * `h` tall). `lines`: each row's ids as JSON; `heights`: each row's height; `extra`: how much the box grows.
  */
-export function fileRows(f: FieldDef, v: AnswerValue | undefined, h: number) {
-  const ids = fileIds(v);
-  const perRow = perRowOf(f) || 1;
+export function fileRows(
+  f: FieldDef,
+  answers: Record<string, AnswerValue | undefined>,
+  w: number,
+  h: number,
+  isPhoto: (id: string) => boolean = () => true,
+) {
+  const all = fileIds(answers[f.key]);
+  const perRow = perRowOf(f, answers) || 1;
+  const photoH = (w / perRow) * PHOTO_SHAPE;
   const lines: string[] = [];
-  for (let i = 0; i < ids.length; i += perRow) lines.push(JSON.stringify(ids.slice(i, i + perRow)));
-  return { size: h / 1.2, lines, perRow, extra: Math.max(0, lines.length - 1) * h };
+  const heights: number[] = [];
+  const groups = perRowOf(f) ? [all.filter(isPhoto), all.filter((id) => !isPhoto(id))] : [all];
+  groups.forEach((ids, g) => {
+    for (let i = 0; i < ids.length; i += perRow) {
+      lines.push(JSON.stringify(ids.slice(i, i + perRow)));
+      heights.push(perRowOf(f) && g === 0 ? photoH : h);
+    }
+  });
+  const total = heights.reduce((a, b) => a + b, 0);
+  return { size: h / 1.2, lines, heights, perRow, extra: Math.max(0, total - h) };
 }
 
 /** Where a page grows: [cut (distance from the top), by how much], sorted. */
@@ -232,6 +251,8 @@ export function pageGrowth(
   shown: (f: FieldDef) => boolean = () => true,
   /** The page's text lines (page fractions, as TextLine): the room under a growing box is not made from them. */
   text: { y: number; height: number }[] = [],
+  /** Whether an answer's file is a photo (photos and other files go on rows of their own). */
+  isPhoto?: (id: string) => boolean,
 ) {
   const { width, height } = size;
   const here = fields.filter((f) => f.position.page === page && !f.dialogOnly && shown(f));
@@ -252,11 +273,11 @@ export function pageGrowth(
   const tile = (id: string) => rows.find((r) => r.id === id)?.tile ?? 0;
   const top = (f: FieldDef) => toRows(f.position.y * height) + ((f.repeat?.row ?? 1) - 1) * tile(f.repeat?.id ?? '');
 
-  const boxes = new Map<string, ReturnType<typeof textFit> & { perRow?: number }>();
+  const boxes = new Map<string, ReturnType<typeof textFit> & { perRow?: number; heights?: number[] }>();
   const ends: { top: number; bottom: number; extra: number }[] = [];
   for (const f of here) {
     if (f.type === 'file' && f.multiple) {
-      const fit = fileRows(f, answers[f.key], f.position.height * height);
+      const fit = fileRows(f, answers, f.position.width * width, f.position.height * height, isPhoto);
       if (!fit.extra) continue;
       boxes.set(f.key, fit);
       ends.push({ top: top(f), bottom: top(f) + f.position.height * height, extra: fit.extra });
@@ -276,7 +297,11 @@ export function pageGrowth(
     const fit = boxes.get(f.key);
     if (!fit?.extra) continue;
     const start = movedDown(top(f), cuts);
-    safe.push(...lineGaps(start, fit.size, fit.lines.length, start + f.position.height * height + fit.extra));
+    if (fit.heights) {
+      // Between file rows (each its own height).
+      let y = start;
+      for (const rh of fit.heights) safe.push((y += rh));
+    } else safe.push(...lineGaps(start, fit.size, fit.lines.length, start + f.position.height * height + fit.extra));
   }
   // A page break between rows rather than through one.
   for (const r of rows)

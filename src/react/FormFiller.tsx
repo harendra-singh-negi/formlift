@@ -7,6 +7,7 @@ import {
   movedDown,
   onSheets,
   pageGrowth,
+  perRowOf,
   textSize,
   type Answers,
   type FieldDef,
@@ -206,9 +207,9 @@ export default function FormFiller({
   const growth = useMemo(
     () =>
       pageSizes.map((size, i) =>
-        pageGrowth(fields, answers, i + 1, size, widthOf, (f) => !!states[f.key]?.visible, pageLines(i + 1) ?? []),
+        pageGrowth(fields, answers, i + 1, size, widthOf, (f) => !!states[f.key]?.visible, pageLines(i + 1) ?? [], ff.isPhoto),
       ),
-    [pageSizes, fields, answers, states, pageLines],
+    [pageSizes, fields, answers, states, pageLines, ff.isPhoto],
   )
   const grows = growth.some((g) => g.cuts.length)
   useEffect(() => {
@@ -244,6 +245,9 @@ export default function FormFiller({
         onRemoveFile={(id) => ff.removeFile(f, id)}
         signatureSrc={ff.signatureSrc(f)}
         photos={ff.photosOf(f)}
+        isPhoto={ff.isPhoto}
+        photosPerRow={perRowOf(f, answers)}
+        onPhotosPerRow={(n) => ff.setPhotosPerRow(f, n)}
         onFile={ff.canUpload ? (file) => void ff.attach(f, file) : undefined}
         onOpenFile={(id) => ff.openFile(id ?? String(answers[f.key]))}
       />

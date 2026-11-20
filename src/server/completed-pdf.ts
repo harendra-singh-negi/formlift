@@ -16,6 +16,8 @@ import {
   defaultLayout,
   fileIds,
   perRowOf,
+  isPhotoName,
+  PHOTO_SHAPE,
   fieldStates,
   type Answers,
   type AnswerValue,
@@ -252,11 +254,13 @@ async function pushDown(
     }
     if (f.type === 'file') {
       // Several files over rows (fileRows): each row drawn on the sheet it starts on.
+      let at = start;
       for (const [n, row] of fit.lines.entries()) {
-        const at = start + n * h;
+        const rh = fit.heights?.[n] ?? h;
         const k = sheetOf(at + 0.5, sheets);
         const s = sheets[k];
-        await draw(pages[k], f, row, { x, top: H - (s.at + at - s.from), w, h });
+        await draw(pages[k], f, row, { x, top: H - (s.at + at - s.from), w, h: rh });
+        at += rh;
       }
       continue;
     }
@@ -422,7 +426,8 @@ export async function completedPdf(
     const { width, height } = p.getCropBox();
     const source = layout ? layout.pages[i]?.source : i + 1;
     const text = source ? (options.textLines?.[source] ?? []) : [];
-    return pageGrowth(fields, answers, i + 1, { width, height }, widthOf, (f) => !!states[f.key]?.visible, text);
+    const isPhoto = (id: string) => isPhotoName(files[id]?.fileName ?? '');
+    return pageGrowth(fields, answers, i + 1, { width, height }, widthOf, (f) => !!states[f.key]?.visible, text, isPhoto);
   });
   const draw: DrawAnswer = async (page, f, v, { x, top, w, h }) => {
     if (f.type === 'signature' && typeof v === 'string') {
@@ -437,8 +442,10 @@ export async function completedPdf(
     // Every file attached; with photosPerRow, the photos drawn side by side, each in a cell of w / photosPerRow.
     const ids = f.type === 'file' ? fileIds(v).filter((id) => files[id]) : [];
     const own = ids.map((id) => files[id]);
-    const per = perRowOf(f);
-    const cell = (i: number) => ({ x: x + (w / (per || own.length)) * i, top, w: w / (per || own.length), h });
+    const per = perRowOf(f, answers);
+    // A row of photos is 4:3 cells (fileRows); a lone row of them in a taller box keeps that height.
+    const rh = f.multiple && per && own.length && own.every((x) => isPhotoName(x.fileName)) ? Math.min(h, (w / per) * PHOTO_SHAPE) : h;
+    const cell = (i: number) => ({ x: x + (w / (per || own.length)) * i, top, w: w / (per || own.length), h: rh });
     own.forEach((file, i) => embedFile(doc, page, cell(i), file, embedded, options.fileUrl?.(ids[i], file)));
     if (own.length && per) {
       // A photo where it is one (PNG / JPEG), else a tile with the file's name: every file has its cell.

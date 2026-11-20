@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyAnswer,
   fileIds,
+  isPhotoName,
   multiAnswer,
+  perRowKey,
   expandRows,
   removeRow,
   rowCount,
@@ -429,6 +431,13 @@ export function useFormFiller({
     }
   }
 
+  const isPhoto = useCallback((id: string) => isPhotoName(files.find((x) => x.id === id)?.fileName ?? ''), [files])
+
+  /** The person's photo size for a file field with several photos: photos per row (1–6), kept with the answers. */
+  function setPhotosPerRow(f: FieldDef, n: number) {
+    setAll({ ...latest.current, [perRowKey(f.key)]: String(Math.min(6, Math.max(1, Math.round(n)))) })
+  }
+
   /** Takes one file off a field with several (`multiple`). */
   function removeFile(f: FieldDef, id: string) {
     change(f, multiAnswer(fileIds(latest.current[f.key]).filter((x) => x !== id)))
@@ -510,6 +519,9 @@ export function useFormFiller({
     ),
     attach,
     removeFile,
+    setPhotosPerRow,
+    /** Whether a file answer's file is a photo (PNG / JPEG, by its name): photos and other files sit on rows of their own. */
+    isPhoto,
     /** The files of a file answer (several for a field with `multiple`), as far as they are known. */
     filesOf: (v: AnswerValue | undefined) => fileIds(v).flatMap((id) => files.filter((x) => x.id === id)),
     canUpload: !!onUpload,
