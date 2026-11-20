@@ -365,6 +365,10 @@ A file field takes any file. On a phone or tablet it offers two buttons: **Attac
 
 In the editor, a file field's **Attachment** section has:
 
+- **Files people can attach**: one file (a new one replaces it) or several (each added, each with a ✕ to take it
+  off; the file picker lets people choose many at once). Field setting: `multiple`. The answer is then a JSON list
+  of file ids, like a multiselect's: `fileIds(answer)` reads either shape. `useFormFiller` has `filesOf(answer)` and
+  `removeFile(field, id)`. In the completed PDF every file is attached and the photos sit side by side in the box.
 - **Photo in the PDF**: a PNG or JPEG answer is also drawn in the field's box in the completed PDF, as a frame of
   that width:height (`4:3`, `1:1`, `16:9`…, the photo cut to it from the middle) or **Whole photo** (its own shape).
   Unset, the file is only attached. Other files are always only attached. Field setting: `photoRatio`.
@@ -1023,6 +1027,7 @@ interface FieldDef {
   maxLength?: number
   min?: number // number / currency / slider; multiselect / checklist: fewest choices
   max?: number // number / currency / slider; multiselect / checklist: most choices; rating: stars (default 5)
+  multiple?: boolean // file: several files; the answer is a JSON list of file ids
   photoRatio?: string // file: draw a PNG / JPEG answer in the completed PDF at this width:height ('4:3'), or 'fit'
   listRows?: 'single' | 'multiple' // file: the name on one line (default) or wrapped, in the list view
   step?: number // slider (default 1)
@@ -1154,7 +1159,7 @@ Check the first row:
 | Repeatable table rows | – | New: fields with the same `repeat` form a table row people can add copies of ([Repeatable table rows](#repeatable-table-rows)). Forms without `repeat` work as before. |
 | Copy and paste fields | – | New in the editor: <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd>, the copy named after the PDF's text where it lands ([Copy and paste](#copy-and-paste-fields)). With `keyboard={false}` it is off, like the other shortcuts. |
 | Field keys can be typed | – | The editor's **Key** box is no longer read-only. A typed key must be unique and is kept when the label changes ([Field keys](#field-keys)). |
-| Photos and attachments | – | New: **Camera** on phones, a photo drawn in the PDF at a chosen ratio (`photoRatio`), the name's lines in the list view (`listRows`), and the **Photos / attachments** filter ([Photos and attachments](#photos-and-attachments)). |
+| Photos and attachments | code that reads a file answer as one id | New: **Camera** on phones, one or several files per field (`multiple`: the answer is then a JSON list of ids; read either shape with `fileIds(answer)`), a photo drawn in the PDF at a chosen ratio (`photoRatio`), the name's lines in the list view (`listRows`), and the **Photos / attachments** filter ([Photos and attachments](#photos-and-attachments)). |
 | Links on a grown page | – | A page of the completed PDF rebuilt for a long answer loses the original's links and file attachments on that page. Other pages keep them. |
 
 ### 0.5 → 0.6
