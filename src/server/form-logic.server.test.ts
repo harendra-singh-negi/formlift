@@ -369,3 +369,20 @@ test('completedPdf: photos and other files share the grid (other files as name t
   const out = await PDFDocument.load(await completedPdf(original, f, { x: '["a","b","c"]' }, files));
   assert.equal(out.getPageCount(), 2); // the page, and the "Attached files" list
 });
+
+test('completedPdf: with fileUrl a file cell is a one-click link; without, an attachment with no popup text', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([600, 800]);
+  const original = await doc.save();
+  const files = { a: { bytes: Buffer.from('%PDF-1.4'), fileName: 'report.pdf', fileType: 'application/pdf' } };
+  const f = [field('x', { type: 'file' })];
+  const annots = async (opts: object) => {
+    const out = await PDFDocument.load(await completedPdf(original, f, { x: 'a' }, files, null, opts));
+    return out.getPage(0).node.Annots()!.asArray().map((r) => String(out.context.lookup(r)));
+  };
+  const linked = await annots({ fileUrl: (id: string) => `https://example.com/files/${id}` });
+  assert.ok(linked.some((a) => a.includes('/Link') && a.includes('https://example.com/files/a')));
+  assert.ok(!linked.some((a) => a.includes('/FileAttachment')));
+  const plain = await annots({});
+  assert.ok(plain.some((a) => a.includes('/FileAttachment') && !a.includes('/Contents')));
+});
