@@ -368,12 +368,17 @@ In the editor, a file field's **Attachment** section has:
 - **Files people can attach**: one file (a new one replaces it) or several (each added, each with a ✕ to take it
   off; the file picker lets people choose many at once). Field setting: `multiple`. The answer is then a JSON list
   of file ids, like a multiselect's: `fileIds(answer)` reads either shape. `useFormFiller` has `filesOf(answer)` and
-  `removeFile(field, id)`. In the completed PDF every file is attached and the photos sit side by side in the box.
+  `removeFile(field, id)`. In the completed PDF every file is attached.
 - **Photo in the PDF**: a PNG or JPEG answer is also drawn in the field's box in the completed PDF, as a frame of
   that width:height (`4:3`, `1:1`, `16:9`…, the photo cut to it from the middle) or **Whole photo** (its own shape).
   Unset, the file is only attached. Other files are always only attached. Field setting: `photoRatio`.
+  While filling, the photos already show in the box this way, so people see what will print.
 - **Name in the list view**: one line, cut short (default), or as many lines as the name needs. Field setting:
   `listRows: 'single' | 'multiple'`.
+
+With several files the box grows like a long answer: a row per box height (photos side by side, as many as fit
+in a row; names one per row), and what is below moves down, onto the next page when needed. On screen and in the
+completed PDF alike. `fileRows(field, answer, width, height)` gives the rows.
 
 The list view's **Photos / attachments** filter (`attachmentFilter()`) shows the questions with a file attached or
 still missing one.
