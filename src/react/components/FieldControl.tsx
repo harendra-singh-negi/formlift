@@ -275,6 +275,8 @@ export default function FieldControl({
   const L = useLabels()
   const [signing, setSigning] = useState(false)
   const [editing, setEditing] = useState(false)
+  // Each shown photo's shape (width / height), once loaded: its frame is then exactly the photo, ✕ on its corner.
+  const [shapes, setShapes] = useState<Record<string, number>>({})
   const fileInput = useRef<HTMLInputElement>(null)
   const cameraInput = useRef<HTMLInputElement>(null)
   // radio names are per document: a field drawn twice (page + a dialog) must not share one
@@ -626,11 +628,14 @@ export default function FieldControl({
               return (
               <div
                 key={id}
-                className="flex min-h-0 min-w-0 items-center justify-center p-0.5"
+                className="flex min-h-0 min-w-0 items-center justify-center p-0.5 [container-type:size]"
                 style={field.multiple && photo(id) ? { aspectRatio: `1 / ${PHOTO_SHAPE}` } : undefined}
               >
-                {/* The ✕ sits on the photo's (or tile's) own corner. */}
-                <span className={`relative inline-flex max-h-full max-w-full ${p ? '' : 'h-full w-full'}`}>
+                {/* The ✕ sits on the photo's own corner: the frame is the photo's shape, as big as fits the cell. */}
+                <span
+                  className={`relative inline-flex max-h-full max-w-full ${p ? '' : 'h-full w-full'}`}
+                  style={p && shapes[id] ? { aspectRatio: shapes[id], width: `min(100cqw, calc(100cqh * ${shapes[id]}))` } : undefined}
+                >
                   <button
                     type="button"
                     title={nameOf(id)}
@@ -638,7 +643,15 @@ export default function FieldControl({
                     className={`flex max-h-full max-w-full cursor-pointer ${p ? '' : 'h-full w-full items-center justify-center gap-1 overflow-hidden rounded border border-line bg-primary-soft/40 px-1 text-[11px] text-primary'}`}
                   >
                     {p ? (
-                      <img src={p.src} alt={nameOf(id)} className={`max-w-full object-contain ${field.multiple ? 'max-h-full' : 'max-h-(--fl-row,6rem)'}`} />
+                      <img
+                        src={p.src}
+                        alt={nameOf(id)}
+                        onLoad={(e) => {
+                          const { naturalWidth: w, naturalHeight: h } = e.currentTarget
+                          if (w && h && shapes[id] !== w / h) setShapes((m) => ({ ...m, [id]: w / h }))
+                        }}
+                        className={shapes[id] ? 'h-full w-full object-contain' : `max-w-full object-contain ${field.multiple ? 'max-h-full' : 'max-h-(--fl-row,6rem)'}`}
+                      />
                     ) : (
                       <>
                         <FileText size={14} className="flex-none" />
@@ -664,7 +677,7 @@ export default function FieldControl({
               ),
             )}
             {!readOnly && (
-              <span className="absolute right-0.5 bottom-0.5 inline-flex gap-1.5 rounded bg-white/90 px-1 py-0.5 text-primary shadow-sm">
+              <span className="absolute top-0.5 left-0.5 z-10 inline-flex items-center gap-2 rounded border border-line bg-white/95 px-1.5 py-0.5 text-primary shadow-sm">
                 {[fileInput, cameraInput].map((ref, i) => (
                   <input
                     key={i}
@@ -683,10 +696,10 @@ export default function FieldControl({
                 {field.multiple && onPhotosPerRow && photos?.length ? (
                   <>
                     <button type="button" className="cursor-pointer disabled:opacity-30" aria-label={L.photosBigger} title={L.photosBigger} disabled={per <= 1} onClick={() => onPhotosPerRow(per - 1)}>
-                      <ZoomIn size={12} />
+                      <ZoomIn size={14} />
                     </button>
                     <button type="button" className="cursor-pointer disabled:opacity-30" aria-label={L.photosSmaller} title={L.photosSmaller} disabled={per >= 6} onClick={() => onPhotosPerRow(per + 1)}>
-                      <ZoomOut size={12} />
+                      <ZoomOut size={14} />
                     </button>
                   </>
                 ) : null}
