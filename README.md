@@ -312,7 +312,9 @@ per box. Groups work for `checkbox` and `toggle`. (`radio` is one-of-many alread
 ### Repeatable table rows
 
 A table with "add as many rows as you need": the person clicks **+ Add row** under the row and gets a copy of it
-(its lines and fields), and the rest of the page moves down, on screen and in the completed PDF.
+(its lines and fields), and the rest of the page moves down, on screen and in the completed PDF. The list view
+has the same **+ Add row** under the table, the added rows show as rows of the table, and a red ✕ beside each
+takes it out (`<QuestionList rows={{ add, remove, canAdd }}>` in your own UI).
 
 - **Editor:** select each field of one table row → *Repeatable row* → **New repeatable row…** for the first, then the
   same row for the others. *Most rows* caps it (empty = no limit).
