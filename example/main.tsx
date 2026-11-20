@@ -91,7 +91,7 @@ const HINTS: Record<Step, ReactNode> = {
   build: (
     <>
       <b>Step 1 · Build.</b> Fields were suggested automatically (dashed). Click one to edit it, drag new fields
-      from the left, try <b>Edit text</b> or <b>Preview</b>, then go to <b>Fill</b>. <b>Ctrl+C</b> a field and{' '}
+      from the left (search them at the top), try <b>Edit text</b> or <b>Preview</b>, then go to <b>Fill</b>. <b>Ctrl+C</b> a field and{' '}
       <b>Ctrl+V</b> it on another spot: it is named after the text there. Give a table row's fields a{' '}
       <b>Repeatable row</b> and people can add rows. A field's <b>Key</b> can be typed (it must be unique). A
       file field chooses one file or <b>several</b>, and how many <b>photos in a row</b> show in the box and the PDF. Auto-detect learns from what you <b>Save</b>: press{' '}
@@ -101,7 +101,7 @@ const HINTS: Record<Step, ReactNode> = {
   fill: (
     <>
       <b>Step 2 · Fill.</b> Answer on the page or switch to <b>List</b>. A long answer grows its box and moves the
-      page down; <b>+ Add row</b> adds a table row. On a phone a file field offers <b>Camera</b>; <b>🔍+ / 🔍−</b> make its photos bigger or smaller; the list's{' '}
+      page down; <b>+ Add row</b> adds a table row (in the list too, ✕ takes one out). On a phone a file field offers <b>Camera</b>; <b>🔍+ / 🔍−</b> make its photos bigger or smaller; the list's{' '}
       <b>Photos / attachments</b> filter finds what is attached or still missing. Answers autosave, <b>Submit</b> checks the rules,{' '}
       <b>Completed PDF</b> downloads the PDF with your answers.
     </>
