@@ -7,7 +7,8 @@ import { groupsOf } from './groups';
 import { resolveLimits, type Limits } from './limits';
 import { FIELD_TYPES, OPTION_TYPES, type Condition, type FieldDef } from './model';
 
-const KEY = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+/** What a field key may be: a letter, then letters, digits or _ (64 at most). */
+export const KEY = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 
 function conditionKeys(c: Condition | undefined, into: Set<string>) {
   for (const r of c?.rules ?? []) {

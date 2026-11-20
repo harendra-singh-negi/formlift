@@ -41,5 +41,5 @@ export type { FilterOption, FilterSource, FilterValues, QuestionFilterDef } from
 export { toLines, type TextLine, type PdfTextItem } from './core/layout'
 export { readPage, pageFlow, flowSegments, flowText } from './core/flow'
 export type { FlowBlock, FlowCell, FlowImage, FlowPara, FlowPart, FlowRun, FlowSegment, PageRead } from './core/flow'
-export { newField, duplicate, reorder, withField, withoutField, newFollowUpField, uniqueKey, keyFor } from './core/fields'
+export { newField, duplicate, reorder, withField, withoutField, newFollowUpField, uniqueKey, keyFor, keyProblem } from './core/fields'
 export { fitInPage, moveBy, resizeBy, snap } from './core/coords'
