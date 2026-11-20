@@ -45,6 +45,7 @@ export {
   multiValue,
   multiAnswer,
   fileIds,
+  ratioOf,
   rangeOf,
   answerText,
 } from './values';
@@ -86,6 +87,7 @@ export {
   GROWING_TYPES,
   wrapText,
   textFit,
+  fileRows,
   textSize,
   pageCuts,
   movedDown,

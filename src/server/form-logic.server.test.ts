@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
 import { completedPdf } from './index';
-import { ratioOf } from './completed-pdf';
 import {
   cleanAnswers,
   fileIds,
+  ratioOf,
   type FieldDef,
   fieldStates,
   validateAnswers,
@@ -340,4 +340,17 @@ test('completedPdf: a field with several files attaches each and prints their na
   assert.deepEqual(fileIds('a'), ['a']);
   assert.deepEqual(fileIds(null), []);
   assert.deepEqual(validateAnswers(f, { docs: '["a","b"]' }), {});
+});
+
+test('completedPdf: many photos grow their box row by row, onto a new page when needed', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([600, 800]);
+  const original = await doc.save();
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const ids = Array.from({ length: 20 }, (_, i) => `p${i}`);
+  const files = Object.fromEntries(ids.map((id) => [id, { bytes: png, fileName: `${id}.png`, fileType: 'image/png' }]));
+  // a box 1/2 page wide, 1/8 tall (100pt): 4:3 frames 133pt wide, 2 per row → 10 rows of 100pt
+  const f = [field('ph', { type: 'file', multiple: true, photoRatio: '4:3', position: { page: 1, x: 0.1, y: 0.5, width: 0.5, height: 0.125 } })];
+  const out = await completedPdf(original, f, { ph: JSON.stringify(ids) }, files);
+  assert.ok((await PDFDocument.load(out)).getPageCount() > 1);
 });

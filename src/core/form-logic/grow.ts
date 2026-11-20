@@ -2,7 +2,7 @@
 // everything below it on the page down, the same way on screen (FormFiller) and in the completed PDF.
 // Units are PDF points, measured from the page's top.
 import type { AnswerValue, FieldDef } from './model';
-import { answerText } from './values';
+import { answerText, fileIds, ratioOf } from './values';
 import { rowCount } from './rows';
 
 /** Width of `text` at font `size` (points), Helvetica metrics: pdf-lib's font, or a canvas measuring Arial. */
@@ -47,6 +47,20 @@ export function textFit(text: string, w: number, h: number, widthOf: WidthOf, si
   const lines = wrapText(text, w - 4, size, widthOf);
   const need = lines.length * size * 1.2 + size * 0.2 + 2;
   return { size, lines, extra: single && lines.length < 2 ? 0 : Math.max(0, need - h) };
+}
+
+/**
+ * A file field with several files in a `w` x `h` box: one row per `h`, as many per row as fit (photos: frames of
+ * the photoRatio, "fit" taken as square; names: one per row). `lines`: each row's ids as JSON; `size` makes
+ * lineGaps fall between rows.
+ */
+export function fileRows(f: FieldDef, v: AnswerValue | undefined, w: number, h: number) {
+  const ids = fileIds(v);
+  const r = f.photoRatio ? (ratioOf(f.photoRatio) ?? 1) : 0;
+  const perRow = r ? Math.max(1, Math.floor(w / (h * r) + 1e-9)) : 1;
+  const lines: string[] = [];
+  for (let i = 0; i < ids.length; i += perRow) lines.push(JSON.stringify(ids.slice(i, i + perRow)));
+  return { size: h / 1.2, lines, perRow, extra: Math.max(0, lines.length - 1) * h };
 }
 
 /** Where a page grows: [cut (distance from the top), by how much], sorted. */
@@ -217,9 +231,16 @@ export function pageGrowth(
   const tile = (id: string) => rows.find((r) => r.id === id)?.tile ?? 0;
   const top = (f: FieldDef) => toRows(f.position.y * height) + ((f.repeat?.row ?? 1) - 1) * tile(f.repeat?.id ?? '');
 
-  const boxes = new Map<string, ReturnType<typeof textFit>>();
+  const boxes = new Map<string, ReturnType<typeof textFit> & { perRow?: number }>();
   const ends: { bottom: number; extra: number }[] = [];
   for (const f of here) {
+    if (f.type === 'file' && f.multiple) {
+      const fit = fileRows(f, answers[f.key], f.position.width * width, f.position.height * height);
+      if (!fit.extra) continue;
+      boxes.set(f.key, fit);
+      ends.push({ bottom: top(f) + f.position.height * height, extra: fit.extra });
+      continue;
+    }
     if (!GROWING_TYPES.includes(f.type)) continue;
     const text = answerText(f, answers[f.key]);
     if (!text) continue;

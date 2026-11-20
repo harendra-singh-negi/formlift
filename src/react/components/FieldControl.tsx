@@ -233,6 +233,8 @@ export interface FieldControlProps {
   onFile?: (file: File) => void
   /** Opens the file; with several, the one with this id. */
   onOpenFile?: (id?: string) => void
+  /** A file field with a photoRatio: its photos, shown in the box as the completed PDF will draw them. */
+  photos?: { id: string; src: string }[]
   /** A file field with `multiple`: takes this file off. */
   onRemoveFile?: (id: string) => void
   /** Image of a stored signature (the answer is its file id); signatures from before are data URLs. */
@@ -256,6 +258,7 @@ export default function FieldControl({
   onFile,
   onOpenFile,
   onRemoveFile,
+  photos,
   signatureSrc,
   compact,
 }: FieldControlProps) {
@@ -557,8 +560,68 @@ export default function FieldControl({
         </>
       )
     case 'file':
+      // Photos with a ratio: shown in the box as the completed PDF draws them (a frame of that shape, cut from
+      // the middle; "fit" = the whole photo), side by side; the buttons stay over them.
+      if (field.photoRatio && photos?.length) {
+        const fit = !/\d\s*[:x×/]\s*\d/.test(field.photoRatio)
+        return (
+          <div
+            className={`relative flex h-full w-full rounded-sm border ${border} bg-white ${field.multiple ? 'flex-wrap content-start items-start' : 'items-center justify-center'}`}
+          >
+            {photos.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onOpenFile?.(field.multiple ? p.id : undefined)}
+                className={`flex min-w-0 cursor-pointer items-center justify-center ${field.multiple ? 'h-(--fl-row,2.25rem) max-w-full' : 'h-full flex-1'}`}
+              >
+                <img
+                  src={p.src}
+                  alt=""
+                  className={`max-h-full max-w-full ${fit ? 'object-contain' : 'h-full object-cover'}`}
+                  style={fit ? undefined : { aspectRatio: field.photoRatio!.replace(/\s*[:x×]\s*/, ' / ') }}
+                />
+              </button>
+            ))}
+            {!readOnly && (
+              <span className="absolute right-0.5 bottom-0.5 inline-flex gap-1 rounded bg-white/90 px-1 text-[11px] text-primary shadow-sm">
+                {[fileInput, cameraInput].map((ref, i) => (
+                  <input
+                    key={i}
+                    ref={ref}
+                    type="file"
+                    hidden
+                    accept="image/*"
+                    {...(i ? { capture: 'environment' as const } : {})}
+                    multiple={!i && field.multiple}
+                    onChange={(e) => {
+                      for (const f of e.target.files ?? []) onFile?.(f)
+                      e.target.value = ''
+                    }}
+                  />
+                ))}
+                <button type="button" {...common} className="cursor-pointer" aria-label={field.multiple ? L.attach : L.replace} onClick={() => fileInput.current?.click()}>
+                  <Paperclip size={11} />
+                </button>
+                {touch && (
+                  <button type="button" className="cursor-pointer" aria-label={L.takePhoto} onClick={() => cameraInput.current?.click()}>
+                    <Camera size={11} />
+                  </button>
+                )}
+                {field.multiple && onRemoveFile && (
+                  <button type="button" className="cursor-pointer hover:text-danger" aria-label={L.removeFile(L.attachedFile)} onClick={() => onRemoveFile(photos[photos.length - 1].id)}>
+                    ✕
+                  </button>
+                )}
+              </span>
+            )}
+          </div>
+        )
+      }
       return (
-        <div className={`flex h-full min-h-[inherit] w-full items-center gap-1 rounded-sm border px-1 ${border} bg-primary-soft/50 in-[.fl-wrap-name]:flex-wrap in-[.fl-wrap-name]:[&>button]:text-[13px]`}>
+        <div
+          className={`flex h-full min-h-[inherit] w-full gap-1 rounded-sm border px-1 ${border} bg-primary-soft/50 in-[.fl-wrap-name]:flex-wrap in-[.fl-wrap-name]:[&>button]:text-[13px] ${field.multiple ? 'relative flex-wrap content-start items-center pr-12' : 'items-center'}`}
+        >
           {[fileInput, cameraInput].map((ref, i) => (
             <input
               key={i}
@@ -578,7 +641,7 @@ export default function FieldControl({
             fileIds(value).map((id) => {
               const name = files?.find((x) => x.id === id)?.fileName
               return (
-                <span key={id} className="inline-flex max-w-full min-w-0 items-center gap-0.5">
+                <span key={id} className="inline-flex h-(--fl-row,auto) max-w-full min-w-0 basis-full items-center gap-0.5">
                   <button
                     type="button"
                     onClick={() => onOpenFile?.(id)}
@@ -610,25 +673,29 @@ export default function FieldControl({
               {fileName || L.attachedFile}
             </button>
           )}
+          {/* Several files: the buttons (icons) sit in the corner, the rows stay as printed. On a phone: Camera too. */}
           {!readOnly && (
-            <button
-              type="button"
-              {...common}
-              onClick={() => fileInput.current?.click()}
-              className="inline-flex flex-none cursor-pointer items-center gap-1 text-[clamp(8px,50cqh,13px)] text-primary"
-            >
-              <Paperclip size={12} /> {value && !field.multiple ? L.replace : L.attach}
-            </button>
-          )}
-          {/* On a phone: pick a file (above) or take a photo with the camera. */}
-          {!readOnly && touch && (
-            <button
-              type="button"
-              onClick={() => cameraInput.current?.click()}
-              className="inline-flex flex-none cursor-pointer items-center gap-1 text-[clamp(8px,50cqh,13px)] text-primary"
-            >
-              <Camera size={12} /> {L.takePhoto}
-            </button>
+            <span className={field.multiple ? 'absolute right-0.5 bottom-0.5 inline-flex gap-1.5 rounded bg-white/90 px-1' : 'contents'}>
+              <button
+                type="button"
+                {...common}
+                aria-label={field.multiple ? L.attach : undefined}
+                onClick={() => fileInput.current?.click()}
+                className="inline-flex flex-none cursor-pointer items-center gap-1 text-[clamp(8px,50cqh,13px)] text-primary"
+              >
+                <Paperclip size={12} /> {!field.multiple && (value ? L.replace : L.attach)}
+              </button>
+              {touch && (
+                <button
+                  type="button"
+                  aria-label={field.multiple ? L.takePhoto : undefined}
+                  onClick={() => cameraInput.current?.click()}
+                  className="inline-flex flex-none cursor-pointer items-center gap-1 text-[clamp(8px,50cqh,13px)] text-primary"
+                >
+                  <Camera size={12} /> {!field.multiple && L.takePhoto}
+                </button>
+              )}
+            </span>
           )}
         </div>
       )

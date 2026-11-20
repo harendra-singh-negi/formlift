@@ -271,18 +271,25 @@ export function useFormFiller({
     return listed.map((q) => (text.has(q.id) ? { ...q, text: text.get(q.id) } : q))
   }, [segments, listed])
 
-  // Loads the stored signatures shown on the page (once each).
+  // Loads the stored pictures shown on the page (once each): signatures, and the photos of file fields with a
+  // photoRatio (other files are not pictures and are left out).
   const loading = useRef(new Set<string>())
   useEffect(() => {
     if (!loadFile) return
     for (const f of fields) {
       const v = answers[f.key]
-      if (f.type !== 'signature' || typeof v !== 'string' || !v || v.startsWith('data:')) continue
-      if (signatures[v] || loading.current.has(v)) continue
-      loading.current.add(v)
-      loadFile(v)
-        .then((blob) => setSignatures((m) => ({ ...m, [v]: URL.createObjectURL(blob) })))
-        .catch(() => loading.current.delete(v))
+      const ids =
+        f.type === 'signature' ? (typeof v === 'string' && v && !v.startsWith('data:') ? [v] : []) : f.type === 'file' && f.photoRatio ? fileIds(v) : []
+      for (const id of ids) {
+        if (signatures[id] || loading.current.has(id)) continue
+        loading.current.add(id)
+        loadFile(id)
+          .then((blob) => {
+            if (f.type === 'signature' || blob.type.startsWith('image/'))
+              setSignatures((m) => ({ ...m, [id]: URL.createObjectURL(blob) }))
+          })
+          .catch(() => loading.current.delete(id))
+      }
     }
   }, [fields, answers, signatures, loadFile])
   const urls = useRef(signatures)
@@ -407,7 +414,8 @@ export function useFormFiller({
       const info = await onUpload(f, file)
       const many = f.type === 'file' && f.multiple
       setFiles((list) => [...list.filter((x) => many || x.fieldKey !== f.key), info])
-      if (f.type === 'signature') setSignatures((m) => ({ ...m, [info.id]: URL.createObjectURL(file) }))
+      if (f.type === 'signature' || (f.photoRatio && file.type.startsWith('image/')))
+        setSignatures((m) => ({ ...m, [info.id]: URL.createObjectURL(file) }))
       change(f, many ? multiAnswer([...fileIds(latest.current[f.key]), info.id]) : info.id)
     } catch (err) {
       notifyError(err)
@@ -503,6 +511,9 @@ export function useFormFiller({
     downloadFile,
     /** Image src of a signature answer (stored file or data URL). */
     signatureSrc: (f: FieldDef) => signatures[String(answers[f.key])],
+    /** A file field with a photoRatio: its photos to preview (id and picture URL), as far as loaded. */
+    photosOf: (f: FieldDef) =>
+      f.type === 'file' && f.photoRatio ? fileIds(answers[f.key]).flatMap((id) => (signatures[id] ? [{ id, src: signatures[id] }] : [])) : [],
     /** Visible fields grouped as questions (tables, option groups), titled from the PDF text once loaded. */
     questions,
     /**

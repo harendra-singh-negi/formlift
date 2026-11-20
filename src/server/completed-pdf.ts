@@ -20,6 +20,7 @@ import {
   answerText,
   defaultLayout,
   fileIds,
+  ratioOf,
   fieldStates,
   type Answers,
   type AnswerValue,
@@ -242,6 +243,17 @@ async function pushDown(
       await draw(pages[sheets.indexOf(s)], f, v, { x, top: H - (s.at + start - s.from), w, h });
       continue;
     }
+    if (f.type === 'file') {
+      // Several files over rows (fileRows): each row drawn on the sheet it starts on.
+      for (const [n, row] of fit.lines.entries()) {
+        const at = start + n * h;
+        const k = sheetOf(at + 0.5, sheets);
+        const s = sheets[k];
+        const ids = JSON.parse(row) as string[];
+        await draw(pages[k], f, row, { x, top: H - (s.at + at - s.from), w: (w / (fit.perRow ?? 1)) * ids.length, h });
+      }
+      continue;
+    }
     const end = start + h + fit.extra;
     // The grown box cleared first: the form's own ruled / dotted lines would run through the text.
     sheets.forEach((s, k) => {
@@ -258,11 +270,6 @@ async function pushDown(
   doc.removePage(index);
 }
 
-/** "4:3" → 4/3; "fit" or anything else → null. */
-export function ratioOf(r: string) {
-  const m = /^(\d+(?:\.\d+)?)\s*[:x×/]\s*(\d+(?:\.\d+)?)$/.exec(r.trim());
-  return m && +m[1] > 0 && +m[2] > 0 ? +m[1] / +m[2] : null;
-}
 
 /**
  * An attached photo drawn in its box: a frame of `ratio` (width:height) as big as fits, centred, the photo filling
