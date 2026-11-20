@@ -257,11 +257,24 @@ function Block({ b, ...draw }: { b: FlowBlock } & Draw) {
   if (b.cells && b.line) {
     const parts = (c: FlowCell) => c.paras.flatMap((p) => p.parts)
     const fields = b.cells.some((c) => parts(c).some((x) => 'field' in x))
+    // A line with answer boxes (not only ticks, stars or switches): a card on a narrow screen (below).
+    const card = b.cells.some((c) => parts(c).some((x) => 'field' in x && !FIXED.includes(x.field.type)))
+    const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '')
+    const said = new Set(b.cells.flatMap((c) => parts(c).flatMap((x) => ('text' in x ? [norm(x.text)] : []))))
     // On a narrow screen a field takes the rest of its label's line (a wide one a line of its own), or goes under it.
     const growOf = (c: FlowCell) => {
       const f = parts(c).find((x) => 'field' in x)?.field
       return parts(c).some((x) => 'text' in x) || !f ? '' : isWide(f) ? 'basis-full' : FIXED.includes(f.type) ? '' : 'flex-[1_1_10em]'
     }
+    // On a narrow screen a line with fields is a card of its own: its text as the heading, then each field on a line
+    // of its own with its name over it (the column header it left), so it is clear what each box is and whose.
+    const named = (paras: FlowPara[]) =>
+      card
+        ? paras.map((p) => ({
+            ...p,
+            parts: p.parts.map((x) => ('field' in x && !said.has(norm(x.field.label)) ? { ...x, caption: true } : x)),
+          }))
+        : paras
     const cell = (c: FlowCell, i: number) => {
       const text = parts(c).some((x) => 'text' in x)
       const grow = growOf(c)
@@ -269,11 +282,11 @@ function Block({ b, ...draw }: { b: FlowBlock } & Draw) {
         <div
           key={i}
           // Text keeps its words whole, a field gives way when the line is short of room.
-          className={`max-w-full @min-[40rem]:ml-(--o) @min-[40rem]:w-(--w) @min-[40rem]:flex-initial ${text ? '' : 'min-w-0'} ${grow}`}
+          className={`max-w-full @min-[40rem]:ml-(--o) @min-[40rem]:w-(--w) @min-[40rem]:flex-initial ${text ? '' : 'min-w-0'} ${grow} ${card && !text ? '@max-[40rem]:basis-full' : ''} ${card && text ? '@max-[40rem]:font-semibold' : ''}`}
           style={{ '--w': `${c.width}%`, '--o': `${c.offset}%` } as CSSProperties}
         >
-          {c.paras.map((p, k) => (
-            <Para key={k} p={p} inCell fill={grow.startsWith('flex') ? 'always' : true} {...draw} />
+          {named(c.paras).map((p, k) => (
+            <Para key={k} p={p} inCell fill={grow.startsWith('flex') || (card && !text) ? 'always' : true} {...draw} />
           ))}
         </div>
       )
@@ -287,14 +300,14 @@ function Block({ b, ...draw }: { b: FlowBlock } & Draw) {
     })
     return (
       <div
-        className={`flex flex-wrap gap-x-2 gap-y-1 @min-[40rem]:flex-nowrap @min-[40rem]:gap-0 ${fields ? 'items-center' : 'items-baseline'} ${b.gap ? 'mt-3' : 'mt-0.5'}`}
+        className={`flex flex-wrap gap-x-2 gap-y-1 @min-[40rem]:flex-nowrap @min-[40rem]:gap-0 ${fields ? 'items-center' : 'items-baseline'} ${card ? '@max-[40rem]:my-2 @max-[40rem]:flex-col @max-[40rem]:items-stretch @max-[40rem]:gap-2 @max-[40rem]:rounded-md @max-[40rem]:border @max-[40rem]:border-line @max-[40rem]:bg-surface/40 @max-[40rem]:p-2.5' : ''} ${b.gap ? 'mt-3' : 'mt-0.5'}`}
       >
         {fields
           ? groups.map((g) => (
               // A line of its own when its field stretches; "Verified ☐  N/A ☐" stay side by side.
               <div
                 key={g[0].i}
-                className={`flex flex-wrap items-center gap-x-2 gap-y-1 @min-[40rem]:contents ${g.some(({ c }) => growOf(c)) ? 'w-full' : ''}`}
+                className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${card ? '@max-[40rem]:flex-col @max-[40rem]:items-stretch @max-[40rem]:gap-2' : ''} @min-[40rem]:contents ${g.some(({ c }) => growOf(c)) ? 'w-full' : ''}`}
               >
                 {g.map(({ c, i }) => cell(c, i))}
               </div>
