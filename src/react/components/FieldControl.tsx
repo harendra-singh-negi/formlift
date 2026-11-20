@@ -664,7 +664,7 @@ export default function FieldControl({
                       type="button"
                       aria-label={L.removeFile(nameOf(id))}
                       onClick={() => (field.multiple ? onRemoveFile?.(id) : onChange(null))}
-                      className="absolute -top-1.5 -right-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-danger/40 bg-white text-[11px] font-bold text-danger shadow hover:bg-danger hover:text-white"
+                      className="absolute -top-1.5 -right-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-danger/40 bg-white text-[11px] font-bold text-danger shadow hover:border-danger hover:bg-danger/5"
                     >
                       ✕
                     </button>
