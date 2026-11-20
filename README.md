@@ -349,6 +349,31 @@ still duplicates right under the field with the same label. In your own UI: `lab
 position)` gives the name for a spot (`nameAt(position, proposed, lines)` when you already read the page), and
 `useFormEditor` has `copySelected()` and `paste()`.
 
+### Field keys
+
+A field's key is the name its answer is stored under. It is made from the label (`Site Name` → `site_name_1`) and
+follows the label until you type your own in the **Key** box. A typed key stays when the label changes. It must start
+with a letter, use letters, digits or `_`, and be unique in the form: a key that is already used shows "This key
+already exists" right under the box and is not saved. Conditions and follow-ups that use a key follow it when it
+changes. In code: `keyProblem(key, id, fields)` says why a key cannot be used (`'empty' | 'invalid' | 'taken'`), or
+`null`.
+
+### Photos and attachments
+
+A file field takes any file. On a phone or tablet it offers two buttons: **Attach** (choose a file) and **Camera**
+(take a photo). Everywhere the file shows under its original name.
+
+In the editor, a file field's **Attachment** section has:
+
+- **Photo in the PDF**: a PNG or JPEG answer is also drawn in the field's box in the completed PDF, as a frame of
+  that width:height (`4:3`, `1:1`, `16:9`…, the photo cut to it from the middle) or **Whole photo** (its own shape).
+  Unset, the file is only attached. Other files are always only attached. Field setting: `photoRatio`.
+- **Name in the list view**: one line, cut short (default), or as many lines as the name needs. Field setting:
+  `listRows: 'single' | 'multiple'`.
+
+The list view's **Photos / attachments** filter (`attachmentFilter()`) shows the questions with a file attached or
+still missing one.
+
 ### Long answers grow their box
 
 Nothing to set up. While filling, a text area, checklist or text field whose answer does not fit grows: the box gets
@@ -980,7 +1005,7 @@ type FormDoc = { fields: FieldDef[]; layout: Layout | null }
 
 interface FieldDef {
   id: string
-  key: string // answer key: starts with a letter; letters, digits and _
+  key: string // answer key: starts with a letter; letters, digits and _; unique in the form
   type: 'text' | 'textarea' | 'number' | 'date' | 'time' | 'datetime' | 'email' | 'phone' | 'url'
       | 'currency' | 'dropdown' | 'radio' | 'multiselect' | 'checklist' | 'checkbox' | 'toggle'
       | 'rating' | 'slider' | 'file' | 'signature'
@@ -998,6 +1023,8 @@ interface FieldDef {
   maxLength?: number
   min?: number // number / currency / slider; multiselect / checklist: fewest choices
   max?: number // number / currency / slider; multiselect / checklist: most choices; rating: stars (default 5)
+  photoRatio?: string // file: draw a PNG / JPEG answer in the completed PDF at this width:height ('4:3'), or 'fit'
+  listRows?: 'single' | 'multiple' // file: the name on one line (default) or wrapped, in the list view
   step?: number // slider (default 1)
   currency?: string // currency: symbol before the amount (₹, $, €)
   decimals?: number // currency: digits after the point (default 2)
@@ -1126,6 +1153,8 @@ Check the first row:
 | Page breaks | – | When a grown page no longer fits, it breaks onto added pages of the same size, with a half-inch margin at the bottom of one and the top of the next, and never through a line of the answer. The filler shows the break live, as it will print. A completed PDF can now have more pages than the original. |
 | Repeatable table rows | – | New: fields with the same `repeat` form a table row people can add copies of ([Repeatable table rows](#repeatable-table-rows)). Forms without `repeat` work as before. |
 | Copy and paste fields | – | New in the editor: <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd>, the copy named after the PDF's text where it lands ([Copy and paste](#copy-and-paste-fields)). With `keyboard={false}` it is off, like the other shortcuts. |
+| Field keys can be typed | – | The editor's **Key** box is no longer read-only. A typed key must be unique and is kept when the label changes ([Field keys](#field-keys)). |
+| Photos and attachments | – | New: **Camera** on phones, a photo drawn in the PDF at a chosen ratio (`photoRatio`), the name's lines in the list view (`listRows`), and the **Photos / attachments** filter ([Photos and attachments](#photos-and-attachments)). |
 | Links on a grown page | – | A page of the completed PDF rebuilt for a long answer loses the original's links and file attachments on that page. Other pages keep them. |
 
 ### 0.5 → 0.6

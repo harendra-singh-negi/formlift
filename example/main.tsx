@@ -93,14 +93,16 @@ const HINTS: Record<Step, ReactNode> = {
       <b>Step 1 · Build.</b> Fields were suggested automatically (dashed). Click one to edit it, drag new fields
       from the left, try <b>Edit text</b> or <b>Preview</b>, then go to <b>Fill</b>. <b>Ctrl+C</b> a field and{' '}
       <b>Ctrl+V</b> it on another spot: it is named after the text there. Give a table row's fields a{' '}
-      <b>Repeatable row</b> and people can add rows. Auto-detect learns from what you <b>Save</b>: press{' '}
+      <b>Repeatable row</b> and people can add rows. A field's <b>Key</b> can be typed (it must be unique). A
+      file field chooses how a photo prints in the PDF (<b>4:3</b>, <b>1:1</b>…). Auto-detect learns from what you <b>Save</b>: press{' '}
       <b>Start over</b> and your changes come back.
     </>
   ),
   fill: (
     <>
       <b>Step 2 · Fill.</b> Answer on the page or switch to <b>List</b>. A long answer grows its box and moves the
-      page down; <b>+ Add row</b> adds a table row. Answers autosave, <b>Submit</b> checks the rules,{' '}
+      page down; <b>+ Add row</b> adds a table row. On a phone a file field offers <b>Camera</b>; the list's{' '}
+      <b>Photos / attachments</b> filter finds what is attached or still missing. Answers autosave, <b>Submit</b> checks the rules,{' '}
       <b>Completed PDF</b> downloads the PDF with your answers.
     </>
   ),
