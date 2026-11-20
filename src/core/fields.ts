@@ -28,6 +28,23 @@ export function uniqueKey(base: string, fields: FieldDef[]) {
   return `${base}_${i}`
 }
 
+/** The part of an automatic key before its number: "PERMIT NUMBER" → permit_number. */
+function keyBase(label: string, type: FieldType) {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40)
+  return /^[a-z]/.test(slug) ? slug : `${type}${slug ? '_' + slug : ''}`
+}
+
+/** Why `key` cannot be this field's key, or null: letters, digits, _ and -, not used by another field. */
+export function keyProblem(key: string, id: string, fields: { id: string; key: string }[]): 'empty' | 'invalid' | 'taken' | null {
+  if (!key) return 'empty'
+  if (!/^[A-Za-z0-9_-]+$/.test(key)) return 'invalid'
+  return fields.some((f) => f.id !== id && f.key === key) ? 'taken' : null
+}
+
 /** A field key from a label: "PERMIT NUMBER" → permit_number_1 (unique among `fields`). */
 export function keyFor(label: string, type: FieldType, fields: { key: string }[]) {
   return keyMaker(fields.map((f) => f.key))(label, type)
@@ -41,12 +58,7 @@ export function keyMaker(taken: string[]) {
   const used = new Set(taken)
   const from = new Map<string, number>() // base → the next number that may be free
   return (label: string, type: FieldType) => {
-    const slug = label
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '')
-      .slice(0, 40)
-    const base = /^[a-z]/.test(slug) ? slug : `${type}${slug ? '_' + slug : ''}`
+    const base = keyBase(label, type)
     let i = from.get(base) ?? 1
     while (used.has(`${base}_${i}`)) i++
     from.set(base, i + 1)
@@ -67,17 +79,18 @@ const renameIn = (c: Cond, from: string, to: string): Cond =>
   }
 
 /**
- * `fields` with `f` put in place of the field with its id. Keys are never typed: a new label gives a new key
- * (unique, from the label), and every condition that used the old key follows it.
+ * `fields` with `f` put in place of the field with its id. A typed key (unique) is kept; an automatic key
+ * (made from the label) follows a new label or type. Every condition that used the old key follows it.
  */
 export function withField(fields: FieldDef[], f: FieldDef): FieldDef[] {
   const old = fields.find((x) => x.id === f.id)
   if (!old) return fields
   const others = fields.filter((x) => x.id !== f.id)
-  const key =
-    old.label === f.label && old.type === f.type && !others.some((x) => x.key === f.key)
-      ? f.key
-      : keyFor(f.label, f.type, others)
+  const free = !others.some((x) => x.key === f.key)
+  const typed = f.key !== old.key
+  const automatic = old.key.replace(/_\d+$/, '') === keyBase(old.label, old.type)
+  const relabeled = old.label !== f.label || old.type !== f.type
+  const key = free && (typed || !relabeled || !automatic) ? f.key : keyFor(f.label, f.type, others)
   const next = { ...f, key }
   if (key === old.key) return fields.map((x) => (x.id === f.id ? next : x))
   const conds = ['visibleWhen', 'requiredWhen', 'readOnlyWhen'] as const
