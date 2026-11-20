@@ -52,10 +52,14 @@ export function textFit(text: string, w: number, h: number, widthOf: WidthOf, si
 /** A photo row's height: its cells are 4:3, so fewer photos in a row (wider cells) are bigger photos. */
 export const PHOTO_SHAPE = 0.75;
 
+/** A file's line in a file field's list (points; less in a lower box): its full name, like a link. */
+export const FILE_LINE = 14;
+
 /**
  * A file field with several files in a box `w` x `h`: perRowOf photos to a row, rows of 4:3 cells (PHOTO_SHAPE),
- * the photos first and the other files (`isPhoto` false) after them on rows `h` tall (names only: one per row,
- * `h` tall). `lines`: each row's ids as JSON; `heights`: each row's height; `extra`: how much the box grows.
+ * the photos first; then the other files (`isPhoto` false), a line each (FILE_LINE) with the full name. Names
+ * only (no photosPerRow): a line each too. `lines`: each row's ids as JSON; `heights`: each row's height; `extra`:
+ * how much the box grows.
  */
 export function fileRows(
   f: FieldDef,
@@ -69,13 +73,15 @@ export function fileRows(
   const photoH = (w / perRow) * PHOTO_SHAPE;
   const lines: string[] = [];
   const heights: number[] = [];
-  const groups = perRowOf(f) ? [all.filter(isPhoto), all.filter((id) => !isPhoto(id))] : [all];
-  groups.forEach((ids, g) => {
-    for (let i = 0; i < ids.length; i += perRow) {
-      lines.push(JSON.stringify(ids.slice(i, i + perRow)));
-      heights.push(perRowOf(f) && g === 0 ? photoH : h);
-    }
-  });
+  const photos = perRowOf(f) ? all.filter(isPhoto) : [];
+  for (let i = 0; i < photos.length; i += perRow) {
+    lines.push(JSON.stringify(photos.slice(i, i + perRow)));
+    heights.push(photoH);
+  }
+  for (const id of all.filter((id) => !photos.includes(id))) {
+    lines.push(JSON.stringify([id]));
+    heights.push(Math.min(h, FILE_LINE));
+  }
   const total = heights.reduce((a, b) => a + b, 0);
   return { size: h / 1.2, lines, heights, perRow, extra: Math.max(0, total - h) };
 }
@@ -291,8 +297,13 @@ export function pageGrowth(
     ends.push({ top: top(f), bottom: top(f) + f.position.height * height, extra: fit.extra });
   }
   // Text bands where the page's rows put them (a line in an added row is at its copies too: rare, left out).
-  const cuts = pageCuts(ends, text.map((l): TextBand => [toRows(l.y * height), toRows((l.y + l.height) * height)]));
-  const safe: number[] = [];
+  const bands = text.map((l): TextBand => [toRows(l.y * height), toRows((l.y + l.height) * height)]);
+  const cuts = pageCuts(ends, bands);
+  // A page break just above a line of the page's text, so the line goes to the next page whole.
+  const safe: number[] = bands.map(([a]) => movedDown(a - 1, cuts));
+  // …and never through one (a growing box's row gaps beside a line of text are not safe there).
+  const moved = bands.map(([a, z]) => [movedDown(a, cuts), movedDown(z, cuts)]);
+  const clear = (ys: number[]) => ys.filter((y) => !moved.some(([a, z]) => y > a + 0.5 && y < z - 0.5));
   for (const f of here) {
     const fit = boxes.get(f.key);
     if (!fit?.extra) continue;
@@ -307,5 +318,5 @@ export function pageGrowth(
   for (const r of rows)
     for (let j = -1; j <= r.copies; j++) safe.push(movedDown(toRows(r.at) + j * r.tile, cuts));
   const length = toRows(height + 1e-9);
-  return { boxes, cuts, rows, top, toRows, sheets: pageSheets(height, cuts, safe, BREAK_MARGIN, length) };
+  return { boxes, cuts, rows, top, toRows, sheets: pageSheets(height, cuts, clear(safe), BREAK_MARGIN, length) };
 }

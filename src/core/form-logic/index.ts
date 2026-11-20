@@ -91,6 +91,7 @@ export {
   textFit,
   fileRows,
   PHOTO_SHAPE,
+  FILE_LINE,
   textSize,
   pageCuts,
   cleanCut,

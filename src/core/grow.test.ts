@@ -22,7 +22,7 @@ test('several files grow their box a row at a time, as many per row as fit', () 
   expect(r.perRow).toBe(2)
   expect(r.lines.map((l) => JSON.parse(l))).toEqual([['a', 'b'], ['c', 'd'], ['e']])
   expect(r.extra).toBe(337.5 - 80)
-  expect(fileRows({ ...f, photosPerRow: undefined }, { p: v }, 300, 80).heights).toEqual([80, 80, 80, 80, 80]) // names: one per row
+  expect(fileRows({ ...f, photosPerRow: undefined }, { p: v }, 300, 80).heights).toEqual([14, 14, 14, 14, 14]) // names: a line each
   expect(fileRows(f, { p: v, p__per: '6' }, 300, 80).extra).toBe(0) // small photos: one row of 37.5
   const g = pageGrowth([f], { p: v }, 1, { width: 600, height: 800 }, () => 1)
   expect(g.boxes.get('p')?.extra).toBe(337.5 - 80)
@@ -38,16 +38,26 @@ test('cleanCut: a page grows from a line with no text beside the growing box', (
   expect(cleanCut(200, 190, [[100, 210]])).toBe(200) // no clean line: at the box's bottom, as before
 })
 
-test('fileRows: photos first, other files on rows of their own; the person\'s size wins', () => {
+test('fileRows: photos first, then a line per other file; the person\'s size wins', () => {
   const f = { id: 'p', key: 'p', type: 'file', label: 'P', source: 'manual', multiple: true, photosPerRow: 3, position: { page: 1, x: 0, y: 0, width: 1, height: 0.1 } } as FieldDef
   const v = JSON.stringify(['a', 'doc1', 'b', 'doc2', 'c', 'd'])
   const photo = (id: string) => !id.startsWith('doc')
   const r = fileRows(f, { p: v }, 300, 80, photo)
-  expect(r.lines.map((l) => JSON.parse(l))).toEqual([['a', 'b', 'c'], ['d'], ['doc1', 'doc2', '']].map((x) => x.filter(Boolean)))
-  expect(r.heights).toEqual([75, 75, 80]) // photo rows 100 x 75; the file row as tall as the box
+  expect(r.lines.map((l) => JSON.parse(l))).toEqual([['a', 'b', 'c'], ['d'], ['doc1'], ['doc2']])
+  expect(r.heights).toEqual([75, 75, 14, 14]) // photo rows 100 x 75; then a line per file, its full name
   const big = fileRows(f, { p: v, p__per: '1' }, 300, 80, photo)
   expect(big.lines).toHaveLength(6) // bigger photos: one a row …
   expect(big.heights[0]).toBe(225) // … each 300 x 225
   expect(perRowOf(f, { p__per: '9' })).toBe(6)
   expect(cleanAnswers([f], { p: v, p__per: '2', q__per: '2' })).toEqual({ p: v, p__per: '2' })
+})
+
+test('pageGrowth: with the page text known, a page break goes above a line, not through it', () => {
+  const f = { id: 't', key: 't', type: 'textarea', label: 'T', source: 'manual', position: { page: 1, x: 0.5, y: 0.5, width: 0.4, height: 0.05 } } as FieldDef
+  const long = Array.from({ length: 60 }, () => 'word').join('\n')
+  const line = { y: 0.6, height: 0.02 } // a line of text under the box
+  const g = pageGrowth([f], { t: long }, 1, { width: 600, height: 800 }, (t, n) => t.length * n * 0.5, () => true, [line])
+  const at = (line.y * 800) // where the line starts on the original page, before the push
+  const moved = at + g.cuts.reduce((s, [c, e]) => (c < at ? s + e : s), 0)
+  for (const s of g.sheets.slice(0, -1)) expect(s.to <= moved - 0.5 || s.to >= moved + line.height * 800).toBe(true)
 })

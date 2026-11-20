@@ -17,7 +17,6 @@ import {
   fileIds,
   perRowOf,
   isPhotoName,
-  PHOTO_SHAPE,
   fieldStates,
   type Answers,
   type AnswerValue,
@@ -26,7 +25,7 @@ import {
   type Layout,
   type LayoutElement,
 } from '../core/form-logic';
-import { movedDown, pageGrowth, sheetOf, sheetPieces, textSize, wrapText, type WidthOf } from '../core/form-logic/grow';
+import { fileRows, movedDown, pageGrowth, sheetOf, sheetPieces, textSize, wrapText, type WidthOf } from '../core/form-logic/grow';
 import { expandRows } from '../core/form-logic/rows';
 
 /** Options of completedPdf. */
@@ -281,17 +280,14 @@ async function pushDown(
 }
 
 
-/** A file that is not a photo, in its cell: a frame and its name over up to 3 lines (cut short after that). */
-function drawTile(page: PDFPage, { x, top, w, h }: { x: number; top: number; w: number; h: number }, name: string, font: PDFFont) {
-  const pad = Math.min(3, w / 20, h / 20);
-  page.drawRectangle({ x: x + pad, y: top - h + pad, width: w - 2 * pad, height: h - 2 * pad, borderColor: rgb(0.6, 0.7, 0.7), borderWidth: 0.5, color: rgb(0.96, 0.98, 0.98) });
-  const size = Math.max(4, Math.min(8, h / 5));
+/** A file in a file field's list: its full name on one line, like a link (smaller type when it is long). */
+function drawFileLine(page: PDFPage, { x, top, w, h }: { x: number; top: number; w: number; h: number }, name: string, font: PDFFont) {
   const text = printable(font, name);
-  let lines = wrapText(text.replace(/([._-])/g, '$1 '), w - 4 * pad - 2, size, (t, n) => font.widthOfTextAtSize(t, n)).map((l) => l.replace(/([._-]) /g, '$1'));
-  const most = Math.min(3, Math.max(1, Math.floor((h - 2 * pad) / (size * 1.2))));
-  if (lines.length > most) lines = [...lines.slice(0, most - 1), `${lines[most - 1].slice(0, -3)}...`];
-  const start = top - h / 2 + ((lines.length - 1) * size * 1.2) / 2 - size * 0.35;
-  lines.forEach((l, n) => page.drawText(l, { x: x + 2 * pad + 1, y: start - n * size * 1.2, size, font, color: rgb(0.075, 0.306, 0.29) }));
+  const size = Math.max(4, Math.min(9, h * 0.65, ((w - 4) / Math.max(1, font.widthOfTextAtSize(text, 9))) * 9));
+  const color = rgb(0.075, 0.306, 0.29);
+  const y = top - h / 2 - size * 0.35;
+  page.drawText(text, { x: x + 2, y, size, font, color });
+  page.drawLine({ start: { x: x + 2, y: y - 1 }, end: { x: x + 2 + Math.min(w - 4, font.widthOfTextAtSize(text, size)), y: y - 1 }, thickness: 0.4, color });
 }
 
 /** An attached photo, whole, as big as fits in its cell and centred. False when the file is not a PNG / JPEG. */
@@ -439,20 +435,31 @@ export async function completedPdf(
       page.drawImage(img, { x, y: top - h + (h - img.height * s) / 2, width: img.width * s, height: img.height * s });
       return;
     }
-    // Every file attached; with photosPerRow, the photos drawn side by side, each in a cell of w / photosPerRow.
     const ids = f.type === 'file' ? fileIds(v).filter((id) => files[id]) : [];
     const own = ids.map((id) => files[id]);
     const per = perRowOf(f, answers);
-    // A row of photos is 4:3 cells (fileRows); a lone row of them in a taller box keeps that height.
-    const rh = f.multiple && per && own.length && own.every((x) => isPhotoName(x.fileName)) ? Math.min(h, (w / per) * PHOTO_SHAPE) : h;
-    const cell = (i: number) => ({ x: x + (w / (per || own.length)) * i, top, w: w / (per || own.length), h: rh });
-    own.forEach((file, i) => embedFile(doc, page, cell(i), file, embedded, options.fileUrl?.(ids[i], file)));
-    if (own.length && per) {
-      // A photo where it is one (PNG / JPEG), else a tile with the file's name: every file has its cell.
-      for (const [i, file] of own.slice(0, per).entries())
-        if (!(await drawPhoto(doc, page, cell(i), file))) drawTile(page, cell(i), file.fileName, font);
+    if (f.type === 'file' && f.multiple) {
+      // Several files, laid out as fileRows does (rows of photos, then a line per file with its full name), from
+      // the top of this box (a grown box draws it row by row: `v` is then one row).
+      const photo = (id: string) => isPhotoName(files[id]?.fileName ?? '');
+      const rows = fileRows(f, { ...answers, [f.key]: JSON.stringify(ids) }, w, h, photo);
+      let at = top;
+      for (const [n, line] of rows.lines.entries()) {
+        const rh = rows.heights[n];
+        const row = JSON.parse(line) as string[];
+        const isPhotos = per > 0 && row.every(photo);
+        for (const [i, id] of row.entries()) {
+          const box = isPhotos ? { x: x + (w / per) * i, top: at, w: w / per, h: rh } : { x, top: at, w, h: rh };
+          embedFile(doc, page, box, files[id], embedded, options.fileUrl?.(id, files[id]));
+          if (!isPhotos || !(await drawPhoto(doc, page, box, files[id]))) drawFileLine(page, box, files[id].fileName, font);
+        }
+        at -= rh;
+      }
       return;
     }
+    const cell = (i: number) => ({ x: x + (w / (per || own.length)) * i, top, w: w / (per || own.length), h });
+    own.forEach((file, i) => embedFile(doc, page, cell(i), file, embedded, options.fileUrl?.(ids[i], file)));
+    if (own.length && per && (await drawPhoto(doc, page, cell(0), own[0]))) return;
     const text = f.type === 'checkbox' ? 'X' : f.type === 'file' ? own.map((x) => x.fileName).join(', ') : answerText(f, v);
     const multiline = f.type === 'textarea' || f.type === 'checklist';
     const size = textSize(h, !multiline);
