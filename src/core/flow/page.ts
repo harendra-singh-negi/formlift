@@ -4,7 +4,8 @@ import type { FieldDef, LayoutElement } from '../form-logic'
 import { lineCells, paragraphs } from './paragraphs'
 import { BLANK, BOX, isText, type Item, piecesOf, round, round4 } from './pieces'
 import { area, type Box, isInk, within } from './read'
-import type { FlowBlock, FlowCell, FlowRun, PageRead } from './types'
+import { partsOf } from './segments'
+import type { FlowBlock, FlowCell, FlowPara, FlowPart, FlowRun, PageRead } from './types'
 
 /**
  * One page of the form as blocks in reading order: the page read by readPage (none for a blank page), the fields
@@ -56,14 +57,16 @@ export function pageFlow(
       break
     }
 
-  const spots = fields.map((f) => boxOf(f.position))
+  // Copies of a repeatable row share their row's place: they are put in after, as more rows (below).
+  const placed = fields.filter((f) => !f.repeat?.row)
+  const spots = placed.map((f) => boxOf(f.position))
   for (const it of items) {
     if (!isText(it.part) || !spots.some((b) => it.x < b.x1 && it.x + it.w > b.x0 && it.top < b.y1 && it.base > b.y0))
       continue
     it.part.text = it.part.text.replace(BOX, '').replace(BLANK, ' ')
   }
   const kept = items.filter((i) => !isText(i.part) || i.part.text.trim())
-  fields.forEach((field, i) => {
+  placed.forEach((field, i) => {
     const b = spots[i]
     kept.push({
       part: { field, w: round((b.x1 - b.x0) / body), h: round((b.y1 - b.y0) / body) },
@@ -153,6 +156,37 @@ export function pageFlow(
     }
   }
   blocks.sort((a, b) => a.top - b.top)
+  // Added table rows (copies of a repeatable row) sit where their row is: the row's blocks again under it, once per
+  // copy, each with that copy's fields, so they read as more rows of the table.
+  const copies = fields.filter((f) => f.repeat?.row)
+  for (const id of new Set(copies.map((f) => f.repeat!.id))) {
+    const own = (b: Placed) => partsOf(b).some((p) => 'field' in p && p.field.repeat?.id === id && !p.field.repeat.row)
+    const first = blocks.findIndex(own)
+    if (first < 0) continue
+    let last = first
+    blocks.forEach((b, i) => own(b) && (last = i))
+    const n = Math.max(...copies.filter((f) => f.repeat!.id === id).map((f) => f.repeat!.row!))
+    const added: Placed[] = []
+    for (let k = 2; k <= n; k++)
+      for (const b of blocks.slice(first, last + 1)) {
+        const copy = (paras: FlowPara[]) =>
+          paras.map((p) => ({
+            ...p,
+            parts: p.parts.flatMap((x): FlowPart[] => {
+              if (!('field' in x) || x.field.repeat?.id !== id) return [x]
+              const f = copies.find((c) => c.id === `${x.field.id}__${k}`)
+              return f ? [{ ...x, field: f }] : []
+            }),
+          }))
+        added.push({
+          ...b,
+          gap: undefined,
+          ...(b.cells && { cells: b.cells.map((c) => ({ ...c, paras: copy(c.paras) })) }),
+          ...(b.paras && { paras: copy(b.paras) }),
+        } as Placed)
+      }
+    blocks.splice(last + 1, 0, ...added)
+  }
   return blocks.map(({ top, bot, ...b }, i) => ({
     ...b,
     y: round4(top / H),

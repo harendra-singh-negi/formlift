@@ -200,3 +200,31 @@ describe('flowSegments', () => {
     expect(flowText(segs[1].blocks)).toBe('Guidance\n')
   })
 })
+
+describe('added table rows', () => {
+  it('a repeatable row\'s copies come right under it, as more rows of the table, each with its own fields', () => {
+    const sheet = { page: 1, source: 1, width: 595, height: 842 }
+    const cell = (x0: number, x1: number, y0: number) => ({ x0, x1, y0, y1: y0 + 20 })
+    const read: PageRead = {
+      width: 595,
+      height: 842,
+      items: [],
+      boxes: [cell(50, 200, 100), cell(200, 400, 100), cell(50, 200, 120), cell(200, 400, 120), cell(50, 400, 140)],
+      images: [],
+    }
+    const at = (id: string, x: number): FieldDef => ({
+      id,
+      key: id,
+      type: 'text',
+      label: id,
+      source: 'manual',
+      repeat: { id: 'r' },
+      position: { page: 1, x: (x + 3) / 595, y: 123 / 842, width: 140 / 595, height: 14 / 842 },
+    })
+    const row = [at('a', 50), at('b', 200)]
+    const copy = (f: FieldDef, k: number): FieldDef => ({ ...f, id: `${f.id}__${k}`, key: `${f.key}__${k}`, repeat: { id: 'r', row: k } })
+    const blocks = pageFlow(read, sheet, [...row, ...row.map((f) => copy(f, 2)), ...row.map((f) => copy(f, 3))])
+    const ids = (b: FlowBlock) => b.cells!.map((c) => c.paras.flatMap((p) => p.parts.flatMap((x) => ('field' in x ? [x.field.id] : []))).join(','))
+    expect(blocks.map(ids)).toEqual([['', ''], ['a', 'b'], ['a__2', 'b__2'], ['a__3', 'b__3'], ['']])
+  })
+})

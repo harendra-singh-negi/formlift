@@ -202,8 +202,14 @@ function PdfPage({
     el.width = src.width
     el.height = Math.round(step * ((g?.sheets.length ?? 1) - 1) + src.height)
     const ctx = el.getContext('2d')
-    for (const p of sheetPieces(H, g?.cuts ?? [], g?.sheets ?? [{ from: 0, to: H, at: 0 }], g?.rows ?? []))
-      ctx?.drawImage(src, 0, p.from * k, src.width, (p.to - p.from) * k, 0, p.sheet * step + p.at * k, src.width, p.height * k)
+    // On whole device pixels: a slice taken or put at a fraction of one is resampled, and its 1 px rules come out
+    // 2 px wide and grey (an added table row looked bold).
+    for (const p of sheetPieces(H, g?.cuts ?? [], g?.sheets ?? [{ from: 0, to: H, at: 0 }], g?.rows ?? [])) {
+      const [sy, sz] = [Math.round(p.from * k), Math.round(p.to * k)]
+      const dy = Math.round(p.sheet * step + p.at * k)
+      const dh = p.height === p.to - p.from ? sz - sy : Math.round(p.height * k)
+      if (sz > sy && dh > 0) ctx?.drawImage(src, 0, sy, src.width, sz - sy, 0, dy, src.width, dh)
+    }
   }, [drawn, growKey, size.height, zoom])
 
   // The original's text lines, read once per page when asked for (Edit text).
