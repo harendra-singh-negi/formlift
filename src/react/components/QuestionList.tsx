@@ -252,9 +252,10 @@ export default function QuestionList({
       {!reading && page.length > 0 && (
         // The document on its paper: as wide as a page reads well, cells stacked on a narrow screen (@container).
         <ul className={`@container my-0 list-none rounded-md bg-white p-3 text-[14px] leading-snug text-ink shadow-[0_1px_6px_rgba(15,23,42,0.14)] sm:p-5 lg:text-[15px] ${paperClassName}`}>
-          {page.map((s) => (
+          {page.map((s, i) => (
             <li
-              key={`${s.blocks[0].page}:${s.blocks[0].y}`}
+              // Page and place, and its order: an added table row's stretch is at its row's place.
+              key={`${s.blocks[0].page}:${s.blocks[0].y}:${i}`}
               className={fs.active ? 'border-t-8 border-hover pt-3 not-first:mt-3 first:border-t-0 first:pt-0' : ''}
             >
               {s.blocks.map((b, j) => {
