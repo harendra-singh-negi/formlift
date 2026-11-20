@@ -97,7 +97,11 @@ Nothing is uploaded. Your PDF and answers stay in your browser. To run the demo 
 | 🟦 **TypeScript** | Written in TypeScript. Ships ESM, CommonJS and full type definitions. |
 
 <div align="center">
-<img src="./docs/filler.png" alt="formlift filler: answering fields on the original page" width="860" />
+<img src="./docs/builder.png" alt="formlift builder: field tools with search on the left, the PDF with its fields in the middle, the selected field's settings on the right" width="860" />
+<br /><sub>The builder: drag fields onto the PDF, set each one on the right.</sub>
+<br /><br />
+<img src="./docs/filler.png" alt="formlift filler: answering fields on the original page, photos and files attached in a file field" width="860" />
+<br /><sub>The filler: answer on the original page; photos show in their box, files as a list.</sub>
 </div>
 
 ## Packages
