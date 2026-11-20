@@ -23,6 +23,7 @@ export { toQuestions, choicesOf, pickedOf, isFilled } from './core/questions'
 export type { Question, PageText, ToQuestionsOptions } from './core/questions'
 export {
   answeredFilter,
+  attachmentFilter,
   builtinFilters,
   categoryFilter,
   choiceFilter,

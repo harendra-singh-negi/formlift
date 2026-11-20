@@ -1276,6 +1276,7 @@ to filter on?). Whether to show it is your call.
 |---|---|---|
 | `answeredFilter()` | `answered` | Answered / Not answered |
 | `partFilter({ id, title, match })` | yours | Written / Empty for parts whose name matches `match` (presets: `remarks` = `/remark/i`, `comments` = `/comment/i`) |
+| `attachmentFilter()` | `attachments` | Attached / Not attached for file fields and parts named photo, picture, image or attachment |
 | `choiceFilter()` / `pickedFilter()` | `choices` / `picked` | answer choices offered / ticked ("Yes", "NA"…) |
 | `categoryFilter()` | `category` | category codes read from the form (`Question.category`) |
 | `tagFilters()` / `tagFilter(key)` | `tag:<key>` | "Risk: H" style tags read from the form |
