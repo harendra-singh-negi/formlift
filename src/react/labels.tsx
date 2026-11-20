@@ -220,6 +220,9 @@ export const DEFAULT_LABELS = {
   listRows: 'Name in the list view',
   listRowsSingle: 'One line (cut short)',
   listRowsMultiple: 'As many lines as it needs',
+  filesAtOnce: 'Files people can attach',
+  oneFile: 'One file',
+  manyFiles: 'Several files',
   keyProblem: (why: 'empty' | 'invalid' | 'taken') =>
     ({
       empty: 'A key is needed',
@@ -330,6 +333,7 @@ export const DEFAULT_LABELS = {
   attach: 'Attach',
   replace: 'Replace',
   takePhoto: 'Camera',
+  removeFile: (name: string) => `Remove ${name}`,
   signatureArea: 'Signature drawing area',
   clear: 'Clear',
   useSignature: 'Use signature',

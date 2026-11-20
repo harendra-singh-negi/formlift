@@ -116,6 +116,8 @@ export interface FieldDef {
    * "1:1"; cropped to it from the middle) or "fit" (whole, its own shape). Unset: the file is only attached.
    */
   photoRatio?: string;
+  /** file: people may attach several files (the answer is a JSON list of file ids, like a multiselect's). */
+  multiple?: boolean;
   /** file: in the list view, the file's name over as many lines as it needs ('multiple') or cut to one (default). */
   listRows?: 'single' | 'multiple';
   /** People can leave comments on this field (a 💬 next to it). Stored apart from the answers: see Comments. */

@@ -3,6 +3,7 @@ import { Camera, Check, Paperclip, PenLine, Star } from 'lucide-react'
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import {
   answerText,
+  fileIds,
   multiAnswer,
   multiValue,
   rangeOf,
@@ -227,8 +228,13 @@ export interface FieldControlProps {
   readOnly?: boolean
   error?: string
   fileName?: string
+  /** A file field with `multiple`: its files (name per id). */
+  files?: { id: string; fileName: string }[]
   onFile?: (file: File) => void
-  onOpenFile?: () => void
+  /** Opens the file; with several, the one with this id. */
+  onOpenFile?: (id?: string) => void
+  /** A file field with `multiple`: takes this file off. */
+  onRemoveFile?: (id: string) => void
   /** Image of a stored signature (the answer is its file id); signatures from before are data URLs. */
   signatureSrc?: string
   /** Phone / touch: typed answers open in a full-size box (the page's boxes are too small to type in). */
@@ -246,8 +252,10 @@ export default function FieldControl({
   readOnly,
   error,
   fileName,
+  files,
   onFile,
   onOpenFile,
+  onRemoveFile,
   signatureSrc,
   compact,
 }: FieldControlProps) {
@@ -558,17 +566,44 @@ export default function FieldControl({
               type="file"
               hidden
               {...(i ? { accept: 'image/*', capture: 'environment' as const } : {})}
+              multiple={!i && field.multiple}
               onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) onFile?.(f)
+                for (const f of e.target.files ?? []) onFile?.(f)
                 e.target.value = ''
               }}
             />
           ))}
-          {value && (
+          {/* Several files: each name opens it, ✕ takes it off. */}
+          {field.multiple &&
+            fileIds(value).map((id) => {
+              const name = files?.find((x) => x.id === id)?.fileName
+              return (
+                <span key={id} className="inline-flex max-w-full min-w-0 items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => onOpenFile?.(id)}
+                    title={name}
+                    className="min-w-0 cursor-pointer truncate text-left text-[clamp(8px,50cqh,13px)] text-primary underline in-[.fl-wrap-name]:text-[13px] in-[.fl-wrap-name]:break-all in-[.fl-wrap-name]:whitespace-normal"
+                  >
+                    {name || L.attachedFile}
+                  </button>
+                  {!readOnly && onRemoveFile && (
+                    <button
+                      type="button"
+                      aria-label={L.removeFile(name || L.attachedFile)}
+                      onClick={() => onRemoveFile(id)}
+                      className="flex-none cursor-pointer text-[clamp(8px,50cqh,13px)] text-muted hover:text-danger"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </span>
+              )
+            })}
+          {!field.multiple && value && (
             <button
               type="button"
-              onClick={onOpenFile}
+              onClick={() => onOpenFile?.()}
               title={fileName}
               className="min-w-0 flex-1 cursor-pointer truncate text-left text-[clamp(8px,50cqh,13px)] text-primary underline in-[.fl-wrap-name]:py-1 in-[.fl-wrap-name]:text-[13px] in-[.fl-wrap-name]:break-all in-[.fl-wrap-name]:whitespace-normal"
             >
@@ -582,7 +617,7 @@ export default function FieldControl({
               onClick={() => fileInput.current?.click()}
               className="inline-flex flex-none cursor-pointer items-center gap-1 text-[clamp(8px,50cqh,13px)] text-primary"
             >
-              <Paperclip size={12} /> {value ? L.replace : L.attach}
+              <Paperclip size={12} /> {value && !field.multiple ? L.replace : L.attach}
             </button>
           )}
           {/* On a phone: pick a file (above) or take a photo with the camera. */}

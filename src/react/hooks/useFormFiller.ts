@@ -2,6 +2,8 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyAnswer,
+  fileIds,
+  multiAnswer,
   expandRows,
   removeRow,
   rowCount,
@@ -395,17 +397,26 @@ export function useFormFiller({
     setAllComments(next)
   }
 
-  /** Uploads a file / signature PNG through onUpload and makes it the field's answer. */
+  /**
+   * Uploads a file / signature PNG through onUpload and makes it the field's answer. A file field with `multiple`
+   * adds it to the ones it has.
+   */
   async function attach(f: FieldDef, file: File) {
     if (!onUpload) return
     try {
       const info = await onUpload(f, file)
-      setFiles((list) => [...list.filter((x) => x.fieldKey !== f.key), info])
+      const many = f.type === 'file' && f.multiple
+      setFiles((list) => [...list.filter((x) => many || x.fieldKey !== f.key), info])
       if (f.type === 'signature') setSignatures((m) => ({ ...m, [info.id]: URL.createObjectURL(file) }))
-      change(f, info.id)
+      change(f, many ? multiAnswer([...fileIds(latest.current[f.key]), info.id]) : info.id)
     } catch (err) {
       notifyError(err)
     }
+  }
+
+  /** Takes one file off a field with several (`multiple`). */
+  function removeFile(f: FieldDef, id: string) {
+    change(f, multiAnswer(fileIds(latest.current[f.key]).filter((x) => x !== id)))
   }
 
   const fetchFile = (id: string, then: (blob: Blob) => void) =>
@@ -480,9 +491,12 @@ export function useFormFiller({
     fileOf,
     /** Files of upload fields that are answers now. */
     attachments: files.filter((x) =>
-      fields.some((f) => f.type === 'file' && f.key === x.fieldKey && answers[f.key] === x.id),
+      fields.some((f) => f.type === 'file' && f.key === x.fieldKey && fileIds(answers[f.key]).includes(x.id)),
     ),
     attach,
+    removeFile,
+    /** The files of a file answer (several for a field with `multiple`), as far as they are known. */
+    filesOf: (v: AnswerValue | undefined) => fileIds(v).flatMap((id) => files.filter((x) => x.id === id)),
     canUpload: !!onUpload,
     canLoadFiles: !!loadFile,
     openFile,

@@ -230,9 +230,11 @@ export default function FormFiller({
         error={errors[f.key]}
         onChange={(v) => ff.change(f, v)}
         fileName={ff.fileOf(answers[f.key])?.fileName}
+        files={f.multiple ? ff.filesOf(answers[f.key]) : undefined}
+        onRemoveFile={(id) => ff.removeFile(f, id)}
         signatureSrc={ff.signatureSrc(f)}
         onFile={ff.canUpload ? (file) => void ff.attach(f, file) : undefined}
-        onOpenFile={() => ff.openFile(String(answers[f.key]))}
+        onOpenFile={(id) => ff.openFile(id ?? String(answers[f.key]))}
       />
       {states[f.key].required && !readOnly && shows('requiredMark') && (
         <span className="pointer-events-none absolute -top-1.5 -right-1.5 text-[12px] font-bold text-danger">*</span>

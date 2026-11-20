@@ -224,6 +224,12 @@ export default function FieldProperties({
 
       {field.type === 'file' && (
         <Section title={L.attachmentSection}>
+          <FormField label={L.filesAtOnce}>
+            <Select className="w-full" value={field.multiple ? 'many' : 'one'} onChange={(e) => set({ multiple: e.target.value === 'many' || undefined })}>
+              <option value="one">{L.oneFile}</option>
+              <option value="many">{L.manyFiles}</option>
+            </Select>
+          </FormField>
           <FormField label={L.photoInPdf}>
             <Select className="w-full" value={field.photoRatio ?? ''} onChange={(e) => set({ photoRatio: e.target.value || undefined })}>
               {['', 'fit', '1:1', '4:3', '3:4', '16:9', '9:16', '3:2'].map((r) => (

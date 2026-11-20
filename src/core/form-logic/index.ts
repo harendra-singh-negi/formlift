@@ -44,6 +44,7 @@ export {
 export {
   multiValue,
   multiAnswer,
+  fileIds,
   rangeOf,
   answerText,
 } from './values';
