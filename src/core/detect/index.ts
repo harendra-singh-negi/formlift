@@ -7,7 +7,8 @@
 //                what they do with boxes, by the boxes' cues (in any form)
 // Suggestions get source 'ai' and a confidence, so the editor shows them as dashed boxes for the admin to check.
 
-import type { FieldDef, Position } from '../form-logic'
+import type { FieldDef, Position, RowSerial } from '../form-logic'
+import { findSerial } from '../form-logic/serial'
 import { clashes } from '../coords'
 import { keyFor, keyMaker } from '../fields'
 import { toLines, type TextLine } from '../layout'
@@ -205,6 +206,16 @@ export async function labelAt(pdf: PdfDoc, OPS: Ops, source: number, n: number, 
   const lines = toLines(read.typed.items, page.view, undefined, read.drawn.vlines)
   const { found } = await proposed(page, read, lines, n, [], '')
   return nameAt(at, found.map((c) => c.field), lines)
+}
+
+/**
+ * The serial printed in a repeatable row ("10.", "(c)", "iv)") whose fields are at `row` on PDF page `source`, or
+ * null (none, or a scanned page with no text). The editor stores it on the row (RepeatRow.serial).
+ */
+export async function serialAt(pdf: PdfDoc, OPS: Ops, source: number, row: Position[]): Promise<RowSerial | null> {
+  const page = await pdf.getPage(source)
+  const read = await readDrawing(page, OPS)
+  return findSerial(row, toLines(read.typed.items, page.view, undefined, read.drawn.vlines))
 }
 
 /** labelAt for a page already read: its proposed boxes and its text lines. */

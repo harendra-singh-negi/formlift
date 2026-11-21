@@ -338,6 +338,17 @@ takes it out and moves the rows under it up (`removeRow(fields, answers, id, k)`
 The copied band is the row's fields plus 2 points under them (the row's bottom line), across the whole page width, so
 whatever else is in that band (an item name in the first column) is copied too.
 
+**Serial numbers.** When the row has a serial printed beside its fields (`10.`, `(c)`, `iv)`, `B:`), the added rows
+count on from it: 11., 12. · (d), (e) · v), vi) · C:, D:. The same style is used: numbers, a b c (then aa, ab), A B C,
+i ii iii, I II III, with the brackets and dot around the serial kept. The editor finds the serial when the row is
+made: the row's leftmost text that sits outside its fields. A lone `i`, `v` or `x` is read from the serial above it,
+so `h)` above makes `i)` a letter and `(iv)` above makes `(v)` roman. If the serial above does not come right before
+it (an amount, a Y / N column), it is not treated as a serial. *Repeatable row → Serial number* shows what was found and offers
+**Count on** (default), **Leave it blank** or **Keep it as printed**. In JSON it is `repeat.serial` (where it is on
+the page, `start`, `style`, `before`, `after`, `mode`); `null` means none was found. Scanned pages have no text, so
+nothing is found and the rows copy as printed. A form saved before this has no `serial`: open it in the editor once
+to look for one.
+
 ### Copy and paste fields
 
 Set up one field the way you want it (type, size, validation, settings), then reuse it:
@@ -1072,7 +1083,7 @@ interface FieldDef {
   followUp?: { when: Condition; title?: string; fields: string[] } // keys of dialogOnly fields
   dialogOnly?: boolean // asked in a dialog, no box on the page
   comments?: boolean // people can comment on it
-  repeat?: { id: string; max?: number } // a field of a repeatable table row (same id on the whole row)
+  repeat?: { id: string; max?: number; serial?: RowSerial | null } // a field of a repeatable table row (same id on the whole row); serial: its printed 10. / (c) / iv), counted on in added rows
 }
 
 type Comments = Record<string, { id: string; text: string; by?: string; at: string }[]> // by field key

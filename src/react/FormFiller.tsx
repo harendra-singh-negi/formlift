@@ -14,6 +14,8 @@ import {
   type FieldDef,
   type Layout,
   type WidthOf,
+  serialBoxes,
+  serialSpot,
 } from '../core/form-logic'
 import { BASE_SCALE, PAGE_GAP } from './constants'
 import { AnswerControl } from './components/FieldControl'
@@ -212,6 +214,7 @@ export default function FormFiller({
       ),
     [pageSizes, fields, answers, states, pageLines, ff.isPhoto],
   )
+  const serials = useMemo(() => serialBoxes(fields), [fields])
   const grows = growth.some((g) => g.cuts.length)
   useEffect(() => {
     if (grows) ff.loadPageText()
@@ -564,6 +567,25 @@ export default function FormFiller({
                       </div>
                     )
                   }),
+                // Added rows' serials (11., (d), v)) over the "10." copied with the row.
+                ...serials
+                  .filter((b) => b.page === page)
+                  .map((b) => (
+                    <div
+                      key={`serial-${b.id}-${b.k}`}
+                      aria-hidden
+                      className="pointer-events-none absolute overflow-visible bg-white whitespace-nowrap text-black"
+                      style={{
+                        left: `${b.serial.x * 100}%`,
+                        top: place(topOf(serialSpot(b))) * px,
+                        width: `${b.serial.width * 100}%`,
+                        height: b.serial.height * H * px,
+                        font: `${b.serial.size * px}px/${b.serial.height * H * px}px Helvetica, Arial, sans-serif`,
+                      }}
+                    >
+                      {b.text}
+                    </div>
+                  )),
                 ...(readOnly ? [] : rowButtons(page, H, topOf, place, px)),
               ]
             }}

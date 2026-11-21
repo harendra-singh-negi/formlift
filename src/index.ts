@@ -1,7 +1,7 @@
 // formlift core: the form model, validation, conditions, layout and PDF field auto-detection.
 // No UI and no runtime dependencies: the same checks run in the browser and on your server.
 export * from './core/form-logic'
-export { detectDocument, detectFields, extractShapes, labelAt, lessonFor, nameAt, type Ops, type Rect, type Seg, type Shapes } from './core/detect'
+export { detectDocument, detectFields, extractShapes, labelAt, lessonFor, nameAt, serialAt, type Ops, type Rect, type Seg, type Shapes } from './core/detect'
 export { addLesson, forgetting, learnt, taughtBy, validateLesson, whyLearnt, LEARNT, REMEMBERED } from './core/learn'
 export type {
   DrawnNote,

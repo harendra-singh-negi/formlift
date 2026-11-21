@@ -10,6 +10,7 @@ import {
   type FieldDef,
   type FieldGroup,
   type FieldType,
+  serialText,
 } from '../../core/form-logic'
 import { fitInPage } from '../../core/coords'
 import { keyProblem, newFollowUpField } from '../../core/fields'
@@ -561,11 +562,32 @@ function RowSection({
               value={r.max ?? ''}
               onChange={(e) => {
                 const max = num(e.target.value)
-                const next = { id: r.id, ...(max && max >= 1 ? { max: Math.floor(max) } : {}) }
+                const { max: _, ...rest } = r
+                const next = { ...rest, ...(max && max >= 1 ? { max: Math.floor(max) } : {}) }
                 onFieldsChange((l) => l.map((f) => (f.repeat?.id === r.id ? { ...f, repeat: next } : f)))
               }}
             />
           </FormField>
+          {r.serial === undefined ? (
+            <p className="m-0 text-[12px] text-muted">{L.rowSerialLooking}</p>
+          ) : r.serial === null ? (
+            <p className="m-0 text-[12px] text-muted">{L.rowSerialNone}</p>
+          ) : (
+            <FormField label={L.rowSerial(serialText(r.serial, 1))}>
+              <Select
+                className="w-full"
+                value={r.serial.mode ?? 'count'}
+                onChange={(e) => {
+                  const serial = { ...r.serial!, mode: e.target.value as 'count' | 'blank' | 'keep' }
+                  onFieldsChange((l) => l.map((f) => (f.repeat?.id === r.id ? { ...f, repeat: { ...f.repeat!, serial } } : f)))
+                }}
+              >
+                <option value="count">{L.rowSerialCount([2, 3, 4].map((k) => serialText(r.serial!, k)).join(', '))}</option>
+                <option value="blank">{L.rowSerialBlank}</option>
+                <option value="keep">{L.rowSerialKeep}</option>
+              </Select>
+            </FormField>
+          )}
         </>
       ) : (
         <p className="m-0 text-[12px] text-muted">{L.rowHelp}</p>

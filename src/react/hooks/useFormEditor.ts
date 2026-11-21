@@ -1,7 +1,7 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { fitInPage, moveBy, resizeBy, snap, toPage } from '../../core/coords'
-import { detectDocument, labelAt, lessonFor, type Ops } from '../../core/detect'
+import { detectDocument, labelAt, lessonFor, serialAt, type Ops } from '../../core/detect'
 import { duplicate, newField, newId, refreshed, reorder, withField, withoutField } from '../../core/fields'
 import { addLesson, forgetting, learnt, taughtBy, LEARNT, REMEMBERED, type Forget, type Lesson } from '../../core/learn'
 import { layerOpen } from '../ui/useOutsideClose'
@@ -204,6 +204,28 @@ export function useFormEditor({
   )
 
   const updateField = useCallback((f: FieldDef) => setFields((l) => withField(l, f)), [setFields])
+  // A repeatable row's printed serial ("10.", "(c)", "iv)"), looked for once per row (serial unset; null = none):
+  // the rows people add count on from it. Part of the change that made the row (no undo step of its own).
+  const lookingSerial = useRef(new Set<string>())
+  useEffect(() => {
+    if (!pdf || !layout) return
+    for (const f of fields) {
+      const id = f.repeat?.id
+      if (!id || f.repeat!.serial !== undefined || lookingSerial.current.has(id)) continue
+      lookingSerial.current.add(id)
+      const row = fields.filter((x) => x.repeat?.id === id && x.position.page === f.position.page)
+      const source = layout.pages[f.position.page - 1]?.source
+      void (source ? loadPdfJs().then((lib) => serialAt(pdf, lib.OPS as unknown as Ops, source, row.map((x) => x.position))) : Promise.resolve(null))
+        .catch(() => null)
+        .then((serial) =>
+          setFields(
+            (l) => l.map((x) => (x.repeat?.id === id && x.repeat.serial === undefined ? { ...x, repeat: { ...x.repeat, serial } } : x)),
+            false,
+          ),
+        )
+        .finally(() => lookingSerial.current.delete(id))
+    }
+  }, [fields, pdf, layout, setFields])
   // Text items grow to fit longer text, so nothing is cut off.
   const updateElement = useCallback(
     (e: LayoutElement) => {

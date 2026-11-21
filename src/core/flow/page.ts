@@ -1,6 +1,7 @@
 // pageFlow: one page as blocks in reading order (paragraphs, tables, pictures, fields where they sit).
 
 import type { FieldDef, LayoutElement } from '../form-logic'
+import { serialText } from '../form-logic/serial'
 import { lineCells, paragraphs } from './paragraphs'
 import { BLANK, BOX, isText, type Item, piecesOf, round, round4 } from './pieces'
 import { area, type Box, isInk, within } from './read'
@@ -166,6 +167,7 @@ export function pageFlow(
     let last = first
     blocks.forEach((b, i) => own(b) && (last = i))
     const n = Math.max(...copies.filter((f) => f.repeat!.id === id).map((f) => f.repeat!.row!))
+    const serial = copies.find((f) => f.repeat!.id === id)?.repeat?.serial
     const added: Placed[] = []
     for (let k = 2; k <= n; k++)
       for (const b of blocks.slice(first, last + 1)) {
@@ -173,6 +175,9 @@ export function pageFlow(
           paras.map((p) => ({
             ...p,
             parts: p.parts.flatMap((x): FlowPart[] => {
+              // The row's printed serial ("10."): this row's own (11.), or none when blanked.
+              if ('text' in x && serial && serial.mode !== 'keep' && x.text.trim() === serialText(serial, 1))
+                return serial.mode === 'blank' ? [] : [{ ...x, text: x.text.replace(x.text.trim(), serialText(serial, k)) }]
               if (!('field' in x) || x.field.repeat?.id !== id) return [x]
               const f = copies.find((c) => c.id === `${x.field.id}__${k}`)
               return f ? [{ ...x, field: f }] : []

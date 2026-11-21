@@ -27,6 +27,7 @@ import {
 } from '../core/form-logic';
 import { fileRows, movedDown, pageGrowth, sheetOf, sheetPieces, textSize, wrapText, type WidthOf } from '../core/form-logic/grow';
 import { expandRows } from '../core/form-logic/rows';
+import { serialBoxes, serialSpot } from '../core/form-logic/serial';
 
 /** Options of completedPdf. */
 export interface CompletedPdfOptions {
@@ -231,6 +232,7 @@ async function pushDown(
   items: { f: FieldDef; v: AnswerValue }[],
   draw: DrawAnswer,
   font: PDFFont,
+  serials: ReturnType<typeof serialBoxes> = [],
 ) {
   const old = doc.getPage(index);
   old.pushOperators(); // a blank page has no Contents, which embedPage refuses
@@ -241,6 +243,15 @@ async function pushDown(
   for (const p of sheetPieces(H, cuts, sheets, g.rows)) {
     const art = await doc.embedPage(old, { left: b.x, right: b.x + W, bottom: top - p.to, top: top - p.from });
     pages[p.sheet].drawPage(art, { x: 0, y: H - p.at - p.height, width: W, height: p.height });
+  }
+  // Added rows' serials: the copied "10." cleared, the row's own one (11., (d), v)) written there.
+  for (const b of serials) {
+    const s = b.serial;
+    const start = movedDown(g.top(serialSpot(b)), cuts);
+    const k = sheetOf(start + 0.5, sheets);
+    const y = H - (sheets[k].at + start - sheets[k].from);
+    pages[k].drawRectangle({ x: s.x * W - 0.5, y: y - s.height * H - 0.5, width: s.width * W + 1, height: s.height * H + 1, color: rgb(1, 1, 1) });
+    if (b.text) pages[k].drawText(printable(font, b.text), { x: s.x * W, y: y - s.size * 0.92, size: s.size, font });
   }
   for (const { f, v } of items) {
     const [x, w, h] = [f.position.x * W, f.position.width * W, f.position.height * H];
@@ -415,6 +426,7 @@ export async function completedPdf(
 
   const font = fonts.sans;
   const fields = expandRows(form, answers); // with the table rows the person added
+  const serials = serialBoxes(fields);
   const states = fieldStates(fields, answers);
   const embedded: Embedded[] = [];
   const widthOf: WidthOf = (t, n) => font.widthOfTextAtSize(printable(font, t), n);
@@ -483,7 +495,7 @@ export async function completedPdf(
     else await draw(pages[i], f, v, boxOn(pages[i], f.position));
   }
   for (let i = pages.length - 1; i >= 0; i--)
-    if (growth[i].cuts.length || growth[i].rows.length) await pushDown(doc, i, growth[i], late[i], draw, font);
+    if (growth[i].cuts.length || growth[i].rows.length) await pushDown(doc, i, growth[i], late[i], draw, font, serials.filter((b) => b.page === i + 1));
   // Answers asked in dialogs have no box on a page: they go on pages at the end, under the field that asked them.
   const name = (f: FieldDef) => `${f.label || f.key} (${T.page(f.position.page)})`;
   const answered = (f: FieldDef) => states[f.key]?.visible && answers[f.key] != null && answers[f.key] !== '';

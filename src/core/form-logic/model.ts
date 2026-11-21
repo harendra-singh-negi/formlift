@@ -138,6 +138,30 @@ export interface RepeatRow {
   max?: number;
   /** On a copy: which row it is (2, 3…). */
   row?: number;
+  /**
+   * The row's printed serial ("10.", "(c)", "iv)"): the editor finds it when the row is made. Added rows count on
+   * from it (11., 12…), or leave it blank, or keep it as printed (`mode`). null: none found. Unset: not looked yet.
+   */
+  serial?: RowSerial | null;
+}
+
+/** A repeatable row's printed serial: where it is on the page (fractions), and how it counts. */
+export interface RowSerial {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Its text size, points. */
+  size: number;
+  /** Its value: 10 for "10.", 3 for "(c)" and for "iii)". */
+  start: number;
+  /** 1, 2, 3 · a, b, c · A, B, C · i, ii, iii · I, II, III */
+  style: '1' | 'a' | 'A' | 'i' | 'I';
+  /** Text around the value: "(" and ")" for "(c)". */
+  before: string;
+  after: string;
+  /** Added rows: count on (default), blank, or the printed serial as it is. */
+  mode?: 'count' | 'blank' | 'keep';
 }
 
 export interface FieldGroup {

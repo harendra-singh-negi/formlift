@@ -10,6 +10,7 @@
 //   validate.ts    checking a form's fields before it is saved
 //   layout.ts      pages shown and what the admin drew on them
 //   rows.ts        repeatable table rows: the copies people add (expandRows)
+//   serial.ts      a repeatable row's printed serial (10. / c) / iv.), counted on in the added rows
 //   grow.ts        long text answers growing their box, pushing the page down (screen and PDF)
 
 export {
@@ -31,6 +32,7 @@ export {
   type AnswerValue,
   type Answers,
   type RepeatRow,
+  type RowSerial,
 } from './model';
 export {
   DEFAULT_LIMITS,
@@ -117,3 +119,4 @@ export {
   removeRow,
   repeatIds,
 } from './rows';
+export { serialText, parseSerial, findSerial, serialBoxes, serialSpot } from './serial';
