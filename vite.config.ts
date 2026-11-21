@@ -6,6 +6,7 @@ import { defineConfig, type Plugin } from 'vite'
 // The aliases let the demo import 'formlift/...' exactly like an app that installed the package.
 const at = (p: string) => fileURLToPath(new URL(p, import.meta.url))
 // Google Analytics only when GA_ID is set (CI reads it from a repo secret); local dev and forks send nothing.
+// cookie_domain 'none': host-only cookies. GA's 'auto' first tries "github.io", a public suffix the browser rejects.
 const GA_ID = process.env.GA_ID
 const analytics = (): Plugin => ({
   name: 'analytics',
@@ -13,7 +14,7 @@ const analytics = (): Plugin => ({
     GA_ID
       ? [
           { tag: 'script', attrs: { async: true, src: `https://www.googletagmanager.com/gtag/js?id=${GA_ID}` }, injectTo: 'head' },
-          { tag: 'script', children: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config',${JSON.stringify(GA_ID)})`, injectTo: 'head' },
+          { tag: 'script', children: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config',${JSON.stringify(GA_ID)},{cookie_domain:'none'})`, injectTo: 'head' },
         ]
       : [],
 })
